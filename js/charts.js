@@ -148,8 +148,8 @@ const Charts = (() => {
       return;
     }
 
-    // Build 20-quarter buckets
-    const BUCKETS = 20;
+    // Build 28-quarter buckets
+    const BUCKETS = 28;
     const buckets = Array(BUCKETS).fill(0);
     const bucketTranches = Array.from({ length: BUCKETS }, () => []);
 
