@@ -576,9 +576,9 @@ window.UI = (function() {
     GameState.meta.started        = true;
     GameState.meta.tutorialYear   = true;
 
-    GameState.company.sharePrice          = 20.00;
-    GameState.company.sharesOutstanding   = 50;
-    GameState.company.marketCap           = 1000;
+    GameState.company.sharePrice          = 10.00;
+    GameState.company.sharesOutstanding   = 10;
+    GameState.company.marketCap           = 100;
     GameState.company.dividendPerShare    = 0.10;
     GameState.company.dividendHistory     = [];
     GameState.company.dividendCutQuarters = 0;
