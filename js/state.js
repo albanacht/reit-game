@@ -43,36 +43,36 @@ const GameState = {
   // ----------------------------------------------------------
   // BALANCE SHEET (rebalanced starting position)
   // ----------------------------------------------------------
-balance: {
-  cash:         100,
-  totalAssets:  0,
-  totalDebt:    200,
-  totalEquity:  0,
-},
+  balance: {
+    cash:         50,     // modest cash reserve
+    totalAssets:  0,      // calculated on init
+    totalDebt:    70,     // two small tranches matching property values
+    totalEquity:  0,      // calculated on init
+  },
 
   // ----------------------------------------------------------
-  // DEBT TRANCHES (rebalanced — lower starting debt)
+  // DEBT TRANCHES
   // ----------------------------------------------------------
   debtTranches: [
-  {
-    id: "d001",
-    amount: 100,
-    rate: 5.0,
-    maturityQuarter: 2,
-    maturityYear: 4,
-    quartersUntilMaturity: 13,
-    label: "5.0% Sr Notes due Y4Q2",
-  },
-  {
-    id: "d002",
-    amount: 100,
-    rate: 5.5,
-    maturityQuarter: 4,
-    maturityYear: 6,
-    quartersUntilMaturity: 23,
-    label: "5.5% Sr Notes due Y6Q4",
-  },
-],
+    {
+      id:                   "d001",
+      amount:               35,
+      rate:                 5.0,
+      maturityQuarter:      2,
+      maturityYear:         4,
+      quartersUntilMaturity:13,
+      label:                "5.0% Sr Notes due Y4Q2",
+    },
+    {
+      id:                   "d002",
+      amount:               35,
+      rate:                 5.5,
+      maturityQuarter:      4,
+      maturityYear:         6,
+      quartersUntilMaturity:23,
+      label:                "5.5% Sr Notes due Y6Q4",
+    },
+  ],
 
   // ----------------------------------------------------------
   // CREDIT RATING
