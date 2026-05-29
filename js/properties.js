@@ -181,18 +181,45 @@ const Properties = (() => {
   // Player starts with one industrial and one multifamily
   // ----------------------------------------------------------
   function generateStartingPortfolio() {
-    const prop1 = generateProperty("industrial", "tier2", false);
-    prop1.purchasePrice = prop1.currentValue;
-    prop1.quarterOwned = 1;
-    prop1.askingPrice = null;
+  // Fixed Tier 1 properties so balance sheet starts healthy
+  var prop1 = {
+    id:            nextPropId(),
+    name:          "Metro Logistics Center",
+    sector:        "industrial",
+    location:      "tier1",
+    label:         "Urban Logistics Hub",
+    purchasePrice: 130,
+    currentValue:  130,
+    askingPrice:   null,
+    annualNOI:     5.85,   // 4.5% cap rate on $130M
+    occupancy:     0.95,
+    age:           6,
+    capexReserve:  0.8,
+    quarterOwned:  1,
+    encumbered:    false,
+    daysOnMarket:  null,
+  };
 
-    const prop2 = generateProperty("multifamily", "tier2", false);
-    prop2.purchasePrice = prop2.currentValue;
-    prop2.quarterOwned = 1;
-    prop2.askingPrice = null;
+  var prop2 = {
+    id:            nextPropId(),
+    name:          "Skyline Residences",
+    sector:        "multifamily",
+    location:      "tier1",
+    label:         "Urban Apartment Tower",
+    purchasePrice: 120,
+    currentValue:  120,
+    askingPrice:   null,
+    annualNOI:     6.0,    // 5.0% cap rate on $120M
+    occupancy:     0.93,
+    age:           8,
+    capexReserve:  1.0,
+    quarterOwned:  1,
+    encumbered:    false,
+    daysOnMarket:  null,
+  };
 
-    return [prop1, prop2];
-  }
+  return [prop1, prop2];
+}
 
   // ----------------------------------------------------------
   // RECALCULATE property market value from current cap rates
