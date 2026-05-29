@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>REIT Simulator</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div id="app">
+
+  <!-- ======================================================
+       START SCREEN
+  ====================================================== -->
+  <div id="start-overlay" class="hidden">
+    <div class="start-logo">REIT SIM</div>
+    <p class="start-subtitle">
+      You are the CEO of a publicly traded Real Estate Investment Trust.
+      Manage your portfolio, survive the board, and grow shareholder value.
+    </p>
+    <div class="start-rules">
+      <h3>How to Play</h3>
+      <ul>
+        <li>Press <strong>Advance Quarter</strong> to run each quarter</li>
+        <li>Buy and sell properties to build your portfolio</li>
+        <li>Issue and retire debt — watch your credit rating</li>
+        <li>Set dividends carefully — cutting them angers the board</li>
+        <li>Keep occupancy up, leverage down, FFO growing</li>
+        <li>Board pressure reaches 0/8 — you're fired</li>
+        <li>The world gets harder every year. Survive as long as you can.</li>
+      </ul>
+    </div>
+    <button id="btn-new-game-go" class="btn btn-primary btn-lg">
+      Start Game
+    </button>
+  </div>
+
+  <!-- ======================================================
+       GAME OVER SCREEN
+  ====================================================== -->
+  <div id="gameover-overlay" class="hidden">
+    <div class="gameover-title">YOU'RE FIRED</div>
+    <div class="gameover-subtitle" id="gameover-quarters"></div>
+    <div class="gameover-letter" id="gameover-reason"></div>
+    <div class="gameover-stats">
+      <div class="go-stat">
+        <div class="go-stat-label">FFO/Share</div>
+        <div class="go-stat-value" id="gameover-ffo">—</div>
+      </div>
+      <div class="go-stat">
+        <div class="go-stat-label">Occupancy</div>
+        <div class="go-stat-value" id="gameover-occ">—</div>
+      </div>
+      <div class="go-stat">
+        <div class="go-stat-label">Debt/Assets</div>
+        <div class="go-stat-value" id="gameover-d2a">—</div>
+      </div>
+      <div class="go-stat">
+        <div class="go-stat-label">Portfolio</div>
+        <div class="go-stat-value" id="gameover-props">—</div>
+      </div>
+    </div>
+    <button id="btn-new-game" class="btn btn-primary btn-lg">
+      Try Again
+    </button>
+  </div>
+
+  <!-- ======================================================
+       HEADER
+  ====================================================== -->
+  <div id="header">
+    <div class="header-top">
+      <span class="header-company" id="hdr-company">REIT Simulator</span>
+      <div class="header-stats">
+        <div class="hdr-stat">
+          <span class="hdr-stat-label">Period</span>
+          <span class="hdr-stat-value" id="hdr-period">—</span>
+        </div>
+        <div class="hdr-stat">
+          <span class="hdr-stat-label">Share Price</span>
+          <span class="hdr-stat-value text-blue" id="hdr-price">—</span>
+        </div>
+        <div class="hdr-stat">
+          <span class="hdr-stat-label">Market Cap</span>
+          <span class="hdr-stat-value" id="hdr-marketcap">—</span>
+        </div>
+        <div class="hdr-stat">
+          <span class="hdr-stat-label">Rating</span>
+          <span class="hdr-stat-value text-yellow" id="hdr-rating">—</span>
+        </div>
+        <div class="hdr-stat">
+          <span class="hdr-stat-label">Cycle</span>
+          <span class="hdr-stat-value" id="hdr-cycle">—</span>
+        </div>
+        <div class="hdr-stat">
+          <span class="hdr-stat-label">Base Rate</span>
+          <span class="hdr-stat-value" id="hdr-rate">—</span>
+        </div>
+        <div class="hdr-stat">
+          <span class="hdr-stat-label">Borrow At</span>
+          <span class="hdr-stat-value text-red" id="hdr-borrow">—</span>
+        </div>
+      </div>
+    </div>
+    <div class="board-pressure-wrap">
+      <span id="board-pressure-label">Board: NEUTRAL</span>
+      <div class="pressure-track">
+        <div id="board-pressure-bar" style="width:0%"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================
+       MAIN LAYOUT
+  ====================================================== -->
+  <div id="main">
+
+    <!-- ====================================================
+         LEFT SIDEBAR
+    ==================================================== -->
+    <div id="sidebar">
+
+      <!-- ADVANCE QUARTER BUTTON -->
+      <button id="btn-advance-quarter">
+        ▶ Advance Quarter
+      </button>
+
+      <!-- P&L PANEL -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Income Statement</span>
+          <span class="text-muted" style="font-size:11px">Quarterly $M</span>
+        </div>
+        <div class="panel-body">
+          <table class="pnl-table">
+            <tr>
+              <td>Gross Potential Rent</td>
+              <td id="pnl-gpr">—</td>
+            </tr>
+            <tr>
+              <td class="pnl-indent">Vacancy Loss</td>
+              <td id="pnl-vacancy" class="text-red">—</td>
+            </tr>
+            <tr>
+              <td class="pnl-indent">Operating Expenses</td>
+              <td id="pnl-opex" class="text-muted">—</td>
+            </tr>
+            <tr class="pnl-divider pnl-subtotal">
+              <td>Net Operating Income</td>
+              <td id="pnl-noi" class="text-teal">—</td>
+            </tr>
+            <tr>
+              <td class="pnl-indent">G&amp;A Expense</td>
+              <td id="pnl-ga" class="text-muted">—</td>
+            </tr>
+            <tr>
+              <td class="pnl-indent">Interest Expense</td>
+              <td id="pnl-interest" class="text-red">—</td>
+            </tr>
+            <tr>
+              <td class="pnl-indent">Depreciation</td>
+              <td id="pnl-depr" class="text-muted">—</td>
+            </tr>
+            <tr>
+              <td class="pnl-indent">Unusual Items</td>
+              <td id="pnl-unusual">—</td>
+            </tr>
+            <tr class="pnl-divider pnl-subtotal">
+              <td>Net Income (GAAP)</td>
+              <td id="pnl-netincome">—</td>
+            </tr>
+            <tr class="pnl-divider">
+              <td><strong>FFO</strong></td>
+              <td id="pnl-ffo" class="text-green"><strong>—</strong></td>
+            </tr>
+            <tr>
+              <td><strong>AFFO</strong></td>
+              <td id="pnl-affo" class="text-teal"><strong>—</strong></td>
+            </tr>
+            <tr class="pnl-divider">
+              <td class="pnl-indent">Dividends Paid</td>
+              <td id="pnl-divpaid" class="text-muted">—</td>
+            </tr>
+            <tr class="pnl-total">
+              <td>Retained Cash</td>
+              <td id="pnl-retained">—</td>
+            </tr>
+          </table>
+        </div>
+      </div>
+
+      <!-- BALANCE SHEET PANEL -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Balance Sheet</span>
+        </div>
+        <div class="panel-body">
+          <div class="bs-grid">
+            <div class="bs-item">
+              <span class="bs-label">Cash</span>
+              <span class="bs-value" id="bs-cash">—</span>
+            </div>
+            <div class="bs-item">
+              <span class="bs-label">Total Assets</span>
+              <span class="bs-value" id="bs-assets">—</span>
+            </div>
+            <div class="bs-item">
+              <span class="bs-label">Total Debt</span>
+              <span class="bs-value text-red" id="bs-debt">—</span>
+            </div>
+            <div class="bs-item">
+              <span class="bs-label">Total Equity</span>
+              <span class="bs-value text-green" id="bs-equity">—</span>
+            </div>
+            <div class="bs-item">
+              <span class="bs-label">Shares Out</span>
+              <span class="bs-value" id="bs-shares">—</span>
+            </div>
+            <div class="bs-item">
+              <span class="bs-label">Div/Share (Q)</span>
+              <span class="bs-value" id="bs-divps">—</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- KEY RATIOS PANEL -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Key Ratios</span>
+        </div>
+        <div class="panel-body">
+          <div class="ratios-grid">
+            <div class="ratio-row">
+              <span class="ratio-label">FFO/Share</span>
+              <span class="ratio-value" id="ratio-ffo-ps">—</span>
+            </div>
+            <div class="ratio-row">
+              <span class="ratio-label">AFFO/Share</span>
+              <span class="ratio-value" id="ratio-affo-ps">—</span>
+            </div>
+            <div class="ratio-row">
+              <span class="ratio-label">Div Coverage</span>
+              <span class="ratio-value" id="ratio-div-cov">—</span>
+            </div>
+            <div class="ratio-row">
+              <span class="ratio-label">Payout Ratio</span>
+              <span class="ratio-value" id="ratio-payout">—</span>
+            </div>
+            <div class="ratio-row">
+              <span class="ratio-label">Debt/Assets</span>
+              <span class="ratio-value" id="ratio-d2a">—</span>
+            </div>
+            <div class="ratio-row">
+              <span class="ratio-label">Debt/EBITDA</span>
+              <span class="ratio-value" id="ratio-d2e">—</span>
+            </div>
+            <div class="ratio-row">
+              <span class="ratio-label">Int. Coverage</span>
+              <span class="ratio-value" id="ratio-int-cov">—</span>
+            </div>
+            <div class="ratio-row">
+              <span class="ratio-label">Occupancy</span>
+              <span class="ratio-value" id="ratio-occ">—</span>
+            </div>
+            <div class="ratio-row">
+              <span class="ratio-label">NOI Margin</span>
+              <span class="ratio-value" id="ratio-noi-margin">—</span>
+            </div>
+            <div class="ratio-row">
+              <span class="ratio-label">Cap Rate</span>
+              <span class="ratio-value" id="ratio-cap-rate">—</span>
+            </div>
+            <div class="ratio-row">
+              <span class="ratio-label">NAV/Share</span>
+              <span class="ratio-value" id="ratio-nav">—</span>
+            </div>
+            <div class="ratio-row">
+              <span class="ratio-label">P/FFO</span>
+              <span class="ratio-value" id="ratio-pffo">—</span>
+            </div>
+            <div class="ratio-row">
+              <span class="ratio-label">P/AFFO</span>
+              <span class="ratio-value" id="ratio-paffo">—</span>
+            </div>
+            <div class="ratio-row">
+              <span class="ratio-label">Div Yield</span>
+              <span class="ratio-value" id="ratio-div-yield">—</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- end sidebar -->
+
+    <!-- ====================================================
+         RIGHT CONTENT AREA
+    ==================================================== -->
+    <div id="content">
+
+      <!-- EARNINGS REPORT -->
+      <div id="earnings-report" class="panel">
+        <div class="panel-header">
+          <span class="panel-title">CFO Earnings Report</span>
+        </div>
+        <div class="panel-body">
+          <p class="text-muted">Press <strong>Advance Quarter</strong> to begin your first quarter.</p>
+        </div>
+      </div>
+
+      <!-- TABBED SECTION: Properties / Debt / Capital Actions -->
+      <div class="section-tabs">
+        <div class="section-tab-bar">
+          <button class="section-tab-btn active" onclick="switchTab('tab-portfolio', this)">
+            Portfolio
+          </button>
+          <button class="section-tab-btn" onclick="switchTab('tab-market', this)">
+            Property Market
+          </button>
+          <button class="section-tab-btn" onclick="switchTab('tab-debt', this)">
+            Debt
+          </button>
+          <button class="section-tab-btn" onclick="switchTab('tab-capital', this)">
+            Capital Actions
+          </button>
+        </div>
+
+        <!-- PORTFOLIO TAB -->
+        <div id="tab-portfolio" class="section-tab-content active">
+          <div class="scroll-list" id="portfolio-list">
+            <p class="text-muted">Start a new game to see your portfolio.</p>
+          </div>
+        </div>
+
+        <!-- PROPERTY MARKET TAB -->
+        <div id="tab-market" class="section-tab-content">
+          <div class="scroll-list" id="market-list">
+            <p class="text-muted">Start a new game to see the property market.</p>
+          </div>
+        </div>
+
+        <!-- DEBT TAB -->
+        <div id="tab-debt" class="section-tab-content">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+            <span class="panel-title">Outstanding Debt</span>
+            <span id="debt-tranche-count" class="text-muted">0/10 tranches</span>
+          </div>
+          <div class="scroll-list" id="debt-tranches-list">
+            <p class="text-muted">No debt outstanding.</p>
+          </div>
+        </div>
+
+        <!-- CAPITAL ACTIONS TAB -->
+        <div id="tab-capital" class="section-tab-content">
+          <div class="actions-grid">
+
+            <!-- Issue Debt -->
+            <div class="action-group">
+              <div class="action-group-title">Issue Debt</div>
+              <div class="action-meta" id="action-borrow-rate">Current rate: —</div>
+              <div class="input-row" style="margin-bottom:6px;">
+                <input type="number" id="input-debt-amount" placeholder="Amount $M" min="1" step="5">
+              </div>
+              <div class="input-row">
+                <input type="number" id="input-debt-years" placeholder="Term (years)" min="1" max="30" step="1">
+                <button class="btn btn-primary btn-sm" id="btn-issue-debt">Issue</button>
+              </div>
+            </div>
+
+            <!-- Retire Debt -->
+            <div class="action-group">
+              <div class="action-group-title">Retire Debt Early</div>
+              <div class="action-meta">Select a tranche in the Debt tab and click Retire Early.</div>
+              <div class="action-meta text-muted">Prepayment penalty applies if &gt;4 quarters remain.</div>
+            </div>
+
+            <!-- Issue Equity -->
+            <div class="action-group">
+              <div class="action-group-title">Issue Equity</div>
+              <div class="action-meta" id="action-shares-out">Shares outstanding: —</div>
+              <div class="input-row">
+                <input type="number" id="input-equity-shares" placeholder="New shares (M)" min="0.1" step="0.5">
+                <button class="btn btn-primary btn-sm" id="btn-issue-equity">Issue</button>
+              </div>
+              <div class="action-meta text-muted" style="margin-top:5px;">Issued at 5% discount. Dilutive.</div>
+            </div>
+
+            <!-- Share Buyback -->
+            <div class="action-group">
+              <div class="action-group-title">Share Buyback</div>
+              <div class="action-meta" id="action-cash-avail">Cash available: —</div>
+              <div class="input-row">
+                <input type="number" id="input-buyback-shares" placeholder="Shares to buy (M)" min="0.1" step="0.5">
+                <button class="btn btn-primary btn-sm" id="btn-buyback">Buy Back</button>
+              </div>
+            </div>
+
+            <!-- Set Dividend -->
+            <div class="action-group" style="grid-column: span 2;">
+              <div class="action-group-title">Set Quarterly Dividend</div>
+              <div class="action-meta" id="action-div-current">Current: —</div>
+              <div class="input-row">
+                <input type="number" id="input-dividend" placeholder="New dividend per share ($)" min="0" step="0.01">
+                <button class="btn btn-primary btn-sm" id="btn-set-dividend">Set Dividend</button>
+              </div>
+              <div class="action-meta text-red" style="margin-top:6px;">
+                ⚠ Cutting the dividend causes significant share price drop and board pressure.
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+      </div><!-- end section-tabs -->
+
+      <!-- CHARTS GRID -->
+      <div class="charts-grid">
+
+        <div class="chart-wrap chart-wide">
+          <canvas id="chart-debt-maturity"></canvas>
+        </div>
+
+        <div class="chart-wrap">
+          <canvas id="chart-ffo-trend"></canvas>
+        </div>
+
+        <div class="chart-wrap">
+          <canvas id="chart-leverage"></canvas>
+        </div>
+
+        <div class="chart-wrap">
+          <canvas id="chart-noi"></canvas>
+        </div>
+
+        <div class="chart-wrap">
+          <canvas id="chart-portfolio"></canvas>
+        </div>
+
+        <div class="chart-wrap">
+          <canvas id="chart-share-price"></canvas>
+        </div>
+
+      </div><!-- end charts-grid -->
+
+    </div><!-- end content -->
+
+  </div><!-- end main -->
+
+</div><!-- end app -->
+
+<!-- ======================================================
+     MODAL
+====================================================== -->
+<div id="modal-overlay" class="hidden">
+  <div class="modal-box">
+    <div id="modal-title"></div>
+    <div id="modal-body"></div>
+    <div id="modal-actions"></div>
+  </div>
+</div>
+
+<!-- ======================================================
+     TOAST CONTAINER
+====================================================== -->
+<div id="toast-container"></div>
+
+<!-- ======================================================
+     SCRIPTS — order matters, state first, ui last
+====================================================== -->
+<script src="js/state.js"></script>
+<script src="js/market.js"></script>
+<script src="js/properties.js"></script>
+<script src="js/events.js"></script>
+<script src="js/financials.js"></script>
+<script src="js/board.js"></script>
+<script src="js/charts.js"></script>
+<script src="js/ui.js"></script>
+
+<!-- Tab switching -->
+<script>
+  function switchTab(tabId, btn) {
+    document.querySelectorAll(".section-tab-content").forEach(t => t.classList.remove("active"));
+    document.querySelectorAll(".section-tab-btn").forEach(b => b.classList.remove("active"));
+    document.getElementById(tabId).classList.add("active");
+    btn.classList.add("active");
+  }
+</script>
+
+</body>
+</html>
