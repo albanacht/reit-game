@@ -287,10 +287,10 @@ window.Market = (() => {
 
     // Reset cap rates to defaults
     GameState.market.capRates = {
-      office:      { tier1: 5.5, tier2: 6.5, suburban: 7.5 },
-      industrial:  { tier1: 4.5, tier2: 5.5, suburban: 6.5 },
-      multifamily: { tier1: 5.0, tier2: 6.0, suburban: 7.0 },
-      retail:      { tier1: 6.0, tier2: 7.0, suburban: 8.5 },
+      office:      { tier1: 6.1, tier2: 7.2, suburban: 8.3 },
+      industrial:  { tier1: 5.0, tier2: 6.1, suburban: 7.2 },
+      multifamily: { tier1: 5.5, tier2: 6.6, suburban: 7.7 },
+      retail:      { tier1: 6.6, tier2: 7.7, suburban: 9.4 },
     };
 
     GameState.credit.rating = "BBB";
