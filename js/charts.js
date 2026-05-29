@@ -10,7 +10,7 @@
 // - Uses vanilla Canvas API only, no external libraries needed
 // ============================================================
 
-const Charts = (() => {
+window.Charts = (() => {
 
   // ----------------------------------------------------------
   // DESIGN TOKENS
@@ -689,7 +689,6 @@ const Charts = (() => {
   }
 
   // Expose maturity bucket data for click detection
-  Charts._maturityBuckets = null;
 
   // ----------------------------------------------------------
   // PUBLIC API
