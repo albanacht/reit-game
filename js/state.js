@@ -46,7 +46,7 @@ window.GameState = {
   balance: {
     cash:         50,     // modest cash reserve
     totalAssets:  0,      // calculated on init
-    totalDebt:    50,     // two small tranches matching property values
+    totalDebt:    100,    // two tranches of $50M each
     totalEquity:  0,      // calculated on init
   },
 
@@ -56,7 +56,7 @@ window.GameState = {
   debtTranches: [
     {
       id:                   "d001",
-      amount:               25,
+      amount:               50,
       rate:                 5.0,
       maturityQuarter:      2,
       maturityYear:         4,
@@ -65,7 +65,7 @@ window.GameState = {
     },
     {
       id:                   "d002",
-      amount:               25,
+      amount:               50,
       rate:                 5.5,
       maturityQuarter:      4,
       maturityYear:         6,
