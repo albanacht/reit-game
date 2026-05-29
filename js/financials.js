@@ -472,6 +472,17 @@ window.Financials = (() => {
   // ----------------------------------------------------------
 
   // Issue new debt tranche
+  function getTermPremium(years) {
+    if (years <= 3)  return 0.00;
+    if (years <= 7)  return 0.25;
+    if (years <= 15) return 0.60;
+    return 1.00;
+  }
+
+  function getCurrentBorrowingRateForTerm(years) {
+    return fmt(Market.getCurrentBorrowingRate() + getTermPremium(years));
+  }
+
   function issueDebt(amount, years) {
     if (GameState.debtTranches.length >= 10) {
       return { success: false, message: "Maximum 10 debt tranches reached. Retire existing debt first." };
@@ -480,20 +491,26 @@ window.Financials = (() => {
       return { success: false, message: "Amount must be greater than zero." };
     }
 
-    const rate      = Market.getCurrentBorrowingRate();
-    const matYear   = GameState.meta.year + years;
-    const matQ      = GameState.meta.quarter;
-    const id        = "d" + Date.now();
-    const label     = `${rate}% Sr Notes due Y${matYear}Q${matQ}`;
+    // Cap per issuance at 20% of total assets
+    var maxIssuance = fmt(GameState.balance.totalAssets * 0.20);
+    if (amount > maxIssuance) {
+      return { success: false, message: "Maximum single issuance is $" + maxIssuance + "M (20% of total assets). Your current capacity: $" + maxIssuance + "M." };
+    }
+
+    var rate    = getCurrentBorrowingRateForTerm(years);
+    var matYear = GameState.meta.year + years;
+    var matQ    = GameState.meta.quarter;
+    var id      = "d" + Date.now();
+    var label   = rate + "% Sr Notes due Y" + matYear + "Q" + matQ;
 
     GameState.debtTranches.push({
-      id,
-      amount: fmt(amount),
-      rate,
-      maturityQuarter: matQ,
-      maturityYear:    matYear,
-      quartersUntilMaturity: years * 4,
-      label,
+      id:                   id,
+      amount:               fmt(amount),
+      rate:                 rate,
+      maturityQuarter:      matQ,
+      maturityYear:         matYear,
+      quartersUntilMaturity:years * 4,
+      label:                label,
     });
 
     GameState.balance.cash = fmt(GameState.balance.cash + amount);
@@ -734,6 +751,8 @@ window.Financials = (() => {
     buybackShares,
     setDividend,
     calcRatios,
+    getCurrentBorrowingRateForTerm,
+    getTermPremium,
   };
 
 })();
