@@ -183,8 +183,7 @@ input::placeholder { color:var(--text-muted); }
 .toast-info    { border-color:var(--blue);   color:var(--blue); }
 
 /* START SCREEN */
-#start-overlay { position:fixed; inset:0; background:var(--bg); z-index:500; display:flex; align-items:center; justify-content:center; overflow-y:auto; padding:20px; }
-#start-overlay.hidden { display:none; }
+#start-overlay { position:fixed; inset:0; background:var(--bg); z-index:9999; display:flex; align-items:center; justify-content:center; overflow-y:auto; padding:20px; }#start-overlay.hidden { display:none; }
 .start-inner { display:flex; flex-direction:column; align-items:center; gap:20px; max-width:960px; width:100%; }
 .start-logo { font-size:42px; font-weight:900; letter-spacing:-1px; background:linear-gradient(135deg,#3b82f6,#14b8a6); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
 .start-subtitle { color:var(--text-muted); font-size:15px; text-align:center; max-width:480px; }
