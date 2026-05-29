@@ -2,14 +2,8 @@
 // ui.js — Game interface, rendering, player actions
 // REIT Simulator Game
 // ============================================================
-// RULES FOR EDITING THIS FILE:
-// - This file only renders and handles user input
-// - It reads GameState but only writes through Financials/Properties
-// - Never put calculation logic here — that belongs in other files
-// - All DOM manipulation lives here and only here
-// ============================================================
 
-const UI = (() => {
+window.UI = (() => {
 
   // ----------------------------------------------------------
   // UTILITY
@@ -18,139 +12,91 @@ const UI = (() => {
     if (n === null || n === undefined || isNaN(n)) return "—";
     return Number(n).toFixed(decimals);
   }
-
-  function fmtM(n) {
-    return `$${fmt(n, 1)}M`;
-  }
-
-  function fmtPct(n) {
-    return `${fmt(n * 100, 1)}%`;
-  }
-
-  function fmtPS(n) {
-    return `$${fmt(n, 2)}`;
-  }
-
-  function colorClass(val, goodAbove, badBelow) {
-    if (val >= goodAbove) return "text-green";
-    if (val <= badBelow)  return "text-red";
-    return "text-yellow";
-  }
-
-  function el(id) {
-    return document.getElementById(id);
-  }
-
-  function setText(id, val) {
-    const e = el(id);
-    if (e) e.textContent = val;
-  }
-
-  function setHTML(id, val) {
-    const e = el(id);
-    if (e) e.innerHTML = val;
-  }
-
-  function setClass(id, cls) {
-    const e = el(id);
-    if (e) e.className = cls;
-  }
+  function fmtM(n)   { return `$${fmt(n, 1)}M`; }
+  function fmtPct(n) { return `${fmt(n * 100, 1)}%`; }
+  function fmtPS(n)  { return `$${fmt(n, 2)}`; }
+  function el(id)    { return document.getElementById(id); }
+  function setText(id, val) { const e = el(id); if (e) e.textContent = val; }
+  function setHTML(id, val) { const e = el(id); if (e) e.innerHTML = val; }
 
   // ----------------------------------------------------------
-  // MODAL SYSTEM
+  // MODAL
   // ----------------------------------------------------------
   function showModal(title, body, actions = []) {
     const overlay = el("modal-overlay");
-    const mtitle  = el("modal-title");
-    const mbody   = el("modal-body");
-    const macts   = el("modal-actions");
-
     if (!overlay) return;
-
-    mtitle.textContent = title;
-    mbody.innerHTML    = body.replace(/\n/g, "<br>");
-    macts.innerHTML    = "";
+    el("modal-title").textContent = title;
+    el("modal-body").innerHTML    = body.replace(/\n/g, "<br>");
+    el("modal-actions").innerHTML = "";
 
     actions.forEach(({ label, style, onClick }) => {
       const btn = document.createElement("button");
       btn.textContent = label;
       btn.className   = `btn ${style || "btn-secondary"}`;
       btn.onclick     = () => { onClick(); closeModal(); };
-      macts.appendChild(btn);
+      el("modal-actions").appendChild(btn);
     });
 
-    // Always add close button
     const closeBtn = document.createElement("button");
     closeBtn.textContent = "Close";
     closeBtn.className   = "btn btn-secondary";
     closeBtn.onclick     = closeModal;
-    macts.appendChild(closeBtn);
-
+    el("modal-actions").appendChild(closeBtn);
     overlay.classList.remove("hidden");
   }
 
   function closeModal() {
-    const overlay = el("modal-overlay");
-    if (overlay) overlay.classList.add("hidden");
+    const o = el("modal-overlay");
+    if (o) o.classList.add("hidden");
   }
 
   // ----------------------------------------------------------
-  // TOAST NOTIFICATIONS
+  // TOAST
   // ----------------------------------------------------------
   function showToast(message, type = "info") {
     const container = el("toast-container");
     if (!container) return;
-
     const toast = document.createElement("div");
-    toast.className = `toast toast-${type}`;
+    toast.className   = `toast toast-${type}`;
     toast.textContent = message;
     container.appendChild(toast);
-
     setTimeout(() => toast.classList.add("toast-visible"), 10);
-    setTimeout(() => {
-      toast.classList.remove("toast-visible");
-      setTimeout(() => toast.remove(), 400);
-    }, 3500);
+    setTimeout(() => { toast.classList.remove("toast-visible"); setTimeout(() => toast.remove(), 400); }, 3500);
   }
 
   // ----------------------------------------------------------
-  // HEADER — company name, period, share price
+  // HEADER
   // ----------------------------------------------------------
   function renderHeader() {
-    setText("hdr-company",    GameState.company.name);
-    setText("hdr-period",     GameState.currentPeriodLabel());
-    setText("hdr-price",      fmtPS(GameState.company.sharePrice));
-    setText("hdr-marketcap",  fmtM(GameState.company.marketCap));
-    setText("hdr-rating",     GameState.credit.rating);
-    setText("hdr-cycle",      GameState.market.cycle.charAt(0).toUpperCase() + GameState.market.cycle.slice(1));
-    setText("hdr-rate",       `${fmt(GameState.market.baseInterestRate, 2)}%`);
-    setText("hdr-borrow",     `${fmt(GameState.market.baseInterestRate + GameState.credit.spread, 2)}%`);
+    setText("hdr-company",   GameState.company.name);
+    setText("hdr-period",    GameState.currentPeriodLabel());
+    setText("hdr-price",     fmtPS(GameState.company.sharePrice));
+    setText("hdr-marketcap", fmtM(GameState.company.marketCap));
+    setText("hdr-rating",    GameState.credit.rating);
+    setText("hdr-cycle",     GameState.market.cycle.charAt(0).toUpperCase() + GameState.market.cycle.slice(1));
+    setText("hdr-rate",      `${fmt(GameState.market.baseInterestRate, 2)}%`);
+    setText("hdr-borrow",    `${fmt(GameState.market.baseInterestRate + GameState.credit.spread, 2)}%`);
 
-    // Board pressure bar
-    const pct  = GameState.board.pressurePoints / GameState.board.maxPressure;
-    const bar  = el("board-pressure-bar");
-    const lbl  = el("board-pressure-label");
+    const pct = GameState.board.pressurePoints / GameState.board.maxPressure;
+    const bar = el("board-pressure-bar");
+    const lbl = el("board-pressure-label");
     if (bar) {
-      bar.style.width = `${Math.min(100, pct * 100)}%`;
-      bar.style.background = pct > 0.75 ? "#ef4444"
-                           : pct > 0.50 ? "#f59e0b"
-                           : "#22c55e";
+      bar.style.width      = `${Math.min(100, pct * 100)}%`;
+      bar.style.background = pct > 0.75 ? "#ef4444" : pct > 0.50 ? "#f59e0b" : "#22c55e";
     }
     if (lbl) {
-      lbl.textContent =
-        `Board: ${GameState.board.mood.toUpperCase()} — ` +
-        `${GameState.board.pressurePoints}/${GameState.board.maxPressure} pressure points`;
+      const tutorialTag = GameState.meta.tutorialYear ? " [ORIENTATION YEAR — Safe]" : "";
+      lbl.textContent = `Board: ${GameState.board.mood.toUpperCase()}${tutorialTag} — ${GameState.board.pressurePoints}/${GameState.board.maxPressure} pressure points`;
     }
   }
 
   // ----------------------------------------------------------
-  // P&L PANEL
+  // P&L
   // ----------------------------------------------------------
   function renderPnL() {
     const p = GameState.pnl;
     setText("pnl-gpr",      fmtM(p.grossPotentialRent));
     setText("pnl-vacancy",  `(${fmtM(p.vacancyLoss)})`);
-    setText("pnl-revenue",  fmtM(p.netRentalRevenue));
     setText("pnl-opex",     `(${fmtM(p.operatingExpenses)})`);
     setText("pnl-noi",      fmtM(p.noi));
     setText("pnl-ga",       `(${fmtM(p.gAndA)})`);
@@ -163,51 +109,43 @@ const UI = (() => {
     setText("pnl-divpaid",  `(${fmtM(p.dividendsPaid)})`);
     setText("pnl-retained", fmtM(p.retainedCash));
 
-    // Color retained cash
     const retEl = el("pnl-retained");
-    if (retEl) {
-      retEl.className = p.retainedCash >= 0 ? "text-green" : "text-red";
-    }
+    if (retEl) retEl.className = p.retainedCash >= 0 ? "text-green" : "text-red";
     const niEl = el("pnl-netincome");
-    if (niEl) {
-      niEl.className = p.netIncome >= 0 ? "text-green" : "text-yellow";
-    }
+    if (niEl)  niEl.className  = p.netIncome >= 0 ? "text-green" : "text-yellow";
   }
 
   // ----------------------------------------------------------
-  // RATIOS PANEL
+  // RATIOS
   // ----------------------------------------------------------
   function renderRatios() {
     const r = GameState.ratios;
     const rows = [
-      { id: "ratio-ffo-ps",     val: fmtPS(r.ffoPerShare),                label: "FFO/Share" },
-      { id: "ratio-affo-ps",    val: fmtPS(r.affoPerShare),               label: "AFFO/Share" },
-      { id: "ratio-div-cov",    val: `${fmt(r.dividendCoverage, 2)}x`,    good: r.dividendCoverage >= 1.2, bad: r.dividendCoverage < 1.0 },
-      { id: "ratio-payout",     val: fmtPct(r.payoutRatio),               good: r.payoutRatio < 0.85, bad: r.payoutRatio > 1.0 },
-      { id: "ratio-d2a",        val: fmtPct(r.debtToAssets),              good: r.debtToAssets < 0.40, bad: r.debtToAssets > 0.60 },
-      { id: "ratio-d2e",        val: `${fmt(r.debtToEbitda, 1)}x`,        good: r.debtToEbitda < 5, bad: r.debtToEbitda > 8 },
-      { id: "ratio-int-cov",    val: `${fmt(r.interestCoverage, 1)}x`,    good: r.interestCoverage >= 2.5, bad: r.interestCoverage < 1.5 },
-      { id: "ratio-occ",        val: fmtPct(r.occupancyPortfolio),        good: r.occupancyPortfolio >= 0.92, bad: r.occupancyPortfolio < 0.80 },
-      { id: "ratio-noi-margin", val: fmtPct(r.noiMargin),                 good: r.noiMargin >= 0.45, bad: r.noiMargin < 0.30 },
-      { id: "ratio-cap-rate",   val: `${fmt(r.impliedCapRate, 2)}%`,      label: "Implied Cap Rate" },
-      { id: "ratio-nav",        val: fmtPS(r.navPerShare),                label: "NAV/Share" },
-      { id: "ratio-pffo",       val: `${fmt(r.pToFFO, 1)}x`,             label: "P/FFO" },
-      { id: "ratio-paffo",      val: `${fmt(r.pToAFFO, 1)}x`,            label: "P/AFFO" },
-      { id: "ratio-div-yield",  val: `${fmt(r.dividendYield, 2)}%`,       good: r.dividendYield > 4, bad: r.dividendYield < 2 },
+      { id: "ratio-ffo-ps",     val: fmtPS(r.ffoPerShare) },
+      { id: "ratio-affo-ps",    val: fmtPS(r.affoPerShare) },
+      { id: "ratio-div-cov",    val: `${fmt(r.dividendCoverage, 2)}x`,  good: r.dividendCoverage >= 1.2, bad: r.dividendCoverage < 1.0 },
+      { id: "ratio-payout",     val: fmtPct(r.payoutRatio),             good: r.payoutRatio < 0.85,      bad: r.payoutRatio > 1.0 },
+      { id: "ratio-d2a",        val: fmtPct(r.debtToAssets),            good: r.debtToAssets < 0.40,     bad: r.debtToAssets > 0.60 },
+      { id: "ratio-d2e",        val: `${fmt(r.debtToEbitda, 1)}x`,      good: r.debtToEbitda < 5,        bad: r.debtToEbitda > 8 },
+      { id: "ratio-int-cov",    val: `${fmt(r.interestCoverage, 1)}x`,  good: r.interestCoverage >= 2.5, bad: r.interestCoverage < 1.5 },
+      { id: "ratio-occ",        val: fmtPct(r.occupancyPortfolio),      good: r.occupancyPortfolio >= 0.92, bad: r.occupancyPortfolio < 0.80 },
+      { id: "ratio-noi-margin", val: fmtPct(r.noiMargin),               good: r.noiMargin >= 0.45,       bad: r.noiMargin < 0.30 },
+      { id: "ratio-cap-rate",   val: `${fmt(r.impliedCapRate, 2)}%` },
+      { id: "ratio-nav",        val: fmtPS(r.navPerShare) },
+      { id: "ratio-pffo",       val: `${fmt(r.pToFFO, 1)}x` },
+      { id: "ratio-paffo",      val: `${fmt(r.pToAFFO, 1)}x` },
+      { id: "ratio-div-yield",  val: `${fmt(r.dividendYield, 2)}%`,     good: r.dividendYield > 4, bad: r.dividendYield < 2 },
     ];
-
     rows.forEach(({ id, val, good, bad }) => {
       const e = el(id);
       if (!e) return;
       e.textContent = val;
-      if (good !== undefined) {
-        e.className = good ? "text-green" : bad ? "text-red" : "text-yellow";
-      }
+      if (good !== undefined) e.className = good ? "text-green" : bad ? "text-red" : "text-yellow";
     });
   }
 
   // ----------------------------------------------------------
-  // BALANCE SHEET PANEL
+  // BALANCE SHEET
   // ----------------------------------------------------------
   function renderBalanceSheet() {
     const b = GameState.balance;
@@ -217,8 +155,6 @@ const UI = (() => {
     setText("bs-equity", fmtM(b.totalEquity));
     setText("bs-shares", `${fmt(GameState.company.sharesOutstanding, 1)}M`);
     setText("bs-divps",  fmtPS(GameState.company.dividendPerShare));
-    setText("bs-annual-div", fmtPS(GameState.company.dividendPerShare * 4));
-
     const cashEl = el("bs-cash");
     if (cashEl) cashEl.className = b.cash < 10 ? "text-red" : b.cash < 25 ? "text-yellow" : "text-green";
   }
@@ -229,31 +165,22 @@ const UI = (() => {
   function renderDebtPanel() {
     const container = el("debt-tranches-list");
     if (!container) return;
-
     if (GameState.debtTranches.length === 0) {
-      container.innerHTML = `<p class="text-muted">No debt outstanding. Debt-free REIT!</p>`;
-      return;
+      container.innerHTML = `<p class="text-muted">No debt outstanding.</p>`; return;
     }
-
     container.innerHTML = GameState.debtTranches.map(t => {
-      const urgency = t.quartersUntilMaturity <= 3  ? "tranche-red"
-                    : t.quartersUntilMaturity <= 7  ? "tranche-yellow"
-                    : "tranche-green";
-      return `
-        <div class="tranche-row ${urgency}">
-          <div class="tranche-info">
-            <span class="tranche-label">${t.label}</span>
-            <span class="tranche-meta">${t.quartersUntilMaturity}q remaining · ${t.rate}% · $${fmt(t.amount, 1)}M</span>
-          </div>
-          <div class="tranche-actions">
-            <button class="btn btn-sm btn-danger" onclick="UI.confirmRetireDebt('${t.id}')">
-              Retire Early
-            </button>
-          </div>
-        </div>`;
+      const urgency = t.quartersUntilMaturity <= 3 ? "tranche-red"
+                    : t.quartersUntilMaturity <= 7 ? "tranche-yellow" : "tranche-green";
+      return `<div class="tranche-row ${urgency}">
+        <div class="tranche-info">
+          <span class="tranche-label">${t.label}</span>
+          <span class="tranche-meta">${t.quartersUntilMaturity}q remaining · ${t.rate}% · $${fmt(t.amount, 1)}M</span>
+        </div>
+        <div class="tranche-actions">
+          <button class="btn btn-sm btn-danger" onclick="UI.confirmRetireDebt('${t.id}')">Retire Early</button>
+        </div>
+      </div>`;
     }).join("");
-
-    // Tranche count warning
     const countEl = el("debt-tranche-count");
     if (countEl) {
       const count = GameState.debtTranches.length;
@@ -263,137 +190,257 @@ const UI = (() => {
   }
 
   // ----------------------------------------------------------
-  // PORTFOLIO PANEL
+  // PORTFOLIO
   // ----------------------------------------------------------
   function renderPortfolio() {
     const container = el("portfolio-list");
     if (!container) return;
-
     if (GameState.portfolio.length === 0) {
-      container.innerHTML = `<p class="text-muted">No properties owned. Buy from the market.</p>`;
-      return;
+      container.innerHTML = `<p class="text-muted">No properties owned. Buy from the market.</p>`; return;
     }
-
     container.innerHTML = GameState.portfolio.map(p => {
-      const occColor = p.occupancy >= 0.90 ? "text-green"
-                     : p.occupancy >= 0.80 ? "text-yellow"
-                     : "text-red";
-      const gainLoss = p.purchasePrice
-        ? fmt(p.currentValue - p.purchasePrice, 1)
-        : 0;
+      const occColor = p.occupancy >= 0.90 ? "text-green" : p.occupancy >= 0.80 ? "text-yellow" : "text-red";
+      const gainLoss = p.purchasePrice ? fmt(p.currentValue - p.purchasePrice, 1) : 0;
       const glColor  = gainLoss >= 0 ? "text-green" : "text-red";
-
-      return `
-        <div class="property-card">
-          <div class="prop-header">
-            <span class="prop-name">${p.name}</span>
-            <span class="prop-tag tag-${p.sector}">${p.sector} · ${p.location}</span>
-          </div>
-          <div class="prop-stats">
-            <span>Value: <strong>${fmtM(p.currentValue)}</strong></span>
-            <span>NOI: <strong>${fmtM(p.annualNOI)}/yr</strong></span>
-            <span>Occ: <strong class="${occColor}">${fmtPct(p.occupancy)}</strong></span>
-            <span>G/L: <strong class="${glColor}">${gainLoss >= 0 ? "+" : ""}${gainLoss}M</strong></span>
-          </div>
-          <div class="prop-actions">
-            <button class="btn btn-sm btn-danger" onclick="UI.confirmSellProperty('${p.id}')">
-              Sell
-            </button>
-          </div>
-        </div>`;
+      return `<div class="property-card">
+        <div class="prop-header">
+          <span class="prop-name">${p.name}</span>
+          <span class="prop-tag tag-${p.sector}">${p.sector} · ${p.location}</span>
+        </div>
+        <div class="prop-stats">
+          <span>Value: <strong>${fmtM(p.currentValue)}</strong></span>
+          <span>NOI: <strong>${fmtM(p.annualNOI)}/yr</strong></span>
+          <span>Occ: <strong class="${occColor}">${fmtPct(p.occupancy)}</strong></span>
+          <span>G/L: <strong class="${glColor}">${gainLoss >= 0 ? "+" : ""}${gainLoss}M</strong></span>
+        </div>
+        <div class="prop-actions">
+          <button class="btn btn-sm btn-danger" onclick="UI.confirmSellProperty('${p.id}')">Sell</button>
+        </div>
+      </div>`;
     }).join("");
   }
 
   // ----------------------------------------------------------
-  // PROPERTY MARKET PANEL
+  // PROPERTY MARKET
   // ----------------------------------------------------------
   function renderPropertyMarket() {
     const container = el("market-list");
     if (!container) return;
-
     container.innerHTML = GameState.propertyMarket.map(p => {
-      const capRate = GameState.market.capRates[p.sector][p.location];
+      const capRate   = GameState.market.capRates[p.sector][p.location];
       const canAfford = GameState.balance.cash >= p.askingPrice;
-
-      return `
-        <div class="property-card ${canAfford ? "" : "prop-unaffordable"}">
-          <div class="prop-header">
-            <span class="prop-name">${p.name}</span>
-            <span class="prop-tag tag-${p.sector}">${p.sector} · ${p.location}</span>
-          </div>
-          <div class="prop-stats">
-            <span>Ask: <strong>${fmtM(p.askingPrice)}</strong></span>
-            <span>NOI: <strong>${fmtM(p.annualNOI)}/yr</strong></span>
-            <span>Occ: <strong>${fmtPct(p.occupancy)}</strong></span>
-            <span>Cap Rate: <strong>${capRate}%</strong></span>
-          </div>
-          <div class="prop-actions">
-            <button class="btn btn-sm btn-primary"
-              onclick="UI.confirmBuyProperty('${p.id}')"
-              ${canAfford ? "" : "disabled title='Insufficient cash'"}>
-              Buy ${fmtM(p.askingPrice)}
-            </button>
-          </div>
-        </div>`;
+      return `<div class="property-card ${canAfford ? "" : "prop-unaffordable"}">
+        <div class="prop-header">
+          <span class="prop-name">${p.name}</span>
+          <span class="prop-tag tag-${p.sector}">${p.sector} · ${p.location}</span>
+        </div>
+        <div class="prop-stats">
+          <span>Ask: <strong>${fmtM(p.askingPrice)}</strong></span>
+          <span>NOI: <strong>${fmtM(p.annualNOI)}/yr</strong></span>
+          <span>Occ: <strong>${fmtPct(p.occupancy)}</strong></span>
+          <span>Cap Rate: <strong>${capRate}%</strong></span>
+        </div>
+        <div class="prop-actions">
+          <button class="btn btn-sm btn-primary"
+            onclick="UI.confirmBuyProperty('${p.id}')"
+            ${canAfford ? "" : "disabled title='Insufficient cash'"}>
+            Buy ${fmtM(p.askingPrice)}
+          </button>
+        </div>
+      </div>`;
     }).join("");
   }
 
   // ----------------------------------------------------------
-  // EARNINGS REPORT PANEL
+  // EARNINGS REPORT
   // ----------------------------------------------------------
   function renderEarningsReport(report) {
     if (!report) return;
     const container = el("earnings-report");
     if (!container) return;
 
-    const eventsHTML = report.firedEvents.length > 0
-      ? `<div class="events-list">
-          ${report.firedEvents.map(e =>
-            `<div class="event-item">
-              <strong>${e.headline}</strong>
-              <p>${e.body}</p>
-              <span class="event-impact">${e.impact}</span>
-            </div>`
+    const isTutorial = GameState.meta.tutorialYear;
+    const goalsHTML  = isTutorial && GameState.board.currentGoals.length > 0
+      ? `<div class="goals-panel">
+          <div class="goals-title">📋 Year 1 Orientation Targets (not enforced)</div>
+          ${GameState.board.currentGoals.map(g =>
+            `<div class="goal-item">▸ ${g.metric}: ${g.target}</div>`
           ).join("")}
-        </div>`
-      : "";
+        </div>` : "";
+
+    const currentGoalsHTML = !isTutorial && GameState.board.currentGoals.length > 0
+      ? `<div class="goals-panel">
+          <div class="goals-title">🎯 Current Year Targets</div>
+          ${GameState.board.currentGoals.map(g =>
+            `<div class="goal-item">▸ ${g.metric}: ${g.target}</div>`
+          ).join("")}
+        </div>` : "";
+
+    const eventsHTML = report.firedEvents.length > 0
+      ? `<div class="events-list">${report.firedEvents.map(e =>
+          `<div class="event-item">
+            <strong>${e.headline}</strong>
+            <p>${e.body}</p>
+            <span class="event-impact">${e.impact}</span>
+          </div>`).join("")}</div>` : "";
 
     const pressureHTML = report.boardResult.pressureChanges.length > 0
-      ? `<div class="pressure-changes">
-          ${report.boardResult.pressureChanges.map(p =>
-            `<div class="pressure-item ${p.type === "pressure" ? "pressure-bad" : "pressure-good"}">
-              <span>${p.type === "pressure" ? "▲" : "▼"} ${p.points}pt — ${p.reason}</span>
-            </div>`
-          ).join("")}
-        </div>`
-      : "";
+      ? `<div class="pressure-changes">${report.boardResult.pressureChanges.map(p =>
+          `<div class="pressure-item ${p.type === "pressure" ? "pressure-bad" : p.type === "warning" ? "pressure-warn" : "pressure-good'}">
+            <span>${p.type === "pressure" ? "▲" : p.type === "warning" ? "⚠" : "▼"} ${p.points}pt — ${p.reason}</span>
+          </div>`).join("")}</div>` : "";
 
     container.innerHTML = `
-      <div class="report-header">
-        <h3>${report.headline}</h3>
-      </div>
-      <div class="report-body">
-        <p>${report.body}</p>
-      </div>
-      ${eventsHTML}
-      ${pressureHTML}
-    `;
+      <div class="report-header"><h3>${report.headline}</h3></div>
+      <div class="report-body"><p>${report.body.replace(/\n/g, "<br>")}</p></div>
+      ${goalsHTML}${currentGoalsHTML}${eventsHTML}${pressureHTML}`;
   }
 
   // ----------------------------------------------------------
-  // CAPITAL ACTIONS PANEL
+  // CAPITAL ACTIONS
   // ----------------------------------------------------------
   function renderCapitalActions() {
-    // Update borrow rate display
-    const borrowRate = Market.getCurrentBorrowingRate();
-    setText("action-borrow-rate", `Current rate: ${fmt(borrowRate, 2)}%`);
+    setText("action-borrow-rate", `Current rate: ${fmt(Market.getCurrentBorrowingRate(), 2)}%`);
     setText("action-div-current", `Current: $${fmt(GameState.company.dividendPerShare, 2)}/share/quarter`);
     setText("action-shares-out",  `Shares outstanding: ${fmt(GameState.company.sharesOutstanding, 1)}M`);
     setText("action-cash-avail",  `Cash available: ${fmtM(GameState.balance.cash)}`);
   }
 
   // ----------------------------------------------------------
-  // FULL RENDER — call after every quarter advance
+  // ANNUAL REPORT OVERLAY
+  // ----------------------------------------------------------
+  function showAnnualReport(snapshot) {
+    if (!snapshot) return;
+    const overlay = el("annual-report-overlay");
+    const content = el("annual-report-content");
+    if (!overlay || !content) return;
+
+    const isYear1  = snapshot.year === 1;
+    const arrow    = (a, b) => a < b ? `<span class="text-green">▲</span>` : a > b ? `<span class="text-red">▼</span>` : "→";
+    const pctChg   = (a, b) => b !== 0 ? `${fmt((a - b) / b * 100, 1)}%` : "—";
+
+    const ratingArrow = (() => {
+      const order = ["CCC","B","BB","BBB","A","AA","AAA"];
+      const si = order.indexOf(snapshot.startRating);
+      const ei = order.indexOf(snapshot.endRating);
+      return ei > si ? `<span class="text-green">▲</span>` : ei < si ? `<span class="text-red">▼</span>` : "→";
+    })();
+
+    const goalsHTML = snapshot.boardAssessment?.goalResults
+      ? `<div class="ar-section">
+          <div class="ar-section-title">Goal Performance</div>
+          ${snapshot.boardAssessment.goalResults.map(g =>
+            `<div class="ar-goal ${g.met ? "ar-goal-met" : "ar-goal-missed"}">
+              ${g.met ? "✅" : "❌"} ${g.metric}: ${g.target}
+            </div>`).join("")}
+        </div>` : "";
+
+    const nextGoalsHTML = snapshot.nextYearGoals?.length > 0
+      ? `<div class="ar-section">
+          <div class="ar-section-title">🎯 Year ${snapshot.year + 1} Board Targets</div>
+          ${snapshot.nextYearGoals.map(g =>
+            `<div class="ar-goal">▸ ${g.metric}: ${g.target}</div>`).join("")}
+        </div>` : "";
+
+    const eventsHTML = snapshot.yearEvents?.length > 0
+      ? `<div class="ar-section">
+          <div class="ar-section-title">Key Events</div>
+          ${snapshot.yearEvents.map(e => `<div class="ar-event">▸ ${e.headline}</div>`).join("")}
+        </div>` : "";
+
+    content.innerHTML = `
+      <div class="ar-header">
+        <div class="ar-logo">${GameState.company.name}</div>
+        <div class="ar-year">Annual Report — Year ${snapshot.year}</div>
+        ${isYear1 ? '<div class="ar-badge">Orientation Year Complete</div>' : ""}
+      </div>
+
+      <div class="ar-grid">
+        <div class="ar-section">
+          <div class="ar-section-title">📈 Share Performance</div>
+          <div class="ar-row"><span>Share Price</span><span>${arrow(snapshot.endPrice, snapshot.startPrice)} $${snapshot.startPrice} → $${snapshot.endPrice} (${snapshot.priceChg >= 0 ? "+" : ""}${snapshot.priceChg}%)</span></div>
+        </div>
+
+        <div class="ar-section">
+          <div class="ar-section-title">💰 Full Year Financials</div>
+          <div class="ar-row"><span>Total Revenue</span><span>${fmtM(snapshot.totalRevenue)}</span></div>
+          <div class="ar-row"><span>Total NOI</span><span>${fmtM(snapshot.totalNOI)}</span></div>
+          <div class="ar-row"><span>Total FFO</span><span class="text-green">${fmtM(snapshot.totalFFO)}</span></div>
+          <div class="ar-row"><span>Total AFFO</span><span>${fmtM(snapshot.totalAFFO)}</span></div>
+          <div class="ar-row"><span>Dividends Paid</span><span>${fmtM(snapshot.totalDividends)}</span></div>
+          <div class="ar-row"><span>Avg Div Coverage</span><span class="${snapshot.avgCoverage >= 1.0 ? "text-green" : "text-red"}">${fmt(snapshot.avgCoverage, 2)}x</span></div>
+          <div class="ar-row"><span>Retained Cash</span><span class="${snapshot.totalRetained >= 0 ? "text-green" : "text-red"}">${fmtM(snapshot.totalRetained)}</span></div>
+        </div>
+
+        <div class="ar-section">
+          <div class="ar-section-title">🏦 Balance Sheet</div>
+          <div class="ar-row"><span>Total Assets</span><span>${arrow(snapshot.endAssets, snapshot.startAssets)} ${fmtM(snapshot.startAssets)} → ${fmtM(snapshot.endAssets)}</span></div>
+          <div class="ar-row"><span>Total Debt</span><span>${fmtM(snapshot.startDebt)} → ${fmtM(snapshot.endDebt)}</span></div>
+          <div class="ar-row"><span>Credit Rating</span><span>${ratingArrow} ${snapshot.startRating} → ${snapshot.endRating}</span></div>
+        </div>
+
+        <div class="ar-section">
+          <div class="ar-section-title">🏢 Portfolio</div>
+          <div class="ar-row"><span>Properties</span><span>${snapshot.startProps} → ${snapshot.endProps}</span></div>
+          <div class="ar-row"><span>Avg Occupancy</span><span class="${snapshot.avgOccupancy >= 0.85 ? "text-green" : "text-yellow"}">${fmtPct(snapshot.avgOccupancy)}</span></div>
+          ${snapshot.bestProp  ? `<div class="ar-row"><span>Best Asset</span><span class="text-green">${snapshot.bestProp.name} (${snapshot.bestProp.occ}%)</span></div>` : ""}
+          ${snapshot.worstProp ? `<div class="ar-row"><span>Needs Work</span><span class="text-red">${snapshot.worstProp.name} (${snapshot.worstProp.occ}%)</span></div>` : ""}
+        </div>
+
+        ${eventsHTML}
+        ${goalsHTML}
+      </div>
+
+      <div class="ar-board-letter">
+        <div class="ar-section-title">📜 Board Assessment</div>
+        <p>${snapshot.boardAssessment?.letter || ""}</p>
+        ${isYear1 ? `<p class="ar-pressure-note">Starting Year 2 with <strong>${snapshot.boardAssessment?.startingPressure || 0} pressure point(s)</strong> already on record.</p>` : ""}
+      </div>
+
+      ${nextGoalsHTML}
+
+      <div class="ar-footer">
+        <button class="btn btn-primary btn-lg" onclick="UI.closeAnnualReport()">
+          Continue to Year ${snapshot.year + 1} →
+        </button>
+      </div>`;
+
+    overlay.classList.remove("hidden");
+  }
+
+  function closeAnnualReport() {
+    const o = el("annual-report-overlay");
+    if (o) o.classList.add("hidden");
+
+    // Check game over after closing annual report
+    if (GameState.meta.gameOver) {
+      setTimeout(showGameOver, 400);
+    }
+  }
+
+  // ----------------------------------------------------------
+  // HELP / F1 POPUP
+  // ----------------------------------------------------------
+  function showHelp() {
+    const overlay = el("help-overlay");
+    if (overlay) overlay.classList.remove("hidden");
+  }
+
+  function closeHelp() {
+    const o = el("help-overlay");
+    if (o) o.classList.add("hidden");
+  }
+
+  function switchHelpTab(tabId, btn) {
+    document.querySelectorAll(".help-tab-content").forEach(t => t.classList.remove("active"));
+    document.querySelectorAll(".help-tab-btn").forEach(b => b.classList.remove("active"));
+    const tab = document.getElementById(tabId);
+    if (tab) tab.classList.add("active");
+    if (btn) btn.classList.add("active");
+  }
+
+  // ----------------------------------------------------------
+  // RENDER ALL
   // ----------------------------------------------------------
   function renderAll(report) {
     renderHeader();
@@ -409,316 +456,206 @@ const UI = (() => {
   }
 
   // ----------------------------------------------------------
-  // PLAYER ACTIONS — Buy/Sell Property
+  // PLAYER ACTIONS
   // ----------------------------------------------------------
   function confirmBuyProperty(propertyId) {
     const prop = GameState.propertyMarket.find(p => p.id === propertyId);
     if (!prop) return;
-
     showModal(
       `Acquire ${prop.name}`,
       `Sector: ${prop.sector} | Location: ${prop.location}\n` +
-      `Asking Price: ${fmtM(prop.askingPrice)}\n` +
-      `Annual NOI: ${fmtM(prop.annualNOI)}\n` +
-      `Occupancy: ${fmtPct(prop.occupancy)}\n` +
-      `Cap Rate: ${GameState.market.capRates[prop.sector][prop.location]}%\n\n` +
-      `Your cash: ${fmtM(GameState.balance.cash)}\n` +
-      `Cash after purchase: ${fmtM(GameState.balance.cash - prop.askingPrice)}`,
-      [{
-        label:   `Buy for ${fmtM(prop.askingPrice)}`,
-        style:   "btn-primary",
-        onClick: () => {
-          const result = Properties.buyProperty(propertyId);
-          showToast(result.message, result.success ? "success" : "error");
-          if (result.success) renderAll();
-        },
-      }]
+      `Asking Price: ${fmtM(prop.askingPrice)}\nAnnual NOI: ${fmtM(prop.annualNOI)}\n` +
+      `Occupancy: ${fmtPct(prop.occupancy)}\nCap Rate: ${GameState.market.capRates[prop.sector][prop.location]}%\n\n` +
+      `Your cash: ${fmtM(GameState.balance.cash)}\nCash after: ${fmtM(GameState.balance.cash - prop.askingPrice)}`,
+      [{ label: `Buy for ${fmtM(prop.askingPrice)}`, style: "btn-primary", onClick: () => {
+        const result = Properties.buyProperty(propertyId);
+        showToast(result.message, result.success ? "success" : "error");
+        if (result.success) renderAll();
+      }}]
     );
   }
 
   function confirmSellProperty(propertyId) {
     const prop = GameState.portfolio.find(p => p.id === propertyId);
     if (!prop) return;
-
     const estPrice = fmt(prop.currentValue * (GameState.market.cycle === "recession" ? 0.95 : 1.00), 1);
-
     showModal(
       `Sell ${prop.name}`,
-      `Current Value: ${fmtM(prop.currentValue)}\n` +
-      `Purchase Price: ${fmtM(prop.purchasePrice)}\n` +
-      `Estimated Sale: ~$${estPrice}M\n` +
-      `Market Cycle: ${GameState.market.cycle} (affects sale price)\n\n` +
-      `Are you sure? This cannot be undone.`,
-      [{
-        label:   "Confirm Sale",
-        style:   "btn-danger",
-        onClick: () => {
-          const result = Properties.sellProperty(propertyId);
-          showToast(result.message, result.success ? "success" : "error");
-          if (result.success) renderAll();
-        },
-      }]
+      `Current Value: ${fmtM(prop.currentValue)}\nPurchase Price: ${fmtM(prop.purchasePrice)}\n` +
+      `Estimated Sale: ~$${estPrice}M\nMarket Cycle: ${GameState.market.cycle}\n\nAre you sure?`,
+      [{ label: "Confirm Sale", style: "btn-danger", onClick: () => {
+        const result = Properties.sellProperty(propertyId);
+        showToast(result.message, result.success ? "success" : "error");
+        if (result.success) renderAll();
+      }}]
     );
   }
 
-  // ----------------------------------------------------------
-  // PLAYER ACTIONS — Debt
-  // ----------------------------------------------------------
   function confirmRetireDebt(trancheId) {
     const tranche = GameState.debtTranches.find(t => t.id === trancheId);
     if (!tranche) return;
-
-    const penalty = tranche.quartersUntilMaturity > 4
-      ? fmt(tranche.amount * 0.01, 1)
-      : 0;
-
+    const penalty   = tranche.quartersUntilMaturity > 4 ? fmt(tranche.amount * 0.01, 1) : 0;
+    const totalCost = fmt(tranche.amount + parseFloat(penalty), 1);
     showModal(
       `Retire ${tranche.label}`,
-      `Amount: ${fmtM(tranche.amount)}\n` +
-      `Rate: ${tranche.rate}%\n` +
+      `Amount: ${fmtM(tranche.amount)}\nRate: ${tranche.rate}%\n` +
       `Quarters remaining: ${tranche.quartersUntilMaturity}\n` +
       `Prepayment penalty: ${penalty > 0 ? fmtM(parseFloat(penalty)) : "None"}\n` +
-      `Total cost: ${fmtM(tranche.amount + parseFloat(penalty))}\n\n` +
-      `Cash available: ${fmtM(GameState.balance.cash)}`,
-      [{
-        label:   "Retire Debt",
-        style:   "btn-danger",
-        onClick: () => {
-          const result = Financials.retireDebt(trancheId);
-          showToast(result.message, result.success ? "success" : "error");
-          if (result.success) renderAll();
-        },
-      }]
+      `Total cost: ${fmtM(parseFloat(totalCost))}\nCash available: ${fmtM(GameState.balance.cash)}`,
+      [{ label: "Retire Debt", style: "btn-danger", onClick: () => {
+        const result = Financials.retireDebt(trancheId);
+        showToast(result.message, result.success ? "success" : "error");
+        if (result.success) renderAll();
+      }}]
     );
   }
 
   function handleIssueDebt() {
-    const amountEl = el("input-debt-amount");
-    const yearsEl  = el("input-debt-years");
-    if (!amountEl || !yearsEl) return;
-
-    const amount = parseFloat(amountEl.value);
-    const years  = parseInt(yearsEl.value);
-
-    if (isNaN(amount) || amount <= 0) {
-      showToast("Enter a valid amount", "error"); return;
-    }
-    if (isNaN(years) || years < 1 || years > 30) {
-      showToast("Enter a valid term (1–30 years)", "error"); return;
-    }
-
+    const amount = parseFloat(el("input-debt-amount")?.value);
+    const years  = parseInt(el("input-debt-years")?.value);
+    if (isNaN(amount) || amount <= 0) { showToast("Enter a valid amount", "error"); return; }
+    if (isNaN(years) || years < 1 || years > 30) { showToast("Enter a valid term (1–30 years)", "error"); return; }
     const rate = Market.getCurrentBorrowingRate();
-    showModal(
-      "Issue New Debt",
-      `Amount: ${fmtM(amount)}\n` +
-      `Term: ${years} years\n` +
-      `Rate: ${fmt(rate, 2)}% (base ${fmt(GameState.market.baseInterestRate, 2)}% + spread ${fmt(GameState.credit.spread, 2)}%)\n` +
-      `Annual interest cost: ${fmtM(amount * rate / 100)}\n` +
-      `Tranches used: ${GameState.debtTranches.length}/10`,
-      [{
-        label:   `Issue at ${fmt(rate, 2)}%`,
-        style:   "btn-primary",
-        onClick: () => {
-          const result = Financials.issueDebt(amount, years);
-          showToast(result.message, result.success ? "success" : "error");
-          if (result.success) { amountEl.value = ""; renderAll(); }
-        },
-      }]
+    showModal("Issue New Debt",
+      `Amount: ${fmtM(amount)}\nTerm: ${years} years\nRate: ${fmt(rate, 2)}%\n` +
+      `Annual interest: ${fmtM(amount * rate / 100)}\nTranches used: ${GameState.debtTranches.length}/10`,
+      [{ label: `Issue at ${fmt(rate, 2)}%`, style: "btn-primary", onClick: () => {
+        const result = Financials.issueDebt(amount, years);
+        showToast(result.message, result.success ? "success" : "error");
+        if (result.success) { if (el("input-debt-amount")) el("input-debt-amount").value = ""; renderAll(); }
+      }}]
     );
   }
 
-  // ----------------------------------------------------------
-  // PLAYER ACTIONS — Equity
-  // ----------------------------------------------------------
   function handleIssueEquity() {
-    const sharesEl = el("input-equity-shares");
-    if (!sharesEl) return;
-    const shares = parseFloat(sharesEl.value);
-    if (isNaN(shares) || shares <= 0) {
-      showToast("Enter a valid number of shares", "error"); return;
-    }
-
-    const price    = GameState.company.sharePrice;
-    const discount = 0.05;
-    const issueP   = price * (1 - discount);
+    const shares = parseFloat(el("input-equity-shares")?.value);
+    if (isNaN(shares) || shares <= 0) { showToast("Enter a valid number of shares", "error"); return; }
+    const issueP   = GameState.company.sharePrice * 0.95;
     const proceeds = shares * issueP;
-
-    showModal(
-      "Issue New Equity",
-      `Shares: ${fmt(shares, 1)}M\n` +
-      `Issue price: ${fmtPS(issueP)} (5% discount to ${fmtPS(price)})\n` +
-      `Gross proceeds: ${fmtM(proceeds)}\n` +
-      `Dilution: existing shareholders diluted ~${fmt(shares / GameState.company.sharesOutstanding * 100, 1)}%\n\n` +
-      `New shares outstanding: ${fmt(GameState.company.sharesOutstanding + shares, 1)}M`,
-      [{
-        label:   "Issue Shares",
-        style:   "btn-primary",
-        onClick: () => {
-          const result = Financials.issueEquity(shares);
-          showToast(result.message, result.success ? "success" : "error");
-          if (result.success) { sharesEl.value = ""; renderAll(); }
-        },
-      }]
+    showModal("Issue New Equity",
+      `Shares: ${fmt(shares, 1)}M\nIssue price: ${fmtPS(issueP)} (5% discount)\n` +
+      `Proceeds: ${fmtM(proceeds)}\nDilution: ~${fmt(shares / GameState.company.sharesOutstanding * 100, 1)}%`,
+      [{ label: "Issue Shares", style: "btn-primary", onClick: () => {
+        const result = Financials.issueEquity(shares);
+        showToast(result.message, result.success ? "success" : "error");
+        if (result.success) { if (el("input-equity-shares")) el("input-equity-shares").value = ""; renderAll(); }
+      }}]
     );
   }
 
   function handleBuyback() {
-    const sharesEl = el("input-buyback-shares");
-    if (!sharesEl) return;
-    const shares = parseFloat(sharesEl.value);
-    if (isNaN(shares) || shares <= 0) {
-      showToast("Enter a valid number of shares", "error"); return;
-    }
+    const shares = parseFloat(el("input-buyback-shares")?.value);
+    if (isNaN(shares) || shares <= 0) { showToast("Enter a valid number of shares", "error"); return; }
     const cost = shares * GameState.company.sharePrice;
-    showModal(
-      "Share Buyback",
-      `Shares: ${fmt(shares, 1)}M\n` +
-      `Price: ${fmtPS(GameState.company.sharePrice)}\n` +
-      `Total cost: ${fmtM(cost)}\n` +
-      `Cash after: ${fmtM(GameState.balance.cash - cost)}\n\n` +
-      `FFO/share improves as share count decreases.`,
-      [{
-        label:   "Buy Back Shares",
-        style:   "btn-primary",
-        onClick: () => {
-          const result = Financials.buybackShares(shares);
-          showToast(result.message, result.success ? "success" : "error");
-          if (result.success) { sharesEl.value = ""; renderAll(); }
-        },
-      }]
+    showModal("Share Buyback",
+      `Shares: ${fmt(shares, 1)}M\nPrice: ${fmtPS(GameState.company.sharePrice)}\n` +
+      `Total cost: ${fmtM(cost)}\nCash after: ${fmtM(GameState.balance.cash - cost)}`,
+      [{ label: "Buy Back Shares", style: "btn-primary", onClick: () => {
+        const result = Financials.buybackShares(shares);
+        showToast(result.message, result.success ? "success" : "error");
+        if (result.success) { if (el("input-buyback-shares")) el("input-buyback-shares").value = ""; renderAll(); }
+      }}]
     );
   }
 
-  // ----------------------------------------------------------
-  // PLAYER ACTIONS — Dividend
-  // ----------------------------------------------------------
   function handleSetDividend() {
-    const divEl = el("input-dividend");
-    if (!divEl) return;
-    const newDiv = parseFloat(divEl.value);
-    if (isNaN(newDiv) || newDiv < 0) {
-      showToast("Enter a valid dividend amount", "error"); return;
-    }
-
-    const old     = GameState.company.dividendPerShare;
-    const change  = newDiv - old;
-    const isCut   = change < -0.001;
-    const isRaise = change >  0.001;
-
+    const newDiv = parseFloat(el("input-dividend")?.value);
+    if (isNaN(newDiv) || newDiv < 0) { showToast("Enter a valid dividend amount", "error"); return; }
+    const old    = GameState.company.dividendPerShare;
+    const change = newDiv - old;
+    const isCut  = change < -0.001;
     const warning = isCut
-      ? `⚠️ WARNING: Cutting the dividend will cause a significant share price drop and board pressure (+2 points).`
-      : isRaise
-      ? `Raising the dividend signals confidence but locks in a higher commitment.`
+      ? `⚠️ WARNING: Cutting the dividend causes a significant share price drop and +2 board pressure points.`
+      : change > 0.001 ? `Raising the dividend signals confidence but locks in a higher commitment.`
       : `No change from current dividend.`;
-
-    showModal(
-      "Set Quarterly Dividend",
-      `Current: ${fmtPS(old)}/share/quarter ($${fmt(old * 4, 2)}/yr)\n` +
-      `New: ${fmtPS(newDiv)}/share/quarter ($${fmt(newDiv * 4, 2)}/yr)\n` +
-      `Change: ${change >= 0 ? "+" : ""}${fmt(change, 3)}\n` +
-      `Quarterly cost: ${fmtM(newDiv * GameState.company.sharesOutstanding)}\n\n` +
-      warning,
-      [{
-        label:   isCut ? "⚠️ Cut Dividend" : isRaise ? "Raise Dividend" : "Maintain Dividend",
-        style:   isCut ? "btn-danger" : "btn-primary",
-        onClick: () => {
-          const result = Financials.setDividend(newDiv);
-          showToast(result.message, result.success ? "success" : "error");
-          if (result.success) { divEl.value = ""; renderAll(); }
-        },
-      }]
+    showModal("Set Quarterly Dividend",
+      `Current: ${fmtPS(old)}/share/quarter\nNew: ${fmtPS(newDiv)}/share/quarter\n` +
+      `Quarterly cost: ${fmtM(newDiv * GameState.company.sharesOutstanding)}\n\n${warning}`,
+      [{ label: isCut ? "⚠️ Cut Dividend" : "Set Dividend", style: isCut ? "btn-danger" : "btn-primary", onClick: () => {
+        const result = Financials.setDividend(newDiv);
+        showToast(result.message, result.success ? "success" : "error");
+        if (result.success) { if (el("input-dividend")) el("input-dividend").value = ""; renderAll(); }
+      }}]
     );
   }
 
   // ----------------------------------------------------------
-  // ADVANCE QUARTER — the big red button
+  // ADVANCE QUARTER
   // ----------------------------------------------------------
   function advanceQuarter() {
-    if (GameState.meta.gameOver) {
-      showGameOver();
-      return;
-    }
+    if (GameState.meta.gameOver) { showGameOver(); return; }
 
-    // Check for pending acquisition offer
     if (GameState._pendingOffer) {
       const offer = GameState._pendingOffer;
-      showModal(
-        `⏰ Offer Expiring: ${offer.propertyName}`,
-        `The acquisition offer of ${fmtM(offer.offerPrice)} (${offer.premium}% premium) expires this quarter.\n\nAccept or decline before advancing?`,
+      showModal(`⏰ Offer Expiring: ${offer.propertyName}`,
+        `Acquisition offer of ${fmtM(offer.offerPrice)} (${offer.premium}% premium) expires this quarter.\nAccept or decline before advancing?`,
         [
-          {
-            label:   `Accept ${fmtM(offer.offerPrice)}`,
-            style:   "btn-primary",
-            onClick: () => {
-              const result = Properties.sellProperty(offer.propertyId);
-              if (result.success) {
-                // Override with offer price
-                GameState.balance.cash = fmt(
-                  GameState.balance.cash - result.salePrice + offer.offerPrice
-                );
-                showToast(`Accepted offer: ${fmtM(offer.offerPrice)}`, "success");
-              }
-              GameState._pendingOffer = null;
-              doAdvanceQuarter();
-            },
-          },
-          {
-            label:   "Decline Offer",
-            style:   "btn-secondary",
-            onClick: () => {
-              GameState._pendingOffer = null;
-              doAdvanceQuarter();
-            },
-          },
+          { label: `Accept ${fmtM(offer.offerPrice)}`, style: "btn-primary", onClick: () => {
+            const result = Properties.sellProperty(offer.propertyId);
+            if (result.success) {
+              GameState.balance.cash = Math.round((GameState.balance.cash - result.salePrice + offer.offerPrice) * 100) / 100;
+              showToast(`Accepted offer: ${fmtM(offer.offerPrice)}`, "success");
+            }
+            GameState._pendingOffer = null;
+            doAdvanceQuarter();
+          }},
+          { label: "Decline Offer", style: "btn-secondary", onClick: () => { GameState._pendingOffer = null; doAdvanceQuarter(); }},
         ]
       );
       return;
     }
-
     doAdvanceQuarter();
   }
 
   function doAdvanceQuarter() {
-    // Run the quarter
     const quarterResult = Financials.runQuarter();
     const boardResult   = Board.evaluateQuarter();
     const report        = Board.generateEarningsReport(quarterResult, boardResult);
 
-    // Render everything
-    renderAll(report);
+    // End of year — check tutorial flag and generate annual report
+    const justEndedYear = GameState.meta.quarter === 1 && GameState.meta.totalQuarters > 1;
+    if (justEndedYear) {
+      // Turn off tutorial flag after Year 1
+      if (GameState.meta.year === 2) {
+        GameState.meta.tutorialYear = false;
+      }
+      const snapshot = Board.generateAnnualReport();
+      renderAll(report);
+      setTimeout(() => showAnnualReport(snapshot), 600);
+    } else {
+      renderAll(report);
+    }
 
-    // Scroll to earnings report
     const reportEl = el("earnings-report");
     if (reportEl) reportEl.scrollIntoView({ behavior: "smooth", block: "start" });
 
-    // Check game over
-    if (GameState.meta.gameOver) {
-      setTimeout(showGameOver, 1200);
+    if (GameState.meta.gameOver && !justEndedYear) {
+      // Calculate and show score
+      const scoreData = Leaderboard.calculateScore();
+      setTimeout(() => {
+        showGameOver();
+        setTimeout(() => Leaderboard.showSubmitScreen(scoreData), 800);
+      }, 1200);
     }
 
-    // Show market cycle change if it happened
     if (quarterResult.marketResult?.cycleResult?.cycleChanged) {
       const cycle = quarterResult.marketResult.cycleResult;
-      setTimeout(() => {
-        showToast(`Market shift: ${cycle.label} — ${cycle.description}`, "warning");
-      }, 800);
+      setTimeout(() => showToast(`Market shift: ${cycle.label} — ${cycle.description}`, "warning"), 800);
     }
   }
 
   // ----------------------------------------------------------
-  // GAME OVER SCREEN
+  // GAME OVER
   // ----------------------------------------------------------
   function showGameOver() {
     const overlay = el("gameover-overlay");
     if (!overlay) return;
-
-    setText("gameover-reason", GameState.meta.gameOverReason);
+    setText("gameover-reason",   GameState.meta.gameOverReason);
     setText("gameover-quarters", `You survived ${GameState.meta.totalQuarters} quarters (${GameState.meta.year} years)`);
-    setText("gameover-ffo",   fmtPS(GameState.ratios.ffoPerShare));
-    setText("gameover-occ",   fmtPct(GameState.ratios.occupancyPortfolio));
-    setText("gameover-d2a",   fmtPct(GameState.ratios.debtToAssets));
-    setText("gameover-props", `${GameState.portfolio.length} properties`);
-
+    setText("gameover-ffo",      fmtPS(GameState.ratios.ffoPerShare));
+    setText("gameover-occ",      fmtPct(GameState.ratios.occupancyPortfolio));
+    setText("gameover-d2a",      fmtPct(GameState.ratios.debtToAssets));
+    setText("gameover-props",    `${GameState.portfolio.length} properties`);
     overlay.classList.remove("hidden");
   }
 
@@ -726,37 +663,47 @@ const UI = (() => {
   // NEW GAME
   // ----------------------------------------------------------
   function newGame() {
+    // Get player name and REIT name from setup screen
+    const nameInput = el("input-player-name");
+    const reitInput = el("input-reit-name");
+    const playerName = (nameInput?.value.trim()) || "CEO";
+    const reitName   = (reitInput?.value.trim()) || "My";
+
+    GameState.player.name     = playerName;
+    GameState.player.reitName = reitName;
+    GameState.company.name    = `${reitName} REIT`;
+
     // Reset meta
-    GameState.meta.quarter       = 1;
-    GameState.meta.year          = 1;
-    GameState.meta.totalQuarters = 0;
-    GameState.meta.gameOver      = false;
-    GameState.meta.gameOverReason= "";
-    GameState.meta.started       = true;
+    GameState.meta.quarter        = 1;
+    GameState.meta.year           = 1;
+    GameState.meta.totalQuarters  = 0;
+    GameState.meta.gameOver       = false;
+    GameState.meta.gameOverReason = "";
+    GameState.meta.started        = true;
+    GameState.meta.tutorialYear   = true;
 
     // Reset company
-    GameState.company.sharePrice         = 20.00;
-    GameState.company.sharesOutstanding  = 50;
-    GameState.company.marketCap          = 1000;
-    GameState.company.dividendPerShare   = 0.30;
-    GameState.company.dividendHistory    = [];
-    GameState.company.dividendCutQuarters= 0;
+    GameState.company.sharePrice          = 20.00;
+    GameState.company.sharesOutstanding   = 50;
+    GameState.company.marketCap           = 1000;
+    GameState.company.dividendPerShare    = 0.10;
+    GameState.company.dividendHistory     = [];
+    GameState.company.dividendCutQuarters = 0;
 
     // Reset balance
-    GameState.balance.cash = 50;
+    GameState.balance.cash = 100;
 
     // Reset debt
     GameState.debtTranches = [
-      { id: "d001", amount: 200, rate: 5.0, maturityQuarter: 2, maturityYear: 4, quartersUntilMaturity: 13, label: "5.0% Sr Notes due Y4Q2" },
-      { id: "d002", amount: 200, rate: 5.5, maturityQuarter: 4, maturityYear: 6, quartersUntilMaturity: 23, label: "5.5% Sr Notes due Y6Q4" },
+      { id: "d001", amount: 130, rate: 5.0, maturityQuarter: 2, maturityYear: 4, quartersUntilMaturity: 13, label: "5.0% Sr Notes due Y4Q2" },
+      { id: "d002", amount: 120, rate: 5.5, maturityQuarter: 4, maturityYear: 6, quartersUntilMaturity: 23, label: "5.5% Sr Notes due Y6Q4" },
     ];
 
-    // Reset history and logs
-    GameState.history  = [];
-    GameState.eventLog = [];
-    GameState._pendingOffer = null;
+    GameState.history          = [];
+    GameState.eventLog         = [];
+    GameState.annualSnapshots  = [];
+    GameState._pendingOffer    = null;
 
-    // Re-initialise all modules
     Market.init();
     Properties.init();
     Board.init();
@@ -764,82 +711,69 @@ const UI = (() => {
     Financials.init();
     Charts.init();
 
-    // Hide overlays
-    const go = el("gameover-overlay");
-    const st = el("start-overlay");
-    if (go) go.classList.add("hidden");
-    if (st) st.classList.add("hidden");
+    // Hide all overlays
+    ["gameover-overlay","start-overlay","annual-report-overlay","help-overlay"].forEach(id => {
+      const o = el(id);
+      if (o) o.classList.add("hidden");
+    });
 
-    // Initial render
     renderAll();
-    showToast("New game started. Good luck, CEO.", "success");
+    showToast(`Welcome, ${playerName}. Good luck running ${reitName} REIT.`, "success");
+
+    // Refresh leaderboard in background
+    Leaderboard.renderLeaderboard("leaderboard-container");
   }
 
   // ----------------------------------------------------------
-  // INITIALISE UI
+  // INIT
   // ----------------------------------------------------------
   function init() {
-    // Wire up advance quarter button
-    const advBtn = el("btn-advance-quarter");
-    if (advBtn) advBtn.addEventListener("click", advanceQuarter);
+    // Buttons
+    const btnMap = {
+      "btn-advance-quarter": advanceQuarter,
+      "btn-new-game":        newGame,
+      "btn-new-game-go":     newGame,
+      "btn-issue-debt":      handleIssueDebt,
+      "btn-issue-equity":    handleIssueEquity,
+      "btn-buyback":         handleBuyback,
+      "btn-set-dividend":    handleSetDividend,
+      "btn-help":            showHelp,
+      "btn-help-close":      closeHelp,
+    };
+    Object.entries(btnMap).forEach(([id, fn]) => {
+      const btn = el(id);
+      if (btn) btn.addEventListener("click", fn);
+    });
 
-    // Wire up new game button
-    const ngBtn = el("btn-new-game");
-    if (ngBtn) ngBtn.addEventListener("click", newGame);
-
-    const ngBtn2 = el("btn-new-game-go");
-    if (ngBtn2) ngBtn2.addEventListener("click", newGame);
-
-    // Wire up capital action buttons
-    const debtBtn = el("btn-issue-debt");
-    if (debtBtn) debtBtn.addEventListener("click", handleIssueDebt);
-
-    const eqBtn = el("btn-issue-equity");
-    if (eqBtn) eqBtn.addEventListener("click", handleIssueEquity);
-
-    const bbBtn = el("btn-buyback");
-    if (bbBtn) bbBtn.addEventListener("click", handleBuyback);
-
-    const divBtn = el("btn-set-dividend");
-    if (divBtn) divBtn.addEventListener("click", handleSetDividend);
+    // F1 key for help
+    document.addEventListener("keydown", e => {
+      if (e.key === "F1") { e.preventDefault(); showHelp(); }
+      if (e.key === "Escape") { closeHelp(); closeModal(); }
+    });
 
     // Modal close on overlay click
-    const overlay = el("modal-overlay");
-    if (overlay) {
-      overlay.addEventListener("click", (e) => {
-        if (e.target === overlay) closeModal();
-      });
-    }
+    const modalOverlay = el("modal-overlay");
+    if (modalOverlay) modalOverlay.addEventListener("click", e => { if (e.target === modalOverlay) closeModal(); });
 
-    // Show start screen
-    const startOverlay = el("start-overlay");
-    if (startOverlay) startOverlay.classList.remove("hidden");
+    const helpOverlay = el("help-overlay");
+    if (helpOverlay) helpOverlay.addEventListener("click", e => { if (e.target === helpOverlay) closeHelp(); });
 
     Charts.init();
+
+    // Show start screen and load leaderboard
+    const startOverlay = el("start-overlay");
+    if (startOverlay) startOverlay.classList.remove("hidden");
+    Leaderboard.renderLeaderboard("leaderboard-container");
   }
 
-  // ----------------------------------------------------------
-  // PUBLIC API
-  // ----------------------------------------------------------
   return {
-    init,
-    newGame,
-    renderAll,
-    showModal,
-    closeModal,
-    showToast,
-    showGameOver,
-    advanceQuarter,
-    confirmBuyProperty,
-    confirmSellProperty,
-    confirmRetireDebt,
-    handleIssueDebt,
-    handleIssueEquity,
-    handleBuyback,
-    handleSetDividend,
+    init, newGame, renderAll, showModal, closeModal, showToast,
+    showGameOver, advanceQuarter, showAnnualReport, closeAnnualReport,
+    showHelp, closeHelp, switchHelpTab,
+    confirmBuyProperty, confirmSellProperty, confirmRetireDebt,
+    handleIssueDebt, handleIssueEquity, handleBuyback, handleSetDividend,
   };
 
 })();
 
-// Boot when DOM is ready
 document.addEventListener("DOMContentLoaded", UI.init);
