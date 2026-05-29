@@ -584,10 +584,10 @@ window.UI = (function() {
     GameState.company.dividendCutQuarters = 0;
     GameState.balance.cash                = 100;
 
-    GameState.debtTranches = [
-      { id: "d001", amount: 130, rate: 5.0, maturityQuarter: 2, maturityYear: 4, quartersUntilMaturity: 13, label: "5.0% Sr Notes due Y4Q2" },
-      { id: "d002", amount: 120, rate: 5.5, maturityQuarter: 4, maturityYear: 6, quartersUntilMaturity: 23, label: "5.5% Sr Notes due Y6Q4" },
-    ];
+   GameState.debtTranches = [
+  { id: "d001", amount: 100, rate: 5.0, maturityQuarter: 2, maturityYear: 4, quartersUntilMaturity: 13, label: "5.0% Sr Notes due Y4Q2" },
+  { id: "d002", amount: 100, rate: 5.5, maturityQuarter: 4, maturityYear: 6, quartersUntilMaturity: 23, label: "5.5% Sr Notes due Y6Q4" },
+];
 
     GameState.history         = [];
     GameState.eventLog        = [];
