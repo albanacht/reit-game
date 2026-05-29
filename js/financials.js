@@ -350,6 +350,20 @@ window.Financials = (() => {
     // Random market noise (±1%)
     priceMod += (Math.random() - 0.5) * 0.02;
 
+    // P/FFO anchor — pull share price toward 15x annualised FFO per share
+    var annualFFOPS = GameState.ratios.annualFFOPS || 0;
+    if (annualFFOPS > 0) {
+      var fairValue = fmt(annualFFOPS * 15);
+      var currentPrice = GameState.company.sharePrice * priceMod;
+      // Gentle mean reversion toward fair value (10% pull per quarter)
+      priceMod = priceMod * 0.90 + (fairValue / GameState.company.sharePrice) * 0.10;
+    }
+
+    // Dividend yield anchor — low yield is a headwind
+    var divYield = GameState.ratios.dividendYield || 0;
+    if (divYield < 1.0) priceMod -= 0.03;
+    else if (divYield < 2.0) priceMod -= 0.01;
+
     // Apply and floor at $1
     GameState.company.sharePrice = fmt(
       Math.max(1.0, GameState.company.sharePrice * priceMod)
@@ -608,21 +622,24 @@ window.Financials = (() => {
       return { success: false, message: "Dividend cannot be negative." };
     }
 
-    // Cutting the dividend
+    // Cutting the dividend — punishment scales with size of cut
     if (change < -0.001) {
+      var cutPct     = Math.abs(pct);
+      var pressurePts = cutPct > 60 ? 4 : cutPct > 30 ? 3 : cutPct > 10 ? 2 : 1;
+      var priceHit    = cutPct > 60 ? 0.25 : cutPct > 30 ? 0.18 : cutPct > 10 ? 0.12 : 0.06;
       GameState.company.sharePrice = fmt(
-        GameState.company.sharePrice * (1 - Math.min(0.20, Math.abs(pct / 100) * 1.5))
+        GameState.company.sharePrice * (1 - priceHit)
       );
       GameState.board.dividendCutQuarters = 0;
       GameState.board.pressurePoints = Math.min(
         GameState.board.maxPressure,
-        GameState.board.pressurePoints + 2
+        GameState.board.pressurePoints + pressurePts
       );
       GameState.board.pressureLog.push({
         quarter: GameState.meta.quarter,
         year:    GameState.meta.year,
-        reason:  `Dividend cut from $${old} to $${newDividendPerShare}/share`,
-        points:  2,
+        reason:  "Dividend cut " + fmt(cutPct, 0) + "% from $" + old + " to $" + newDividendPerShare + "/share",
+        points:  pressurePts,
       });
     }
 
