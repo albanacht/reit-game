@@ -38,6 +38,7 @@ window.GameState = {
     dividendPerShare:     0.10,        // $ per share per quarter (rebalanced)
     dividendHistory:      [],
     dividendCutQuarters:  0,
+    equityIssuanceCount:  0,   // tracks number of equity issuances
   },
 
   // ----------------------------------------------------------
