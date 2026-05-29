@@ -688,8 +688,6 @@ const Charts = (() => {
     }
   }
 
-  // Expose maturity bucket data for click detection
-  Charts._maturityBuckets = null;
 
   // ----------------------------------------------------------
   // PUBLIC API
