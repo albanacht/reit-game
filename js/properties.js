@@ -181,7 +181,7 @@ window.Properties = (() => {
   // Player starts with one industrial and one multifamily
   // ----------------------------------------------------------
   function generateStartingPortfolio() {
-    const sectors = ["industrial", "multifamily", "office", "retail"];
+    const sectors = ["industrial", "multifamily", "office"];
     return sectors.map(function(sector) {
       const prop = generateProperty(sector, "tier2", false);
       prop.purchasePrice = prop.currentValue;
