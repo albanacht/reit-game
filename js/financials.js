@@ -712,7 +712,12 @@ window.Financials = (() => {
     GameState.balance.totalEquity = fmt(
       GameState.balance.totalAssets - GameState.balance.totalDebt
     );
-    GameState.company.marketCap = fmt(
+    // Set share price dynamically at 95% of NAV per share
+    var navPerShare = fmt(
+      GameState.balance.totalEquity / GameState.company.sharesOutstanding
+    );
+    GameState.company.sharePrice = fmt(navPerShare * 0.95);
+    GameState.company.marketCap  = fmt(
       GameState.company.sharePrice * GameState.company.sharesOutstanding
     );
   }
