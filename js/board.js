@@ -1,506 +1,629 @@
 // ============================================================
-// events.js — Random event engine
+// board.js — Board pressure, win/lose, annual report, tutorial
 // REIT Simulator Game
 // ============================================================
-// RULES FOR EDITING THIS FILE:
-// - This file generates and applies random events each quarter
-// - Events target specific sectors, locations, or the whole portfolio
-// - This file WRITES to GameState.portfolio (occupancy, NOI)
-// - This file WRITES to GameState.pnl.unusualItems
-// - This file WRITES to GameState.market (for macro events)
-// - Never touches debt or equity — financials.js does that
-// ============================================================
 
-window.Events = (() => {
+window.Board = (() => {
 
-  // ----------------------------------------------------------
-  // EVENT CATALOGUE
-  // Each event has:
-  //   id, name, description
-  //   type: "macro" | "sector" | "property"
-  //   target: which sectors/locations it can hit (null = any)
-  //   probability: base chance per quarter (0–1)
-  //   cycleBias: which cycles make this more likely
-  //   effect: function(targets) that applies the impact
-  //   narrativeTemplates: array of strings, one picked randomly
-  // ----------------------------------------------------------
+  const MOOD_LEVELS = [
+    { maxPct: 0.00, mood: "pleased",  label: "Pleased",  color: "#22c55e" },
+    { maxPct: 0.25, mood: "neutral",  label: "Neutral",  color: "#94a3b8" },
+    { maxPct: 0.50, mood: "concerned",label: "Concerned",color: "#f59e0b" },
+    { maxPct: 0.75, mood: "angry",    label: "Angry",    color: "#ef4444" },
+    { maxPct: 1.00, mood: "furious",  label: "Furious",  color: "#7f1d1d" },
+  ];
 
-  // ----------------------------------------------------------
-  // UTILITY
-  // ----------------------------------------------------------
-  function randBetween(min, max) {
-    return min + Math.random() * (max - min);
-  }
-
-  function pick(arr) {
-    return arr[Math.floor(Math.random() * arr.length)];
-  }
-
-  function fmt(n) {
-    return Math.round(n * 10) / 10;
-  }
-
-  // Get portfolio properties matching a filter
-  function getMatching(filter) {
-    return GameState.portfolio.filter(filter);
-  }
-
-  // Apply occupancy hit to a set of properties
-  function applyOccupancyHit(properties, minHit, maxHit) {
-    const impacts = [];
-    properties.forEach(prop => {
-      const hit = randBetween(minHit, maxHit);
-      const oldOcc = prop.occupancy;
-      prop.occupancy = Math.max(0.30, fmt(prop.occupancy - hit));
-      impacts.push({ name: prop.name, from: oldOcc, to: prop.occupancy });
-    });
-    return impacts;
-  }
-
-  // Apply NOI change to a set of properties
-  function applyNOIChange(properties, minPct, maxPct) {
-    const impacts = [];
-    properties.forEach(prop => {
-      const pct = randBetween(minPct, maxPct);
-      const oldNOI = prop.annualNOI;
-      prop.annualNOI = Math.max(0.1, fmt(prop.annualNOI * (1 + pct)));
-      impacts.push({ name: prop.name, from: oldNOI, to: prop.annualNOI });
-    });
-    return impacts;
-  }
-
-  // Add to unusual items (one-time P&L hit or gain)
-  function addUnusualItem(amount) {
-    GameState.pnl.unusualItems = fmt(GameState.pnl.unusualItems + amount);
-  }
-
-  // ----------------------------------------------------------
-  // EVENT DEFINITIONS
-  // ----------------------------------------------------------
-  const EVENT_CATALOGUE = [
-
-    // ---- MACRO EVENTS ----------------------------------------
-
+  const PRESSURE_RULES = [
     {
-      id: "fed_rate_hike",
-      name: "Federal Reserve Rate Hike",
-      type: "macro",
-      target: null,
-      baseProbability: 0.15,
-      cycleBias: { expanding: 2.0, stable: 1.0, contracting: 0.3, recession: 0.1 },
-      apply(narrative) {
-        const hike = pick([0.25, 0.25, 0.50]);
-        GameState.market.baseInterestRate = fmt(
-          Math.min(12, GameState.market.baseInterestRate + hike)
-        );
-        const msg = pick([
-          `The Federal Reserve raised its benchmark rate by ${hike*100}bps to ${GameState.market.baseInterestRate}%, citing persistent inflation. New debt issuance will be more expensive.`,
-          `In a widely anticipated move, the Fed hiked rates ${hike*100}bps. Your floating-rate exposure is now a concern.`,
-          `The Fed delivered a ${hike*100}bps hike, pushing the base rate to ${GameState.market.baseInterestRate}%. Refinancing costs are rising.`,
-        ]);
-        return { isMacro: true, headline: "🏦 Fed Hikes Rates", body: msg, impact: `-${hike*100}bps to base rate` };
+      id: "dividend_coverage", label: "Dividend Coverage",
+      evaluate() {
+        const coverage  = GameState.ratios.dividendCoverage;
+        const threshold = GameState.board.thresholds.dividendCoverage;
+        if (coverage < 0.85) return { points: 3, reason: `Dividend coverage critically low at ${fmt(coverage)}x (min ${threshold}x)` };
+        if (coverage < threshold) return { points: 1, reason: `Dividend coverage below threshold: ${fmt(coverage)}x vs ${threshold}x` };
+        if (coverage > 1.40) return { relief: 1, reason: `Strong dividend coverage of ${fmt(coverage)}x` };
+        return null;
       },
     },
-
     {
-      id: "fed_rate_cut",
-      name: "Federal Reserve Rate Cut",
-      type: "macro",
-      target: null,
-      baseProbability: 0.12,
-      cycleBias: { expanding: 0.1, stable: 0.5, contracting: 2.0, recession: 3.0 },
-      apply() {
-        const cut = pick([0.25, 0.25, 0.50]);
-        GameState.market.baseInterestRate = fmt(
-          Math.max(2, GameState.market.baseInterestRate - cut)
-        );
-        const msg = pick([
-          `The Federal Reserve cut rates by ${cut*100}bps to ${GameState.market.baseInterestRate}%, providing relief on new borrowings.`,
-          `A surprise ${cut*100}bps cut from the Fed. Your refinancing window just got more attractive.`,
-          `Fed eases by ${cut*100}bps. Cap rates may follow over coming quarters.`,
-        ]);
-        return { isMacro: true, headline: "🏦 Fed Cuts Rates", body: msg, impact: `+${cut*100}bps relief to base rate` };
+      id: "debt_to_assets", label: "Leverage",
+      evaluate() {
+        const d2a       = GameState.ratios.debtToAssets;
+        const threshold = GameState.board.thresholds.debtToAssets;
+        if (d2a > 0.65) return { points: 3, reason: `Leverage dangerously high at ${fmt(d2a*100)}% debt/assets` };
+        if (d2a > threshold) return { points: 1, reason: `Leverage above threshold: ${fmt(d2a*100)}% vs ${fmt(threshold*100)}% limit` };
+        if (d2a < 0.35) return { relief: 1, reason: `Conservative leverage at ${fmt(d2a*100)}% debt/assets` };
+        return null;
       },
     },
-
     {
-      id: "credit_crunch",
-      name: "Credit Market Freeze",
-      type: "macro",
-      target: null,
-      baseProbability: 0.05,
-      cycleBias: { expanding: 0.1, stable: 0.3, contracting: 1.5, recession: 3.0 },
-      apply() {
-        // Temporarily widen all spreads by forcing a rating drop
-        const ratingOrder = ["AAA","AA","A","BBB","BB","B","CCC"];
-        const idx = ratingOrder.indexOf(GameState.credit.rating);
-        if (idx < ratingOrder.length - 1) {
-          GameState.credit.rating = ratingOrder[idx + 1];
-          const spreads = { AAA:0.5,AA:0.8,A:1.1,BBB:1.6,BB:2.5,B:3.8,CCC:6.0 };
-          GameState.credit.spread = spreads[GameState.credit.rating];
+      id: "occupancy", label: "Portfolio Occupancy",
+      evaluate() {
+        const occ       = GameState.ratios.occupancyPortfolio;
+        const threshold = GameState.board.thresholds.occupancy;
+        if (occ < 0.72) return { points: 3, reason: `Portfolio occupancy critically low at ${fmt(occ*100)}%` };
+        if (occ < threshold) return { points: 1, reason: `Occupancy below threshold: ${fmt(occ*100)}% vs ${fmt(threshold*100)}%` };
+        if (occ > 0.93) return { relief: 1, reason: `Excellent occupancy at ${fmt(occ*100)}%` };
+        return null;
+      },
+    },
+    {
+      id: "ffo_growth", label: "FFO Growth",
+      evaluate() {
+        const history = GameState.history;
+        if (history.length < 4) return null;
+        const currentFFO   = GameState.pnl.ffo;
+        const priorYearFFO = history[history.length - 4]?.ffo || currentFFO;
+        const growth = priorYearFFO > 0 ? (currentFFO - priorYearFFO) / priorYearFFO : 0;
+        GameState.board.thresholds.ffoGrowth = growth;
+        if (growth < -0.10) return { points: 2, reason: `FFO declined ${fmt(Math.abs(growth)*100)}% year-over-year` };
+        if (growth < 0)     return { points: 1, reason: `FFO down ${fmt(Math.abs(growth)*100)}% year-over-year` };
+        if (growth > 0.08)  return { relief: 1, reason: `Strong FFO growth of ${fmt(growth*100)}% year-over-year` };
+        return null;
+      },
+    },
+    {
+      id: "interest_coverage", label: "Interest Coverage",
+      evaluate() {
+        const coverage = GameState.ratios.interestCoverage;
+        if (coverage < 1.20) return { points: 3, reason: `Interest coverage dangerously thin at ${fmt(coverage)}x` };
+        if (coverage < 1.50) return { points: 1, reason: `Interest coverage weak at ${fmt(coverage)}x` };
+        return null;
+      },
+    },
+    {
+      id: "cash_position", label: "Cash Position",
+      evaluate() {
+        const cash    = GameState.balance.cash;
+        const assets  = GameState.balance.totalAssets;
+        const cashPct = assets > 0 ? cash / assets : 0;
+        if (cash < 5)       return { points: 2, reason: `Critical liquidity — only $${fmt(cash)}M cash` };
+        if (cashPct < 0.02) return { points: 1, reason: `Low liquidity: cash at ${fmt(cashPct*100)}% of assets` };
+        return null;
+      },
+    },
+    {
+      id: "credit_rating", label: "Credit Rating",
+      evaluate() {
+        const rating = GameState.credit.rating;
+        const watch  = GameState.credit.watchNegative;
+        if (rating === "CCC")          return { points: 3, reason: "Credit rating in distressed territory (CCC)" };
+        if (rating === "B")            return { points: 2, reason: "Credit rating fallen to B — cost of debt is punishing" };
+        if (rating === "BB" && watch)  return { points: 1, reason: "Sub-investment grade (BB) on negative watch" };
+        if (rating === "BB")           return { points: 1, reason: "Credit rating below investment grade (BB)" };
+        if (["A","AA","AAA"].includes(rating)) return { relief: 1, reason: `Strong credit rating of ${rating}` };
+        return null;
+      },
+    },
+    {
+      id: "negative_retained_cash", label: "Cash Flow Sustainability",
+      evaluate() {
+        const retained = GameState.pnl.retainedCash;
+        if (retained < -5) return { points: 2, reason: "Paying $" + fmt(Math.abs(retained)) + "M more in dividends than AFFO" };
+        if (retained < 0)  return { points: 1, reason: "Dividend exceeds AFFO by $" + fmt(Math.abs(retained)) + "M" };
+        return null;
+      },
+    },
+    {
+      id: "dividend_growth", label: "Dividend Growth",
+      evaluate() {
+        // Only evaluate from Year 2 onwards, at year end (Q4)
+        if (GameState.meta.year < 2) return null;
+        if (GameState.meta.quarter !== 4) return null;
+
+        // Find the dividend target goal
+        var divGoal = GameState.board.currentGoals.find(function(g) { return g.key === "dividendPerShare"; });
+        if (!divGoal) return null;
+
+        var current = GameState.company.dividendPerShare;
+        var target  = divGoal.threshold;
+
+        if (current < target * 0.85) {
+          return { points: 3, reason: "Dividend $" + current + "/share far below board target of $" + target + "/share" };
         }
-        addUnusualItem(-randBetween(2, 6));
-        const msg = pick([
-          "Credit markets have seized up following a banking sector scare. Lenders are pulling back and spreads have blown out. Your effective credit rating has been marked down one notch.",
-          "A sudden risk-off move in credit markets has tightened lending standards. Your borrowing costs have increased and one tranche was repriced at a higher spread.",
-        ]);
-        return { isMacro: true, headline: "🔒 Credit Market Freeze", body: msg, impact: "Rating marked down 1 notch" };
+        if (current < target) {
+          return { points: 2, reason: "Dividend $" + current + "/share below board target of $" + target + "/share" };
+        }
+        if (current >= target * 1.05) {
+          return { relief: 1, reason: "Dividend exceeded board growth target at $" + current + "/share" };
+        }
+        return null;
       },
     },
+  ];
 
-    {
-      id: "pandemic_shock",
-      name: "Pandemic / Public Health Crisis",
-      type: "macro",
-      target: null,
-      baseProbability: 0.03,
-      cycleBias: { expanding: 0.5, stable: 1.0, contracting: 1.0, recession: 0.5 },
-      apply() {
-        // Crushes retail and office, spares industrial
-        const retailProps = getMatching(p => p.sector === "retail");
-        const officeProps = getMatching(p => p.sector === "office");
-        const indProps    = getMatching(p => p.sector === "industrial");
-
-        applyOccupancyHit(retailProps, 0.15, 0.30);
-        applyOccupancyHit(officeProps, 0.10, 0.20);
-        applyNOIChange(indProps, 0.02, 0.06); // e-commerce boost
-
-        addUnusualItem(-randBetween(5, 15));
-
-        const msg = `A public health emergency has been declared. Retail properties are facing forced closures and your office tenants have vacated to work-from-home. Industrial assets are seeing a modest boost from accelerated e-commerce demand. Expect occupancy pain for 2–4 quarters.`;
-        return { isMacro: true, headline: "🦠 Pandemic Shock", body: msg, impact: "Retail & Office occupancy -15–30%" };
-      },
-    },
-
-    {
-      id: "interest_rate_shock",
-      name: "Unexpected Rate Shock",
-      type: "macro",
-      target: null,
-      baseProbability: 0.06,
-      cycleBias: { expanding: 1.5, stable: 0.8, contracting: 0.5, recession: 0.3 },
-      apply() {
-        const shock = randBetween(0.50, 1.00);
-        GameState.market.baseInterestRate = fmt(
-          Math.min(12, GameState.market.baseInterestRate + shock)
-        );
-        const msg = `Inflation data came in dramatically above expectations, forcing an emergency rate response. The base rate jumped ${fmt(shock*100)}bps to ${GameState.market.baseInterestRate}%. Bond markets are repricing and cap rates are expected to follow.`;
-        return { isMacro: true, headline: "⚡ Rate Shock", body: msg, impact: `+${fmt(shock*100)}bps emergency hike` };
-      },
-    },
-
-    // ---- SECTOR EVENTS ----------------------------------------
-
-    {
-      id: "retail_oversupply",
-      name: "Retail Oversupply Crisis",
-      type: "sector",
-      target: { sector: "retail" },
-      baseProbability: 0.12,
-      cycleBias: { expanding: 0.5, stable: 1.0, contracting: 2.0, recession: 2.5 },
-      apply() {
-        const props = getMatching(p => p.sector === "retail");
-        if (props.length === 0) return null;
-        applyOccupancyHit(props, 0.05, 0.15);
-        applyNOIChange(props, -0.05, -0.10);
-        const msg = pick([
-          "A wave of retailer bankruptcies has hit the sector. Several anchor tenants have vacated, and your retail properties are seeing significant occupancy pressure.",
-          "Online competition has accelerated store closures across the retail sector. Your shopping centers are feeling the heat with rising vacancies and falling rents.",
-          "National retail chains announced mass store closure programs this quarter, directly impacting occupancy across your retail portfolio.",
-        ]);
-        return { headline: "🏬 Retail Sector Crisis", body: msg, impact: "Retail occupancy & NOI down" };
-      },
-    },
-
-    {
-      id: "office_wfh",
-      name: "Work-From-Home Structural Shift",
-      type: "sector",
-      target: { sector: "office" },
-      baseProbability: 0.10,
-      cycleBias: { expanding: 0.7, stable: 1.2, contracting: 1.5, recession: 1.8 },
-      apply() {
-        const props = getMatching(p => p.sector === "office");
-        if (props.length === 0) return null;
-        // Suburban office hit hardest
-        const suburban = props.filter(p => p.location === "suburban");
-        const others   = props.filter(p => p.location !== "suburban");
-        applyOccupancyHit(suburban, 0.08, 0.18);
-        applyOccupancyHit(others,   0.03, 0.08);
-        const msg = pick([
-          "Major corporations announced permanent hybrid work policies this quarter, triggering lease non-renewals across suburban office markets. Your CBD assets are more resilient but not immune.",
-          "A survey of Fortune 500 tenants shows significant planned footprint reductions. Suburban office is most exposed; flight-to-quality continues to benefit Tier 1 assets.",
-        ]);
-        return { headline: "🏠 WFH Structural Shift", body: msg, impact: "Office occupancy down, suburban worst" };
-      },
-    },
-
-    {
-      id: "industrial_boom",
-      name: "Industrial / Logistics Boom",
-      type: "sector",
-      target: { sector: "industrial" },
-      baseProbability: 0.14,
-      cycleBias: { expanding: 2.0, stable: 1.5, contracting: 0.8, recession: 0.4 },
-      apply() {
-        const props = getMatching(p => p.sector === "industrial");
-        if (props.length === 0) return null;
-        applyNOIChange(props, 0.03, 0.08);
-        props.forEach(p => {
-          p.occupancy = Math.min(1.0, fmt(p.occupancy + randBetween(0.01, 0.04)));
-        });
-        const msg = pick([
-          "E-commerce demand continues to surge, driving record absorption of industrial space. Your logistics assets are benefiting from strong rent growth and near-full occupancy.",
-          "Supply chain restructuring is driving demand for last-mile logistics facilities. Your industrial portfolio is commanding premium rents at lease renewal.",
-        ]);
-        return { headline: "📦 Industrial Boom", body: msg, impact: "Industrial NOI & occupancy up" };
-      },
-    },
-
-    {
-      id: "multifamily_oversupply",
-      name: "Housing Oversupply",
-      type: "sector",
-      target: { sector: "multifamily" },
-      baseProbability: 0.10,
-      cycleBias: { expanding: 1.5, stable: 1.0, contracting: 0.8, recession: 0.5 },
-      apply() {
-        const props = getMatching(p =>
-          p.sector === "multifamily" && p.location === "suburban"
-        );
-        if (props.length === 0) return null;
-        applyOccupancyHit(props, 0.04, 0.10);
-        applyNOIChange(props, -0.03, -0.07);
-        const msg = pick([
-          "A construction boom over the past two years has flooded suburban apartment markets with new supply. Concessions are rising and renewal rents are flat to down.",
-          "Suburban multifamily is absorbing a surge of new completions. Your suburban apartment communities are facing higher vacancy and lower effective rents.",
-        ]);
-        return { headline: "🏘️ Multifamily Oversupply", body: msg, impact: "Suburban multifamily NOI & occupancy down" };
-      },
-    },
-
-    {
-      id: "multifamily_shortage",
-      name: "Housing Shortage Windfall",
-      type: "sector",
-      target: { sector: "multifamily" },
-      baseProbability: 0.10,
-      cycleBias: { expanding: 1.5, stable: 1.2, contracting: 0.8, recession: 0.3 },
-      apply() {
-        const props = getMatching(p => p.sector === "multifamily");
-        if (props.length === 0) return null;
-        applyNOIChange(props, 0.04, 0.09);
-        props.forEach(p => {
-          p.occupancy = Math.min(1.0, fmt(p.occupancy + randBetween(0.01, 0.03)));
-        });
-        const msg = "A chronic shortage of housing supply combined with strong population growth has pushed rents sharply higher. Your multifamily portfolio is seeing strong mark-to-market rent gains at lease expiry.";
-        return { headline: "🏠 Housing Shortage Windfall", body: msg, impact: "Multifamily NOI & occupancy up" };
-      },
-    },
-
-    // ---- PROPERTY-LEVEL EVENTS ----------------------------------------
-
-    {
-      id: "major_tenant_bankruptcy",
-      name: "Major Tenant Bankruptcy",
-      type: "property",
-      target: null,
-      baseProbability: 0.18,
-      cycleBias: { expanding: 0.5, stable: 0.8, contracting: 1.8, recession: 2.5 },
-      apply() {
-        if (GameState.portfolio.length === 0) return null;
-        // Pick one property at random, weighted toward retail and office
-        const weighted = GameState.portfolio.flatMap(p =>
-          p.sector === "retail" ? [p, p] :
-          p.sector === "office" ? [p, p] : [p]
-        );
-        const prop = pick(weighted);
-        const hit = randBetween(0.08, 0.20);
-        const oldOcc = prop.occupancy;
-        prop.occupancy = Math.max(0.30, fmt(prop.occupancy - hit));
-        const cost = randBetween(0.5, 2.0);
-        addUnusualItem(-fmt(cost));
-        const msg = pick([
-          `A major tenant at ${prop.name} filed for Chapter 11 bankruptcy protection, vacating ${fmt(hit*100)}% of leasable area. We incurred $${fmt(cost)}M in lease termination and re-leasing costs.`,
-          `${prop.name} lost its anchor tenant to insolvency this quarter. Occupancy fell from ${fmt(oldOcc*100)}% to ${fmt(prop.occupancy*100)}%. Re-leasing efforts are underway but will take 2–3 quarters.`,
-        ]);
-        return { headline: "💥 Tenant Bankruptcy", body: msg, impact: `${prop.name} occupancy -${fmt(hit*100)}%` };
-      },
-    },
-
-    {
-      id: "major_repair",
-      name: "Unexpected Capital Repair",
-      type: "property",
-      target: null,
-      baseProbability: 0.15,
-      cycleBias: { expanding: 1.0, stable: 1.0, contracting: 1.0, recession: 1.0 },
-      apply() {
-        if (GameState.portfolio.length === 0) return null;
-        // Older properties more likely
-        const weighted = GameState.portfolio.flatMap(p =>
-          p.age > 15 ? [p, p, p] : p.age > 8 ? [p, p] : [p]
-        );
-        const prop = pick(weighted);
-        const cost = randBetween(1.0, fmt(prop.currentValue * 0.04));
-        addUnusualItem(-fmt(cost));
-        const msg = pick([
-          `${prop.name} (age ${prop.age} years) required emergency roof replacement and HVAC system upgrade this quarter, resulting in a $${fmt(cost)}M unplanned capital expense.`,
-          `An inspection at ${prop.name} revealed significant structural issues requiring immediate remediation. The $${fmt(cost)}M repair program has been expensed this quarter.`,
-          `Fire suppression system failure at ${prop.name} required full system replacement. Insurance covered 40% of the $${fmt(cost*1.67)}M cost; our net expense was $${fmt(cost)}M.`,
-        ]);
-        return { headline: "🔧 Emergency Repair Required", body: msg, impact: `-$${fmt(cost)}M unusual expense` };
-      },
-    },
-
-    {
-      id: "new_lease_windfall",
-      name: "Major New Lease Signed",
-      type: "property",
-      target: null,
-      baseProbability: 0.14,
-      cycleBias: { expanding: 2.0, stable: 1.2, contracting: 0.6, recession: 0.3 },
-      apply() {
-        if (GameState.portfolio.length === 0) return null;
-        // Prefer properties with room to improve
-        const candidates = GameState.portfolio.filter(p => p.occupancy < 0.92);
-        if (candidates.length === 0) return null;
-        const prop = pick(candidates);
-        const gain = randBetween(0.03, 0.09);
-        prop.occupancy = Math.min(1.0, fmt(prop.occupancy + gain));
-        applyNOIChange([prop], 0.02, 0.05);
-        const msg = pick([
-          `We are pleased to announce a long-term lease agreement at ${prop.name} with a creditworthy national tenant. Occupancy at the property has increased to ${fmt(prop.occupancy*100)}%.`,
-          `${prop.name} signed a 10-year anchor lease this quarter, meaningfully improving occupancy and locking in above-market rents for the next decade.`,
-        ]);
-        return { headline: "✅ Major Lease Signed", body: msg, impact: `${prop.name} occupancy +${fmt(gain*100)}%` };
-      },
-    },
-
-    {
-      id: "zoning_approval",
-      name: "Zoning / Development Approval",
-      type: "property",
-      target: null,
-      baseProbability: 0.08,
-      cycleBias: { expanding: 1.5, stable: 1.2, contracting: 0.8, recession: 0.5 },
-      apply() {
-        if (GameState.portfolio.length === 0) return null;
-        const prop = pick(GameState.portfolio);
-        const valueGain = randBetween(0.03, 0.08);
-        prop.currentValue = fmt(prop.currentValue * (1 + valueGain));
-        const msg = `Planning authorities approved a density uplift application at ${prop.name}, allowing for additional development rights. Independent appraisers have marked the property up ${fmt(valueGain*100)}% to reflect the enhanced entitlement value.`;
-        return { headline: "📋 Zoning Approval", body: msg, impact: `${prop.name} value +${fmt(valueGain*100)}%` };
-      },
-    },
-
-    {
-      id: "natural_disaster",
-      name: "Natural Disaster / Extreme Weather",
-      type: "property",
-      target: null,
-      baseProbability: 0.06,
-      cycleBias: { expanding: 1.0, stable: 1.0, contracting: 1.0, recession: 1.0 },
-      apply() {
-        if (GameState.portfolio.length === 0) return null;
-        // Hit suburban properties more (less resilient infrastructure)
-        const weighted = GameState.portfolio.flatMap(p =>
-          p.location === "suburban" ? [p, p] : [p]
-        );
-        const prop = pick(weighted);
-        const cost = randBetween(2.0, fmt(prop.currentValue * 0.06));
-        const occHit = randBetween(0.05, 0.15);
-        prop.occupancy = Math.max(0.30, fmt(prop.occupancy - occHit));
-        addUnusualItem(-fmt(cost));
-        const msg = pick([
-          `Severe flooding caused significant damage to ${prop.name}. Insurance claims are underway but the net uninsured cost is estimated at $${fmt(cost)}M. Occupancy has been temporarily impacted while repairs are completed.`,
-          `${prop.name} sustained structural damage from an extreme weather event. Emergency repairs are costing $${fmt(cost)}M. Several tenants have invoked force majeure clauses on their leases.`,
-        ]);
-        return { headline: "🌪️ Natural Disaster", body: msg, impact: `-$${fmt(cost)}M + occupancy hit` };
-      },
-    },
-
-    {
-      id: "acquisition_offer",
-      name: "Unsolicited Acquisition Offer",
-      type: "property",
-      target: null,
-      baseProbability: 0.07,
-      cycleBias: { expanding: 2.0, stable: 1.0, contracting: 0.5, recession: 0.2 },
-      apply() {
-        if (GameState.portfolio.length === 0) return null;
-        const prop = pick(GameState.portfolio);
-        const premium = randBetween(0.08, 0.20);
-        const offerPrice = fmt(prop.currentValue * (1 + premium));
-        // Store the offer for UI to handle — player must decide next quarter
-        GameState._pendingOffer = {
-          propertyId: prop.id,
-          propertyName: prop.name,
-          offerPrice,
-          premium: fmt(premium * 100),
-          expiresNextQuarter: true,
-        };
-        const msg = `We have received an unsolicited offer of $${offerPrice}M for ${prop.name}, representing a ${fmt(premium*100)}% premium to current appraised value. The board is reviewing the offer. You may accept or decline next quarter.`;
-        return { headline: "💼 Acquisition Offer Received", body: msg, impact: `Offer: $${offerPrice}M for ${prop.name}` };
-      },
-    },
-
-  ]; // end EVENT_CATALOGUE
+  function fmt(n) { return Math.round(n * 100) / 100; }
+  function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 
   // ----------------------------------------------------------
-  // ROLL EVENTS FOR THE QUARTER
-  // Returns array of events that fired this quarter
+  // YEAR 1 SILENT SCORING
+  // Track how well player did without applying pressure
   // ----------------------------------------------------------
-  function rollEvents() {
-    const cycle = GameState.market.cycle;
-    const year = GameState.meta.year;
-    const firedEvents = [];
+  function updateYear1Score() {
+    const s = GameState.board.year1Score;
+    if (GameState.ratios.dividendCoverage < 0.90) s.dividendMaintained = false;
+    if (GameState.ratios.occupancyPortfolio < 0.75) s.occupancyOk = false;
+    if (GameState.ratios.debtToAssets > 0.60) s.leverageOk = false;
+    if (GameState.balance.cash < 10) s.cashOk = false;
+    if (GameState.history.length >= 2) {
+      const curr = GameState.pnl.noi;
+      const prev = GameState.history[GameState.history.length - 2]?.noi || curr;
+      if (curr < prev) s.noiGrowth = false;
+    }
+  }
 
-    // Base number of event slots per quarter (increases with years)
-    const eventSlots = Math.min(3, 1 + Math.floor(year / 3));
+  // ----------------------------------------------------------
+  // YEAR 1 END ASSESSMENT
+  // Returns starting pressure for Year 2 and board message
+  // ----------------------------------------------------------
+  function assessYear1() {
+    const s = GameState.board.year1Score;
+    let startingPressure = 0;
+    const failures = [];
+    const successes = [];
 
-    // Build probability-adjusted list
-    const candidates = EVENT_CATALOGUE.map(evt => {
-      const bias = evt.cycleBias[cycle] || 1.0;
-      // Probability scales up slightly with years (world gets more volatile)
-      const yearMod = 1 + (year - 1) * 0.05;
-      return {
-        evt,
-        probability: Math.min(0.60, evt.baseProbability * bias * yearMod),
+    if (!s.dividendMaintained) { startingPressure += 2; failures.push("dividend coverage was repeatedly insufficient"); }
+    else successes.push("dividend was maintained throughout the year");
+
+    if (!s.occupancyOk)  { startingPressure += 1; failures.push("portfolio occupancy fell below 75%"); }
+    else successes.push("occupancy remained healthy");
+
+    if (!s.leverageOk)   { startingPressure += 1; failures.push("leverage exceeded our 60% limit"); }
+    else successes.push("leverage was kept within limits");
+
+    if (!s.cashOk)       { startingPressure += 1; failures.push("liquidity fell to dangerously low levels"); }
+    else successes.push("adequate liquidity was maintained");
+
+    if (!s.noiGrowth)    { startingPressure += 1; failures.push("NOI failed to grow during the orientation year"); }
+    else successes.push("NOI showed positive momentum");
+
+    // Apply starting pressure to Year 2
+    GameState.board.pressurePoints = Math.min(GameState.board.maxPressure - 1, startingPressure);
+
+    const performance = startingPressure === 0 ? "excellent"
+                      : startingPressure <= 2  ? "acceptable"
+                      : startingPressure <= 4  ? "disappointing"
+                      : "deeply concerning";
+
+    const successText = successes.length > 0
+      ? `On the positive side: ${successes.join("; ")}.`
+      : "";
+    const failureText = failures.length > 0
+      ? `However, the board is troubled that ${failures.join("; ")}.`
+      : "";
+
+    const letter = `Dear ${GameState.player.name},\n\n` +
+      `The board has completed its Year 1 orientation assessment of your tenure as CEO of ${GameState.company.name}.\n\n` +
+      `Your overall performance during the orientation year was ${performance}. ${successText} ${failureText}\n\n` +
+      `Effective Year 2, the board will apply full scrutiny. You are entering Year 2 with ${startingPressure} pressure point${startingPressure !== 1 ? "s" : ""} already on the record. ` +
+      `${startingPressure >= 5 ? "We strongly advise immediate corrective action — your position is already precarious." : startingPressure >= 3 ? "The board will be watching closely from the first quarter." : "We wish you continued success."}`;
+
+    return { letter, startingPressure, performance };
+  }
+
+  // ----------------------------------------------------------
+  // SET ANNUAL GOALS
+  // Board sets explicit targets for the coming year
+  // ----------------------------------------------------------
+  function setAnnualGoals(year) {
+    const goals = [];
+
+    // Goals tighten each year
+    const coverageTarget  = Math.round((1.05 + (year - 1) * 0.05) * 100) / 100;
+    const occupancyTarget = Math.round((0.82 + (year - 1) * 0.01) * 100) / 100;
+    const leverageTarget  = Math.round((0.55 - (year - 2) * 0.01) * 100) / 100;
+
+    // Dynamic dividend growth target based on prior year FFO growth
+    var divGrowthTarget = 0.05; // default 5%
+    if (GameState.history.length >= 4) {
+      var h = GameState.history;
+      var currFFO = h[h.length - 1].ffo || 0;
+      var prevFFO = h.length >= 8 ? h[h.length - 5].ffo || currFFO : currFFO;
+      var ffoGrowth = prevFFO > 0 ? (currFFO - prevFFO) / prevFFO : 0;
+      if (ffoGrowth >= 0.15)      divGrowthTarget = 0.25;  // great year: 25% raise expected
+      else if (ffoGrowth >= 0.08) divGrowthTarget = 0.12;  // good year: 12% raise
+      else if (ffoGrowth >= 0.03) divGrowthTarget = 0.07;  // decent year: 7% raise
+      else if (ffoGrowth > 0)     divGrowthTarget = 0.03;  // modest year: 3% raise
+      else                        divGrowthTarget = 0;      // decline: just maintain
+    }
+    var currentDiv    = GameState.company.dividendPerShare;
+    var targetDiv     = Math.round(currentDiv * (1 + divGrowthTarget) * 100) / 100;
+    var divGrowthPct  = Math.round(divGrowthTarget * 100);
+
+    goals.push({ metric: "Dividend Coverage",    target: ">" + coverageTarget + "x",           key: "dividendCoverage",   threshold: coverageTarget });
+    goals.push({ metric: "Dividend per Share",   target: ">$" + targetDiv + " (+" + divGrowthPct + "%)", key: "dividendPerShare", threshold: targetDiv, divTarget: true });
+    goals.push({ metric: "Portfolio Occupancy",  target: ">" + fmt(occupancyTarget*100) + "%",  key: "occupancyPortfolio", threshold: occupancyTarget });
+    goals.push({ metric: "Debt / Assets",        target: "<" + fmt(leverageTarget*100) + "%",   key: "debtToAssets",       threshold: leverageTarget, inverse: true });
+    goals.push({ metric: "FFO Growth (YoY)",     target: ">0%",                                 key: "ffoGrowth",          threshold: 0 });
+
+    if (year >= 3) goals.push({ metric: "Interest Coverage", target: ">1.8x", key: "interestCoverage", threshold: 1.8 });
+    if (year >= 4) goals.push({ metric: "Credit Rating",     target: "BBB+",  key: "creditRating",     threshold: "BBB" });
+
+    GameState.board.lastYearGoals = GameState.board.currentGoals;
+    GameState.board.currentGoals  = goals;
+    return goals;
+  }
+
+  // ----------------------------------------------------------
+  // EVALUATE GOALS vs LAST YEAR
+  // ----------------------------------------------------------
+  function evaluateGoals() {
+    const goals   = GameState.board.lastYearGoals;
+    const history = GameState.history;
+    if (goals.length === 0 || history.length < 4) return [];
+
+    const lastYearHistory = history.slice(-4);
+    return goals.map(goal => {
+      let met = false;
+      if (goal.key === "dividendCoverage") {
+        const avg = lastYearHistory.reduce((s, h) => s + (h.dividendCoverage || 0), 0) / lastYearHistory.length;
+        met = avg >= goal.threshold;
+      } else if (goal.key === "occupancyPortfolio") {
+        const avg = lastYearHistory.reduce((s, h) => s + (h.occupancy || 0), 0) / lastYearHistory.length;
+        met = avg >= goal.threshold;
+      } else if (goal.key === "debtToAssets") {
+        const avg = lastYearHistory.reduce((s, h) => s + (h.debtToAssets || 0), 0) / lastYearHistory.length;
+        met = avg <= goal.threshold;
+      } else if (goal.key === "dividendPerShare") {
+        met = GameState.company.dividendPerShare >= goal.threshold;
+      } else if (goal.key === "ffoGrowth") {
+        met = (GameState.board.thresholds.ffoGrowth || 0) >= goal.threshold;
+      } else if (goal.key === "interestCoverage") {
+        const avg = lastYearHistory.reduce((s, h) => s + (h.interestCoverage || 0), 0) / lastYearHistory.length;
+        met = avg >= goal.threshold;
+      } else if (goal.key === "creditRating") {
+        const order = ["CCC","B","BB","BBB","A","AA","AAA"];
+        met = order.indexOf(GameState.credit.rating) >= order.indexOf(goal.threshold);
+      }
+      return { ...goal, met };
+    });
+  }
+
+  // ----------------------------------------------------------
+  // GENERATE ANNUAL REPORT
+  // Called at end of Q4 each year
+  // ----------------------------------------------------------
+  function generateAnnualReport() {
+    const year    = GameState.meta.year - 1;  // year just completed
+    const history = GameState.history;
+    const isYear1 = year === 1;
+
+    // Pull this year's 4 quarters
+    const yearHistory = history.slice(-4);
+    if (yearHistory.length === 0) return null;
+
+    // Prior year snapshot for comparison
+    const priorSnapshot = GameState.annualSnapshots.length > 0
+      ? GameState.annualSnapshots[GameState.annualSnapshots.length - 1]
+      : null;
+
+    // Full year aggregates
+    const totalRevenue     = yearHistory.reduce((s, h) => s + (h.grossPotentialRent || 0), 0);
+    const totalNOI         = yearHistory.reduce((s, h) => s + (h.noi || 0), 0);
+    const totalFFO         = yearHistory.reduce((s, h) => s + (h.ffo || 0), 0);
+    const totalAFFO        = yearHistory.reduce((s, h) => s + (h.affo || 0), 0);
+    const totalDividends   = yearHistory.reduce((s, h) => s + (h.dividendsPaid || 0), 0);
+    const totalRetained    = yearHistory.reduce((s, h) => s + (h.retainedCash || 0), 0);
+    const avgOccupancy     = yearHistory.reduce((s, h) => s + (h.occupancy || 0), 0) / yearHistory.length;
+    const avgCoverage      = yearHistory.reduce((s, h) => s + (h.dividendCoverage || 0), 0) / yearHistory.length;
+
+    // Share stats
+    const startPrice = priorSnapshot?.endSharePrice || yearHistory[0].sharePrice;
+    const endPrice   = yearHistory[yearHistory.length - 1].sharePrice;
+    const priceChg   = startPrice > 0 ? ((endPrice - startPrice) / startPrice * 100) : 0;
+
+    // Balance sheet
+    const startAssets = priorSnapshot?.endAssets || yearHistory[0].totalAssets;
+    const endAssets   = yearHistory[yearHistory.length - 1].totalAssets;
+    const startDebt   = priorSnapshot?.endDebt   || yearHistory[0].totalDebt;
+    const endDebt     = yearHistory[yearHistory.length - 1].totalDebt;
+    const startRating = priorSnapshot?.endRating  || yearHistory[0].creditRating;
+    const endRating   = yearHistory[yearHistory.length - 1].creditRating;
+
+    // Portfolio
+    const startProps  = priorSnapshot?.endProps   || 0;
+    const endProps    = yearHistory[yearHistory.length - 1].portfolioSize;
+
+    // Best/worst property
+    let bestProp = null, worstProp = null;
+    if (GameState.portfolio.length > 0) {
+      const sorted = [...GameState.portfolio].sort((a, b) => b.occupancy - a.occupancy);
+      bestProp  = sorted[0];
+      worstProp = sorted[sorted.length - 1];
+    }
+
+    // Key events this year
+    const yearEvents = GameState.eventLog
+      .filter(e => e.year === year)
+      .flatMap(e => e.events || [])
+      .slice(0, 6);
+
+    // Year 1 assessment or goal evaluation
+    let boardAssessment = null;
+    let nextYearGoals   = [];
+
+    if (isYear1) {
+      boardAssessment = assessYear1();
+      nextYearGoals   = setAnnualGoals(2);
+    } else {
+      const goalResults = evaluateGoals();
+      const metCount    = goalResults.filter(g => g.met).length;
+      const totalGoals  = goalResults.length;
+      nextYearGoals     = setAnnualGoals(year + 1);
+
+      const perf = metCount === totalGoals ? "all targets"
+                 : metCount >= totalGoals * 0.7 ? "most targets"
+                 : metCount >= totalGoals * 0.4 ? "some targets"
+                 : "few targets";
+
+      boardAssessment = {
+        goalResults,
+        metCount,
+        totalGoals,
+        performance: perf,
+        letter: `${GameState.player.name}, you met ${metCount} of ${totalGoals} board targets for Year ${year}. ` +
+          (metCount === totalGoals
+            ? "Excellent execution. The board is pleased with management's performance."
+            : metCount >= totalGoals * 0.7
+            ? "A solid year overall, though some areas need attention going forward."
+            : metCount >= totalGoals * 0.4
+            ? "Mixed results. Several key metrics fell short of board expectations."
+            : "A disappointing year. The board expects significant improvement in Year " + (year + 1) + "."),
       };
-    });
 
-    // Roll each event independently
-    const firedIds = new Set();
-    candidates.forEach(({ evt, probability }) => {
-      if (firedIds.has(evt.id)) return;
-      if (Math.random() < probability) {
-        const result = evt.apply();
-        if (result) {
-          firedIds.add(evt.id);
-          firedEvents.push(result);
+      // Apply pressure adjustments based on goal performance
+      if (metCount < totalGoals * 0.4) {
+        GameState.board.pressurePoints = Math.min(
+          GameState.board.maxPressure,
+          GameState.board.pressurePoints + 1
+        );
+      } else if (metCount === totalGoals) {
+        GameState.board.pressurePoints = Math.max(0, GameState.board.pressurePoints - 1);
+      }
+    }
+
+    // Save annual snapshot
+    const snapshot = {
+      year,
+      totalRevenue:   fmt(totalRevenue),
+      totalNOI:       fmt(totalNOI),
+      totalFFO:       fmt(totalFFO),
+      totalAFFO:      fmt(totalAFFO),
+      totalDividends: fmt(totalDividends),
+      totalRetained:  fmt(totalRetained),
+      avgOccupancy:   fmt(avgOccupancy),
+      avgCoverage:    fmt(avgCoverage),
+      startPrice:     fmt(startPrice),
+      endPrice:       fmt(endPrice),
+      priceChg:       fmt(priceChg),
+      startAssets:    fmt(startAssets),
+      endAssets:      fmt(endAssets),
+      startDebt:      fmt(startDebt),
+      endDebt:        fmt(endDebt),
+      startRating,
+      endRating,
+      startProps,
+      endProps,
+      bestProp:       bestProp  ? { name: bestProp.name,  occ: fmt(bestProp.occupancy * 100)  } : null,
+      worstProp:      worstProp ? { name: worstProp.name, occ: fmt(worstProp.occupancy * 100) } : null,
+      yearEvents,
+      boardAssessment,
+      nextYearGoals,
+    };
+
+    GameState.annualSnapshots.push(snapshot);
+    return snapshot;
+  }
+
+  // ----------------------------------------------------------
+  // EVALUATE QUARTER (regular pressure evaluation)
+  // ----------------------------------------------------------
+  function evaluateQuarter() {
+    const isTutorial = GameState.meta.tutorialYear;
+
+    // Update Year 1 silent scoring
+    if (isTutorial) updateYear1Score();
+
+    const pressureChanges = [];
+    let totalDelta = 0;
+
+    // In tutorial year — evaluate but don't apply pressure or fire
+    PRESSURE_RULES.forEach(rule => {
+      const result = rule.evaluate();
+      if (!result) return;
+
+      if (!isTutorial) {
+        if (result.points) {
+          GameState.board.pressurePoints = Math.min(
+            GameState.board.maxPressure,
+            GameState.board.pressurePoints + result.points
+          );
+          totalDelta += result.points;
+          pressureChanges.push({ rule: rule.label, type: "pressure", points: result.points, reason: result.reason });
+          GameState.board.pressureLog.push({ quarter: GameState.meta.quarter, year: GameState.meta.year, reason: result.reason, points: result.points });
         }
+        if (result.relief) {
+          GameState.board.pressurePoints = Math.max(0, GameState.board.pressurePoints - result.relief);
+          totalDelta -= result.relief;
+          pressureChanges.push({ rule: rule.label, type: "relief", points: result.relief, reason: result.reason });
+        }
+      } else {
+        // In tutorial: show what WOULD have happened
+        if (result.points) pressureChanges.push({ rule: rule.label, type: "warning", points: result.points, reason: `[Year 1 — no penalty yet] ${result.reason}` });
+        if (result.relief) pressureChanges.push({ rule: rule.label, type: "relief",  points: result.relief, reason: result.reason });
       }
     });
 
-    // Cap at eventSlots to avoid chaos
-    return firedEvents.slice(0, eventSlots);
+    // Yearly escalation (not in tutorial)
+    if (!isTutorial) {
+      const yearlyPressure = Math.floor(GameState.meta.year / 3);
+      if (yearlyPressure > 0) {
+        GameState.board.pressurePoints = Math.min(GameState.board.maxPressure, GameState.board.pressurePoints + yearlyPressure);
+      }
+    }
+
+    // Update mood
+    const pct = GameState.board.pressurePoints / GameState.board.maxPressure;
+    const moodLevel = MOOD_LEVELS.slice().reverse().find(m => pct > m.maxPct) || MOOD_LEVELS[0];
+    GameState.board.mood = isTutorial
+      ? (pressureChanges.some(p => p.type === "warning") ? "concerned" : "neutral")
+      : moodLevel.mood;
+
+    // Game over check (never in tutorial year)
+    if (!isTutorial && GameState.board.pressurePoints >= GameState.board.maxPressure) {
+      GameState.meta.gameOver      = true;
+      GameState.meta.gameOverReason = generateTerminationLetter();
+    }
+
+    return { pressureChanges, totalDelta, currentPressure: GameState.board.pressurePoints, maxPressure: GameState.board.maxPressure, mood: GameState.board.mood, gameOver: GameState.meta.gameOver, isTutorial };
   }
 
   // ----------------------------------------------------------
-  // INITIALISE — clear any pending offers at game start
+  // TUTORIAL COACHING MESSAGES
+  // One per quarter in Year 1
+  // ----------------------------------------------------------
+  function getTutorialMessage() {
+    const q = GameState.meta.quarter;
+    const msgs = {
+      1: `Welcome, ${GameState.player.name}. This is your orientation year — the board will not fire you in Year 1, but we are watching and scoring you silently. Focus on growing your NOI base by acquiring 1–2 properties this quarter. Check the Property Market tab.`,
+      2: `Q2 already. Your interest coverage ratio is important — make sure your NOI comfortably exceeds your quarterly interest expense. If it's below 1.5x, consider either acquiring more properties or reducing debt. Check the Ratios panel on the left.`,
+      3: `You're halfway through Year 1. Now is a good time to review your debt maturity ladder — click any bar on the chart to see which tranches are coming due. You don't want multiple large maturities arriving in the same quarter.`,
+      4: `Final quarter of Year 1. The board will issue its orientation assessment after this quarter and set targets for Year 2. Make sure your dividend coverage is above 1.0x and occupancy above 75% — these carry the most weight in our assessment.`,
+    };
+    return msgs[q] || "";
+  }
+
+  // ----------------------------------------------------------
+  // CFO EARNINGS REPORT
+  // ----------------------------------------------------------
+  function generateEarningsReport(quarterResult, boardResult) {
+    const { pnl, ratios, marketResult, firedEvents, maturityMsgs } = quarterResult;
+    const period  = GameState.currentPeriodLabel();
+    const company = GameState.company;
+    const credit  = GameState.credit;
+    const market  = GameState.market;
+    const isTutorial = GameState.meta.tutorialYear;
+
+    const openings = {
+      pleased:   [`${period} delivered strong results across the portfolio.`, `Management is pleased to report solid execution in ${period}.`],
+      neutral:   [`${period} produced results broadly in line with expectations.`, `${period} saw mixed performance across the portfolio.`],
+      concerned: [`${period} presented meaningful challenges management is addressing.`, `We must be candid with the board about a difficult ${period}.`],
+      angry:     [`${period} was a disappointing quarter requiring immediate action.`, `The board should be aware that ${period} results are deeply concerning.`],
+      furious:   [`${period} results represent a serious deterioration requiring urgent intervention.`],
+    };
+    const opening = pick(openings[GameState.board.mood] || openings.neutral);
+
+    const tutorialNote = isTutorial
+      ? `\n\n[ORIENTATION YEAR: Board pressure suspended. ${getTutorialMessage()}]`
+      : "";
+
+    const ffoLine = `FFO came in at $${fmt(pnl.ffo)}M ($${fmt(ratios.ffoPerShare)}/share) against a quarterly dividend of $${fmt(pnl.dividendsPaid)}M ($${company.dividendPerShare}/share), implying coverage of ${fmt(ratios.dividendCoverage)}x.`;
+    const noiLine = `Net Operating Income was $${fmt(pnl.noi)}M on gross potential rent of $${fmt(pnl.grossPotentialRent)}M, with vacancy loss of $${fmt(pnl.vacancyLoss)}M reflecting portfolio occupancy of ${fmt(ratios.occupancyPortfolio * 100)}%.`;
+    const rateLine = `Base rates stand at ${market.baseInterestRate}%. Our credit rating is ${credit.rating} (spread: +${credit.spread}%), giving an all-in borrowing cost of ${fmt(market.baseInterestRate + credit.spread)}%.${credit.watchNegative ? " We are on negative credit watch." : ""}`;
+    const levLine  = `The balance sheet carries $${fmt(GameState.balance.totalDebt)}M of debt against $${fmt(GameState.balance.totalAssets)}M of assets (${fmt(ratios.debtToAssets * 100)}% LTV). Interest coverage: ${fmt(ratios.interestCoverage)}x.`;
+
+    const pressureLines = {
+      pleased:   "The board is satisfied with management's execution.",
+      neutral:   "The board notes performance is broadly on track.",
+      concerned: `The board has flagged ${boardResult.pressureChanges.filter(p => p.type === "pressure").length} areas of concern.`,
+      angry:     `The board is registering serious dissatisfaction. Pressure at ${boardResult.currentPressure}/${boardResult.maxPressure}.`,
+      furious:   `The board is considering management changes. Pressure critical at ${boardResult.currentPressure}/${boardResult.maxPressure}.`,
+    };
+    const pressureLine = isTutorial
+      ? "The board is monitoring your progress during the orientation year."
+      : (pressureLines[GameState.board.mood] || "");
+
+    const eventLines    = firedEvents.length > 0 ? `Notable items: ${firedEvents.map(e => e.headline).join(", ")}.` : "No material unusual items this quarter.";
+    const maturityLine  = maturityMsgs.length > 0 ? maturityMsgs.join(" ") : "";
+    const cycleChangeLine = marketResult.cycleResult?.cycleChanged ? `⚠️ Market cycle shift: Entering a ${marketResult.cycleResult.label} phase. ${marketResult.cycleResult.description}` : "";
+
+    const marketLine = marketResult.commentary;
+
+    const body = [opening, tutorialNote, "", noiLine, ffoLine, "", marketLine, rateLine, levLine, "", eventLines, maturityLine, cycleChangeLine, "", pressureLine]
+      .filter(l => l !== undefined && l !== null)
+      .join(" ").replace(/ {2,}/g, " ").trim();
+
+    const headlines = {
+      pleased:   `✅ ${period} — Strong Results`,
+      neutral:   `📋 ${period} — Steady Quarter`,
+      concerned: `⚠️ ${period} — Challenges Emerging`,
+      angry:     `🔴 ${period} — Board Dissatisfied`,
+      furious:   `🚨 ${period} — Crisis: Board Intervention Imminent`,
+    };
+    const tutorialHeadline = `📚 ${period} — Orientation Year`;
+    const headline = isTutorial ? tutorialHeadline : (headlines[GameState.board.mood] || `📋 ${period} Earnings Report`);
+
+    GameState.eventLog.push({ quarter: GameState.meta.quarter, year: GameState.meta.year, headline, body, events: firedEvents, pressure: boardResult });
+
+    return { headline, body, firedEvents, boardResult };
+  }
+
+  // ----------------------------------------------------------
+  // TERMINATION LETTER
+  // ----------------------------------------------------------
+  function generateTerminationLetter() {
+    const quarters = GameState.meta.totalQuarters;
+    const years    = GameState.meta.year;
+    const lastFail = GameState.board.pressureLog.length > 0
+      ? GameState.board.pressureLog[GameState.board.pressureLog.length - 1].reason
+      : "sustained underperformance";
+
+    return pick([
+      `After careful deliberation, the Board of ${GameState.company.name} has voted to remove ${GameState.player.name} as CEO, effective immediately. The final issue: ${lastFail}. The company operated for ${quarters} quarters (${years} years) under your leadership.`,
+      `${GameState.player.name}, the Board has lost confidence in your ability to manage ${GameState.company.name}. Accumulated pressure reached the maximum threshold. The final straw was: ${lastFail}. You survived ${quarters} quarters.`,
+      `NOTICE OF TERMINATION: Following ${quarters} quarters of leadership, the Board of ${GameState.company.name} has exercised its right to replace management. Key metrics including dividend coverage (${fmt(GameState.ratios.dividendCoverage)}x), leverage (${fmt(GameState.ratios.debtToAssets*100)}%), and occupancy (${fmt(GameState.ratios.occupancyPortfolio*100)}%) failed to meet required standards.`,
+    ]);
+  }
+
+  // ----------------------------------------------------------
+  // BOARD STATUS
+  // ----------------------------------------------------------
+  function getBoardStatus() {
+    const pressure = GameState.board.pressurePoints;
+    const max      = GameState.board.maxPressure;
+    const mood     = GameState.board.mood;
+    const pct      = pressure / max;
+    const moodLevel = MOOD_LEVELS.slice().reverse().find(m => pct > m.maxPct) || MOOD_LEVELS[0];
+
+    return {
+      pressure, max, pct: fmt(pct * 100), mood,
+      moodLabel:  moodLevel.label,
+      color:      moodLevel.color,
+      isTutorial: GameState.meta.tutorialYear,
+      warningMsg: pct >= 0.75 ? "⚠️ Board patience nearly exhausted." : pct >= 0.50 ? "The board is watching closely." : null,
+    };
+  }
+
+  // ----------------------------------------------------------
+  // INIT
   // ----------------------------------------------------------
   function init() {
-    GameState._pendingOffer = null;
+    GameState.board.pressurePoints = 0;
+    GameState.board.maxPressure    = 8;
+    GameState.board.mood           = "neutral";
+    GameState.board.pressureLog    = [];
+    GameState.board.currentGoals   = [];
+    GameState.board.lastYearGoals  = [];
+    GameState.board.year1Score     = { dividendMaintained: true, occupancyOk: true, leverageOk: true, cashOk: true, noiGrowth: true };
+    GameState.board.thresholds     = { dividendCoverage: 1.0, debtToAssets: 0.60, occupancy: 0.80, ffoGrowth: 0 };
+    GameState.eventLog             = [];
+    GameState.annualSnapshots      = [];
+    GameState.meta.tutorialYear    = true;
+
+    // Set initial Year 1 goals (coaching targets, not enforced)
+    GameState.board.currentGoals = [
+      { metric: "Dividend Coverage",   target: ">0.90x",  threshold: 0.90 },
+      { metric: "Portfolio Occupancy", target: ">75%",    threshold: 0.75 },
+      { metric: "Debt / Assets",       target: "<60%",    threshold: 0.60, inverse: true },
+      { metric: "Cash",                target: ">$10M",   threshold: 10 },
+    ];
   }
 
-  // ----------------------------------------------------------
-  // PUBLIC API
-  // ----------------------------------------------------------
   return {
-    init,
-    rollEvents,
-    EVENT_CATALOGUE,
+    init, evaluateQuarter, generateEarningsReport,
+    generateAnnualReport, getBoardStatus, assessYear1,
+    setAnnualGoals, getTutorialMessage,
+    PRESSURE_RULES, MOOD_LEVELS,
   };
 
 })();
