@@ -3,7 +3,7 @@
 // REIT Simulator Game
 // ============================================================
 
-const GameState = {
+window.GameState = {
 
   // ----------------------------------------------------------
   // PLAYER IDENTITY
@@ -56,7 +56,7 @@ const GameState = {
   debtTranches: [
     {
       id:                   "d001",
-      amount:               35,
+      amount:               25,
       rate:                 5.0,
       maturityQuarter:      2,
       maturityYear:         4,
@@ -65,7 +65,7 @@ const GameState = {
     },
     {
       id:                   "d002",
-      amount:               35,
+      amount:               25,
       rate:                 5.5,
       maturityQuarter:      4,
       maturityYear:         6,
