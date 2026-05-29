@@ -143,7 +143,16 @@ window.UI = (function() {
     setText("bs-shares", fmt(GameState.company.sharesOutstanding, 1) + "M");
     setText("bs-divps",  fmtPS(GameState.company.dividendPerShare));
     var cashEl = el("bs-cash");
-    if (cashEl) cashEl.className = b.cash < 10 ? "text-red" : b.cash < 25 ? "text-yellow" : "text-green";
+    if (cashEl) {
+      if (b.cash < 0)  cashEl.className = "text-red";
+      else if (b.cash < 10) cashEl.className = "text-red";
+      else if (b.cash < 25) cashEl.className = "text-yellow";
+      else cashEl.className = "text-green";
+      // Show overdraft warning
+      if (b.cash < 0) {
+        cashEl.textContent = fmtM(b.cash) + " ⚠ OVERDRAFT";
+      }
+    }
   }
 
   function renderDebtPanel() {
@@ -675,6 +684,7 @@ window.UI = (function() {
     GameState.company.dividendPerShare    = 0.10;
     GameState.company.dividendHistory     = [];
     GameState.company.dividendCutQuarters = 0;
+    GameState.company.equityIssuanceCount  = 0;
     GameState.balance.cash                = 50;
 
     GameState.debtTranches = [
