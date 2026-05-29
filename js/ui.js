@@ -608,12 +608,25 @@ window.UI = (function() {
       if (o) o.classList.add("hidden");
     });
 
-    renderAll();
-    showToast("Welcome, " + playerName + ". Good luck running " + reitName + " REIT.", "success");
-    Leaderboard.renderLeaderboard("leaderboard-container");
-  }
+renderAll();
+    showModal(
+      "📜 Letter from the Board of Directors",
+      "Dear " + playerName + ",\n\n" +
+      "The Board of Directors is pleased to appoint you as Chief Executive Officer of " + reitName + " REIT.\n\n" +
+      "Year 1 is an orientation period. We will not terminate your contract regardless of performance, but we are watching and scoring you silently. At year end we will issue a formal assessment and set binding targets for Year 2 onwards.\n\n" +
+      "The board's priorities are simple:\n" +
+      "▸ Dividend coverage — FFO must cover what you pay out (target >1.0x)\n" +
+      "▸ Leverage — debt must not exceed 60% of assets\n" +
+      "▸ Occupancy — keep your properties tenanted (target >80%)\n" +
+      "▸ FFO growth — the board expects earnings to grow each year\n\n" +
+      "You have $100M cash, two properties, and $250M of debt. The market is stable. Use Year 1 wisely — acquire properties to grow your NOI base and make sure your dividend is covered before Year 2 begins.\n\n" +
+      "The world is unpredictable. Good management is about surviving the bad quarters, not just enjoying the good ones.\n\n" +
+      "— The Board of Directors",
+      []
+    );
 
-  // ----------------------------------------------------------
+    
+    // ----------------------------------------------------------
   // INIT — called once on page load, shows start screen only
   // ----------------------------------------------------------
   function init() {
