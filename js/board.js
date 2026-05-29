@@ -1,643 +1,803 @@
 // ============================================================
-// board.js — Board pressure, win/lose, annual report, tutorial
+// financials.js — Quarterly P&L engine, ratios, balance sheet
 // REIT Simulator Game
 // ============================================================
+// RULES FOR EDITING THIS FILE:
+// - This is the master calculation engine for each quarter
+// - Call Financials.runQuarter() once per quarter advance
+// - It reads from GameState.portfolio, market, debt, company
+// - It writes to GameState.pnl, ratios, balance, history
+// - It never generates events — events.js does that
+// - It never renders anything — ui.js does that
+// ============================================================
 
-window.Board = (() => {
-
-  const MOOD_LEVELS = [
-    { maxPct: 0.00, mood: "pleased",  label: "Pleased",  color: "#22c55e" },
-    { maxPct: 0.25, mood: "neutral",  label: "Neutral",  color: "#94a3b8" },
-    { maxPct: 0.50, mood: "concerned",label: "Concerned",color: "#f59e0b" },
-    { maxPct: 0.75, mood: "angry",    label: "Angry",    color: "#ef4444" },
-    { maxPct: 1.00, mood: "furious",  label: "Furious",  color: "#7f1d1d" },
-  ];
-
-  const PRESSURE_RULES = [
-    {
-      id: "dividend_coverage", label: "Dividend Coverage",
-      evaluate() {
-        const coverage  = GameState.ratios.dividendCoverage;
-        const threshold = GameState.board.thresholds.dividendCoverage;
-        if (coverage < 0.85) return { points: 3, reason: `Dividend coverage critically low at ${fmt(coverage)}x (min ${threshold}x)` };
-        if (coverage < threshold) return { points: 1, reason: `Dividend coverage below threshold: ${fmt(coverage)}x vs ${threshold}x` };
-        if (coverage > 1.40) return { relief: 1, reason: `Strong dividend coverage of ${fmt(coverage)}x` };
-        return null;
-      },
-    },
-    {
-      id: "debt_to_assets", label: "Leverage",
-      evaluate() {
-        const d2a       = GameState.ratios.debtToAssets;
-        const threshold = GameState.board.thresholds.debtToAssets;
-        if (d2a > 0.65) return { points: 3, reason: `Leverage dangerously high at ${fmt(d2a*100)}% debt/assets` };
-        if (d2a > threshold) return { points: 1, reason: `Leverage above threshold: ${fmt(d2a*100)}% vs ${fmt(threshold*100)}% limit` };
-        if (d2a < 0.35) return { relief: 1, reason: `Conservative leverage at ${fmt(d2a*100)}% debt/assets` };
-        return null;
-      },
-    },
-    {
-      id: "occupancy", label: "Portfolio Occupancy",
-      evaluate() {
-        const occ       = GameState.ratios.occupancyPortfolio;
-        const threshold = GameState.board.thresholds.occupancy;
-        if (occ < 0.72) return { points: 3, reason: `Portfolio occupancy critically low at ${fmt(occ*100)}%` };
-        if (occ < threshold) return { points: 1, reason: `Occupancy below threshold: ${fmt(occ*100)}% vs ${fmt(threshold*100)}%` };
-        if (occ > 0.93) return { relief: 1, reason: `Excellent occupancy at ${fmt(occ*100)}%` };
-        return null;
-      },
-    },
-    {
-      id: "ffo_growth", label: "FFO Growth",
-      evaluate() {
-        const history = GameState.history;
-        if (history.length < 4) return null;
-        const currentFFO   = GameState.pnl.ffo;
-        const priorYearFFO = history[history.length - 4]?.ffo || currentFFO;
-        const growth = priorYearFFO > 0 ? (currentFFO - priorYearFFO) / priorYearFFO : 0;
-        GameState.board.thresholds.ffoGrowth = growth;
-        if (growth < -0.10) return { points: 2, reason: `FFO declined ${fmt(Math.abs(growth)*100)}% year-over-year` };
-        if (growth < 0)     return { points: 1, reason: `FFO down ${fmt(Math.abs(growth)*100)}% year-over-year` };
-        if (growth > 0.08)  return { relief: 1, reason: `Strong FFO growth of ${fmt(growth*100)}% year-over-year` };
-        return null;
-      },
-    },
-    {
-      id: "interest_coverage", label: "Interest Coverage",
-      evaluate() {
-        const coverage = GameState.ratios.interestCoverage;
-        if (coverage < 1.20) return { points: 3, reason: `Interest coverage dangerously thin at ${fmt(coverage)}x` };
-        if (coverage < 1.50) return { points: 1, reason: `Interest coverage weak at ${fmt(coverage)}x` };
-        return null;
-      },
-    },
-    {
-      id: "cash_position", label: "Cash Position",
-      evaluate() {
-        const cash    = GameState.balance.cash;
-        const assets  = GameState.balance.totalAssets;
-        const cashPct = assets > 0 ? cash / assets : 0;
-        if (cash < 5)       return { points: 2, reason: `Critical liquidity — only $${fmt(cash)}M cash` };
-        if (cashPct < 0.02) return { points: 1, reason: `Low liquidity: cash at ${fmt(cashPct*100)}% of assets` };
-        return null;
-      },
-    },
-    {
-      id: "credit_rating", label: "Credit Rating",
-      evaluate() {
-        const rating = GameState.credit.rating;
-        const watch  = GameState.credit.watchNegative;
-        if (rating === "CCC")          return { points: 3, reason: "Credit rating in distressed territory (CCC)" };
-        if (rating === "B")            return { points: 2, reason: "Credit rating fallen to B — cost of debt is punishing" };
-        if (rating === "BB" && watch)  return { points: 1, reason: "Sub-investment grade (BB) on negative watch" };
-        if (rating === "BB")           return { points: 1, reason: "Credit rating below investment grade (BB)" };
-        if (["A","AA","AAA"].includes(rating)) return { relief: 1, reason: `Strong credit rating of ${rating}` };
-        return null;
-      },
-    },
-    {
-      id: "negative_retained_cash", label: "Cash Flow Sustainability",
-      evaluate() {
-        const retained = GameState.pnl.retainedCash;
-        if (retained < -5) return { points: 2, reason: "Paying $" + fmt(Math.abs(retained)) + "M more in dividends than AFFO" };
-        if (retained < 0)  return { points: 1, reason: "Dividend exceeds AFFO by $" + fmt(Math.abs(retained)) + "M" };
-        return null;
-      },
-    },
-    {
-      id: "minimum_payout", label: "Minimum Payout",
-      evaluate() {
-        // REITs must distribute at least 60% of AFFO
-        var affo = GameState.pnl.affo || 0;
-        var divPaid = GameState.pnl.dividendsPaid || 0;
-        if (affo <= 0) return null;
-        var payoutRatio = divPaid / affo;
-        if (payoutRatio < 0.40) return { points: 3, reason: "Payout ratio critically low at " + fmt(payoutRatio * 100, 0) + "% — board expects minimum 60% of AFFO distributed" };
-        if (payoutRatio < 0.60) return { points: 2, reason: "Payout ratio below 60% threshold: " + fmt(payoutRatio * 100, 0) + "% — board expects REIT to distribute earnings" };
-        if (payoutRatio >= 0.85) return { relief: 1, reason: "Strong payout ratio of " + fmt(payoutRatio * 100, 0) + "% — board pleased with distributions" };
-        return null;
-      },
-    },
-    {
-      id: "dividend_growth", label: "Dividend Growth",
-      evaluate() {
-        // Only evaluate from Year 2 onwards, at year end (Q4)
-        if (GameState.meta.year < 2) return null;
-        if (GameState.meta.quarter !== 4) return null;
-
-        // Find the dividend target goal
-        var divGoal = GameState.board.currentGoals.find(function(g) { return g.key === "dividendPerShare"; });
-        if (!divGoal) return null;
-
-        var current = GameState.company.dividendPerShare;
-        var target  = divGoal.threshold;
-
-        if (current < target * 0.85) {
-          return { points: 3, reason: "Dividend $" + current + "/share far below board target of $" + target + "/share" };
-        }
-        if (current < target) {
-          return { points: 2, reason: "Dividend $" + current + "/share below board target of $" + target + "/share" };
-        }
-        if (current >= target * 1.05) {
-          return { relief: 1, reason: "Dividend exceeded board growth target at $" + current + "/share" };
-        }
-        return null;
-      },
-    },
-  ];
-
-  function fmt(n) { return Math.round(n * 100) / 100; }
-  function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+window.Financials = (() => {
 
   // ----------------------------------------------------------
-  // YEAR 1 SILENT SCORING
-  // Track how well player did without applying pressure
+  // CONSTANTS
   // ----------------------------------------------------------
-  function updateYear1Score() {
-    const s = GameState.board.year1Score;
-    if (GameState.ratios.dividendCoverage < 0.90) s.dividendMaintained = false;
-    if (GameState.ratios.occupancyPortfolio < 0.75) s.occupancyOk = false;
-    if (GameState.ratios.debtToAssets > 0.60) s.leverageOk = false;
-    if (GameState.balance.cash < 10) s.cashOk = false;
-    if (GameState.history.length >= 2) {
-      const curr = GameState.pnl.noi;
-      const prev = GameState.history[GameState.history.length - 2]?.noi || curr;
-      if (curr < prev) s.noiGrowth = false;
-    }
+  const OPEX_RATIO        = 0.35;  // Operating expenses as % of GPR (property level)
+  const DEPRECIATION_RATE = 0.025; // Annual depreciation as % of asset value
+  const GA_BASE           = 0.5;   // Fixed G&A per quarter $M
+  const GA_PORTFOLIO_PCT  = 0.003; // Additional G&A per $M of portfolio value
+  const CAPEX_RESERVE_PCT = 0.005; // Annual normalized capex reserve as % of asset value
+
+  // ----------------------------------------------------------
+  // UTILITY
+  // ----------------------------------------------------------
+  function fmt(n) {
+    return Math.round(n * 100) / 100;
   }
 
   // ----------------------------------------------------------
-  // YEAR 1 END ASSESSMENT
-  // Returns starting pressure for Year 2 and board message
+  // STEP 1 — CALCULATE PORTFOLIO NOI
+  // Gross Potential Rent → Vacancy Loss → Net Revenue → NOI
   // ----------------------------------------------------------
-  function assessYear1() {
-    const s = GameState.board.year1Score;
-    let startingPressure = 0;
-    const failures = [];
-    const successes = [];
+  function calcPortfolioNOI() {
+    let grossPotentialRent  = 0;
+    let vacancyLoss         = 0;
+    let netRentalRevenue    = 0;
+    let operatingExpenses   = 0;
+    let noi                 = 0;
 
-    if (!s.dividendMaintained) { startingPressure += 2; failures.push("dividend coverage was repeatedly insufficient"); }
-    else successes.push("dividend was maintained throughout the year");
+    GameState.portfolio.forEach(prop => {
+      // Quarterly GPR = annual NOI potential ÷ 4
+      const propGPR      = fmt(prop.annualNOI / 4);
+      const propVacancy  = fmt(propGPR * (1 - prop.occupancy));
+      const propRevenue  = fmt(propGPR - propVacancy);
+      const propOpex     = fmt(propGPR * OPEX_RATIO);
+      const propNOI      = fmt(propRevenue - propOpex);
 
-    if (!s.occupancyOk)  { startingPressure += 1; failures.push("portfolio occupancy fell below 75%"); }
-    else successes.push("occupancy remained healthy");
-
-    if (!s.leverageOk)   { startingPressure += 1; failures.push("leverage exceeded our 60% limit"); }
-    else successes.push("leverage was kept within limits");
-
-    if (!s.cashOk)       { startingPressure += 1; failures.push("liquidity fell to dangerously low levels"); }
-    else successes.push("adequate liquidity was maintained");
-
-    if (!s.noiGrowth)    { startingPressure += 1; failures.push("NOI failed to grow during the orientation year"); }
-    else successes.push("NOI showed positive momentum");
-
-    // Apply starting pressure to Year 2
-    GameState.board.pressurePoints = Math.min(GameState.board.maxPressure - 1, startingPressure);
-
-    const performance = startingPressure === 0 ? "excellent"
-                      : startingPressure <= 2  ? "acceptable"
-                      : startingPressure <= 4  ? "disappointing"
-                      : "deeply concerning";
-
-    const successText = successes.length > 0
-      ? `On the positive side: ${successes.join("; ")}.`
-      : "";
-    const failureText = failures.length > 0
-      ? `However, the board is troubled that ${failures.join("; ")}.`
-      : "";
-
-    const letter = `Dear ${GameState.player.name},\n\n` +
-      `The board has completed its Year 1 orientation assessment of your tenure as CEO of ${GameState.company.name}.\n\n` +
-      `Your overall performance during the orientation year was ${performance}. ${successText} ${failureText}\n\n` +
-      `Effective Year 2, the board will apply full scrutiny. You are entering Year 2 with ${startingPressure} pressure point${startingPressure !== 1 ? "s" : ""} already on the record. ` +
-      `${startingPressure >= 5 ? "We strongly advise immediate corrective action — your position is already precarious." : startingPressure >= 3 ? "The board will be watching closely from the first quarter." : "We wish you continued success."}`;
-
-    return { letter, startingPressure, performance };
-  }
-
-  // ----------------------------------------------------------
-  // SET ANNUAL GOALS
-  // Board sets explicit targets for the coming year
-  // ----------------------------------------------------------
-  function setAnnualGoals(year) {
-    const goals = [];
-
-    // Goals tighten each year
-    const coverageTarget  = Math.round((1.05 + (year - 1) * 0.05) * 100) / 100;
-    const occupancyTarget = Math.round((0.82 + (year - 1) * 0.01) * 100) / 100;
-    const leverageTarget  = Math.round((0.55 - (year - 2) * 0.01) * 100) / 100;
-
-    // Dynamic dividend growth target based on prior year FFO growth
-    var divGrowthTarget = 0.05; // default 5%
-    if (GameState.history.length >= 4) {
-      var h = GameState.history;
-      var currFFO = h[h.length - 1].ffo || 0;
-      var prevFFO = h.length >= 8 ? h[h.length - 5].ffo || currFFO : currFFO;
-      var ffoGrowth = prevFFO > 0 ? (currFFO - prevFFO) / prevFFO : 0;
-      if (ffoGrowth >= 0.15)      divGrowthTarget = 0.25;  // great year: 25% raise expected
-      else if (ffoGrowth >= 0.08) divGrowthTarget = 0.12;  // good year: 12% raise
-      else if (ffoGrowth >= 0.03) divGrowthTarget = 0.07;  // decent year: 7% raise
-      else if (ffoGrowth > 0)     divGrowthTarget = 0.03;  // modest year: 3% raise
-      else                        divGrowthTarget = 0;      // decline: just maintain
-    }
-    var currentDiv    = GameState.company.dividendPerShare;
-    var targetDiv     = Math.round(currentDiv * (1 + divGrowthTarget) * 100) / 100;
-    var divGrowthPct  = Math.round(divGrowthTarget * 100);
-
-    goals.push({ metric: "Dividend Coverage",    target: ">" + coverageTarget + "x",           key: "dividendCoverage",   threshold: coverageTarget });
-    goals.push({ metric: "Dividend per Share",   target: ">$" + targetDiv + " (+" + divGrowthPct + "%)", key: "dividendPerShare", threshold: targetDiv, divTarget: true });
-    goals.push({ metric: "Portfolio Occupancy",  target: ">" + fmt(occupancyTarget*100) + "%",  key: "occupancyPortfolio", threshold: occupancyTarget });
-    goals.push({ metric: "Debt / Assets",        target: "<" + fmt(leverageTarget*100) + "%",   key: "debtToAssets",       threshold: leverageTarget, inverse: true });
-    goals.push({ metric: "FFO Growth (YoY)",     target: ">0%",                                 key: "ffoGrowth",          threshold: 0 });
-
-    if (year >= 3) goals.push({ metric: "Interest Coverage", target: ">1.8x", key: "interestCoverage", threshold: 1.8 });
-    if (year >= 4) goals.push({ metric: "Credit Rating",     target: "BBB+",  key: "creditRating",     threshold: "BBB" });
-
-    GameState.board.lastYearGoals = GameState.board.currentGoals;
-    GameState.board.currentGoals  = goals;
-    return goals;
-  }
-
-  // ----------------------------------------------------------
-  // EVALUATE GOALS vs LAST YEAR
-  // ----------------------------------------------------------
-  function evaluateGoals() {
-    const goals   = GameState.board.lastYearGoals;
-    const history = GameState.history;
-    if (goals.length === 0 || history.length < 4) return [];
-
-    const lastYearHistory = history.slice(-4);
-    return goals.map(goal => {
-      let met = false;
-      if (goal.key === "dividendCoverage") {
-        const avg = lastYearHistory.reduce((s, h) => s + (h.dividendCoverage || 0), 0) / lastYearHistory.length;
-        met = avg >= goal.threshold;
-      } else if (goal.key === "occupancyPortfolio") {
-        const avg = lastYearHistory.reduce((s, h) => s + (h.occupancy || 0), 0) / lastYearHistory.length;
-        met = avg >= goal.threshold;
-      } else if (goal.key === "debtToAssets") {
-        const avg = lastYearHistory.reduce((s, h) => s + (h.debtToAssets || 0), 0) / lastYearHistory.length;
-        met = avg <= goal.threshold;
-      } else if (goal.key === "dividendPerShare") {
-        met = GameState.company.dividendPerShare >= goal.threshold;
-      } else if (goal.key === "ffoGrowth") {
-        met = (GameState.board.thresholds.ffoGrowth || 0) >= goal.threshold;
-      } else if (goal.key === "interestCoverage") {
-        const avg = lastYearHistory.reduce((s, h) => s + (h.interestCoverage || 0), 0) / lastYearHistory.length;
-        met = avg >= goal.threshold;
-      } else if (goal.key === "creditRating") {
-        const order = ["CCC","B","BB","BBB","A","AA","AAA"];
-        met = order.indexOf(GameState.credit.rating) >= order.indexOf(goal.threshold);
-      }
-      return { ...goal, met };
+      grossPotentialRent += propGPR;
+      vacancyLoss        += propVacancy;
+      netRentalRevenue   += propRevenue;
+      operatingExpenses  += propOpex;
+      noi                += propNOI;
     });
-  }
-
-  // ----------------------------------------------------------
-  // GENERATE ANNUAL REPORT
-  // Called at end of Q4 each year
-  // ----------------------------------------------------------
-  function generateAnnualReport() {
-    const year    = GameState.meta.year - 1;  // year just completed
-    const history = GameState.history;
-    const isYear1 = year === 1;
-
-    // Pull this year's 4 quarters
-    const yearHistory = history.slice(-4);
-    if (yearHistory.length === 0) return null;
-
-    // Prior year snapshot for comparison
-    const priorSnapshot = GameState.annualSnapshots.length > 0
-      ? GameState.annualSnapshots[GameState.annualSnapshots.length - 1]
-      : null;
-
-    // Full year aggregates
-    const totalRevenue     = yearHistory.reduce((s, h) => s + (h.grossPotentialRent || 0), 0);
-    const totalNOI         = yearHistory.reduce((s, h) => s + (h.noi || 0), 0);
-    const totalFFO         = yearHistory.reduce((s, h) => s + (h.ffo || 0), 0);
-    const totalAFFO        = yearHistory.reduce((s, h) => s + (h.affo || 0), 0);
-    const totalDividends   = yearHistory.reduce((s, h) => s + (h.dividendsPaid || 0), 0);
-    const totalRetained    = yearHistory.reduce((s, h) => s + (h.retainedCash || 0), 0);
-    const avgOccupancy     = yearHistory.reduce((s, h) => s + (h.occupancy || 0), 0) / yearHistory.length;
-    const avgCoverage      = yearHistory.reduce((s, h) => s + (h.dividendCoverage || 0), 0) / yearHistory.length;
-
-    // Share stats
-    const startPrice = priorSnapshot?.endSharePrice || yearHistory[0].sharePrice;
-    const endPrice   = yearHistory[yearHistory.length - 1].sharePrice;
-    const priceChg   = startPrice > 0 ? ((endPrice - startPrice) / startPrice * 100) : 0;
-
-    // Balance sheet
-    const startAssets = priorSnapshot?.endAssets || yearHistory[0].totalAssets;
-    const endAssets   = yearHistory[yearHistory.length - 1].totalAssets;
-    const startDebt   = priorSnapshot?.endDebt   || yearHistory[0].totalDebt;
-    const endDebt     = yearHistory[yearHistory.length - 1].totalDebt;
-    const startRating = priorSnapshot?.endRating  || yearHistory[0].creditRating;
-    const endRating   = yearHistory[yearHistory.length - 1].creditRating;
-
-    // Portfolio
-    const startProps  = priorSnapshot?.endProps   || 0;
-    const endProps    = yearHistory[yearHistory.length - 1].portfolioSize;
-
-    // Best/worst property
-    let bestProp = null, worstProp = null;
-    if (GameState.portfolio.length > 0) {
-      const sorted = [...GameState.portfolio].sort((a, b) => b.occupancy - a.occupancy);
-      bestProp  = sorted[0];
-      worstProp = sorted[sorted.length - 1];
-    }
-
-    // Key events this year
-    const yearEvents = GameState.eventLog
-      .filter(e => e.year === year)
-      .flatMap(e => e.events || [])
-      .slice(0, 6);
-
-    // Year 1 assessment or goal evaluation
-    let boardAssessment = null;
-    let nextYearGoals   = [];
-
-    if (isYear1) {
-      boardAssessment = assessYear1();
-      nextYearGoals   = setAnnualGoals(2);
-    } else {
-      const goalResults = evaluateGoals();
-      const metCount    = goalResults.filter(g => g.met).length;
-      const totalGoals  = goalResults.length;
-      nextYearGoals     = setAnnualGoals(year + 1);
-
-      const perf = metCount === totalGoals ? "all targets"
-                 : metCount >= totalGoals * 0.7 ? "most targets"
-                 : metCount >= totalGoals * 0.4 ? "some targets"
-                 : "few targets";
-
-      boardAssessment = {
-        goalResults,
-        metCount,
-        totalGoals,
-        performance: perf,
-        letter: `${GameState.player.name}, you met ${metCount} of ${totalGoals} board targets for Year ${year}. ` +
-          (metCount === totalGoals
-            ? "Excellent execution. The board is pleased with management's performance."
-            : metCount >= totalGoals * 0.7
-            ? "A solid year overall, though some areas need attention going forward."
-            : metCount >= totalGoals * 0.4
-            ? "Mixed results. Several key metrics fell short of board expectations."
-            : "A disappointing year. The board expects significant improvement in Year " + (year + 1) + "."),
-      };
-
-      // Apply pressure adjustments based on goal performance
-      if (metCount < totalGoals * 0.4) {
-        GameState.board.pressurePoints = Math.min(
-          GameState.board.maxPressure,
-          GameState.board.pressurePoints + 1
-        );
-      } else if (metCount === totalGoals) {
-        GameState.board.pressurePoints = Math.max(0, GameState.board.pressurePoints - 1);
-      }
-    }
-
-    // Save annual snapshot
-    const snapshot = {
-      year,
-      totalRevenue:   fmt(totalRevenue),
-      totalNOI:       fmt(totalNOI),
-      totalFFO:       fmt(totalFFO),
-      totalAFFO:      fmt(totalAFFO),
-      totalDividends: fmt(totalDividends),
-      totalRetained:  fmt(totalRetained),
-      avgOccupancy:   fmt(avgOccupancy),
-      avgCoverage:    fmt(avgCoverage),
-      startPrice:     fmt(startPrice),
-      endPrice:       fmt(endPrice),
-      priceChg:       fmt(priceChg),
-      startAssets:    fmt(startAssets),
-      endAssets:      fmt(endAssets),
-      startDebt:      fmt(startDebt),
-      endDebt:        fmt(endDebt),
-      startRating,
-      endRating,
-      startProps,
-      endProps,
-      bestProp:       bestProp  ? { name: bestProp.name,  occ: fmt(bestProp.occupancy * 100)  } : null,
-      worstProp:      worstProp ? { name: worstProp.name, occ: fmt(worstProp.occupancy * 100) } : null,
-      yearEvents,
-      boardAssessment,
-      nextYearGoals,
-    };
-
-    GameState.annualSnapshots.push(snapshot);
-    return snapshot;
-  }
-
-  // ----------------------------------------------------------
-  // EVALUATE QUARTER (regular pressure evaluation)
-  // ----------------------------------------------------------
-  function evaluateQuarter() {
-    const isTutorial = GameState.meta.tutorialYear;
-
-    // Update Year 1 silent scoring
-    if (isTutorial) updateYear1Score();
-
-    const pressureChanges = [];
-    let totalDelta = 0;
-
-    // In tutorial year — evaluate but don't apply pressure or fire
-    PRESSURE_RULES.forEach(rule => {
-      const result = rule.evaluate();
-      if (!result) return;
-
-      if (!isTutorial) {
-        if (result.points) {
-          GameState.board.pressurePoints = Math.min(
-            GameState.board.maxPressure,
-            GameState.board.pressurePoints + result.points
-          );
-          totalDelta += result.points;
-          pressureChanges.push({ rule: rule.label, type: "pressure", points: result.points, reason: result.reason });
-          GameState.board.pressureLog.push({ quarter: GameState.meta.quarter, year: GameState.meta.year, reason: result.reason, points: result.points });
-        }
-        if (result.relief) {
-          GameState.board.pressurePoints = Math.max(0, GameState.board.pressurePoints - result.relief);
-          totalDelta -= result.relief;
-          pressureChanges.push({ rule: rule.label, type: "relief", points: result.relief, reason: result.reason });
-        }
-      } else {
-        // In tutorial: show what WOULD have happened
-        if (result.points) pressureChanges.push({ rule: rule.label, type: "warning", points: result.points, reason: `[Year 1 — no penalty yet] ${result.reason}` });
-        if (result.relief) pressureChanges.push({ rule: rule.label, type: "relief",  points: result.relief, reason: result.reason });
-      }
-    });
-
-    // Yearly escalation (not in tutorial)
-    if (!isTutorial) {
-      const yearlyPressure = Math.floor(GameState.meta.year / 3);
-      if (yearlyPressure > 0) {
-        GameState.board.pressurePoints = Math.min(GameState.board.maxPressure, GameState.board.pressurePoints + yearlyPressure);
-      }
-    }
-
-    // Update mood
-    const pct = GameState.board.pressurePoints / GameState.board.maxPressure;
-    const moodLevel = MOOD_LEVELS.slice().reverse().find(m => pct > m.maxPct) || MOOD_LEVELS[0];
-    GameState.board.mood = isTutorial
-      ? (pressureChanges.some(p => p.type === "warning") ? "concerned" : "neutral")
-      : moodLevel.mood;
-
-    // Game over check (never in tutorial year)
-    if (!isTutorial && GameState.board.pressurePoints >= GameState.board.maxPressure) {
-      GameState.meta.gameOver      = true;
-      GameState.meta.gameOverReason = generateTerminationLetter();
-    }
-
-    return { pressureChanges, totalDelta, currentPressure: GameState.board.pressurePoints, maxPressure: GameState.board.maxPressure, mood: GameState.board.mood, gameOver: GameState.meta.gameOver, isTutorial };
-  }
-
-  // ----------------------------------------------------------
-  // TUTORIAL COACHING MESSAGES
-  // One per quarter in Year 1
-  // ----------------------------------------------------------
-  function getTutorialMessage() {
-    const q = GameState.meta.quarter;
-    const msgs = {
-      1: `Welcome, ${GameState.player.name}. This is your orientation year — the board will not fire you in Year 1, but we are watching and scoring you silently. Focus on growing your NOI base by acquiring 1–2 properties this quarter. Check the Property Market tab.`,
-      2: `Q2 already. Your interest coverage ratio is important — make sure your NOI comfortably exceeds your quarterly interest expense. If it's below 1.5x, consider either acquiring more properties or reducing debt. Check the Ratios panel on the left.`,
-      3: `You're halfway through Year 1. Now is a good time to review your debt maturity ladder — click any bar on the chart to see which tranches are coming due. You don't want multiple large maturities arriving in the same quarter.`,
-      4: `Final quarter of Year 1. The board will issue its orientation assessment after this quarter and set targets for Year 2. Make sure your dividend coverage is above 1.0x and occupancy above 75% — these carry the most weight in our assessment.`,
-    };
-    return msgs[q] || "";
-  }
-
-  // ----------------------------------------------------------
-  // CFO EARNINGS REPORT
-  // ----------------------------------------------------------
-  function generateEarningsReport(quarterResult, boardResult) {
-    const { pnl, ratios, marketResult, firedEvents, maturityMsgs } = quarterResult;
-    const period  = GameState.currentPeriodLabel();
-    const company = GameState.company;
-    const credit  = GameState.credit;
-    const market  = GameState.market;
-    const isTutorial = GameState.meta.tutorialYear;
-
-    const openings = {
-      pleased:   [`${period} delivered strong results across the portfolio.`, `Management is pleased to report solid execution in ${period}.`],
-      neutral:   [`${period} produced results broadly in line with expectations.`, `${period} saw mixed performance across the portfolio.`],
-      concerned: [`${period} presented meaningful challenges management is addressing.`, `We must be candid with the board about a difficult ${period}.`],
-      angry:     [`${period} was a disappointing quarter requiring immediate action.`, `The board should be aware that ${period} results are deeply concerning.`],
-      furious:   [`${period} results represent a serious deterioration requiring urgent intervention.`],
-    };
-    const opening = pick(openings[GameState.board.mood] || openings.neutral);
-
-    const tutorialNote = isTutorial
-      ? `\n\n[ORIENTATION YEAR: Board pressure suspended. ${getTutorialMessage()}]`
-      : "";
-
-    const ffoLine = `FFO came in at $${fmt(pnl.ffo)}M ($${fmt(ratios.ffoPerShare)}/share) against a quarterly dividend of $${fmt(pnl.dividendsPaid)}M ($${company.dividendPerShare}/share), implying coverage of ${fmt(ratios.dividendCoverage)}x.`;
-    const noiLine = `Net Operating Income was $${fmt(pnl.noi)}M on gross potential rent of $${fmt(pnl.grossPotentialRent)}M, with vacancy loss of $${fmt(pnl.vacancyLoss)}M reflecting portfolio occupancy of ${fmt(ratios.occupancyPortfolio * 100)}%.`;
-    const rateLine = `Base rates stand at ${market.baseInterestRate}%. Our credit rating is ${credit.rating} (spread: +${credit.spread}%), giving an all-in borrowing cost of ${fmt(market.baseInterestRate + credit.spread)}%.${credit.watchNegative ? " We are on negative credit watch." : ""}`;
-    const levLine  = `The balance sheet carries $${fmt(GameState.balance.totalDebt)}M of debt against $${fmt(GameState.balance.totalAssets)}M of assets (${fmt(ratios.debtToAssets * 100)}% LTV). Interest coverage: ${fmt(ratios.interestCoverage)}x.`;
-
-    const pressureLines = {
-      pleased:   "The board is satisfied with management's execution.",
-      neutral:   "The board notes performance is broadly on track.",
-      concerned: `The board has flagged ${boardResult.pressureChanges.filter(p => p.type === "pressure").length} areas of concern.`,
-      angry:     `The board is registering serious dissatisfaction. Pressure at ${boardResult.currentPressure}/${boardResult.maxPressure}.`,
-      furious:   `The board is considering management changes. Pressure critical at ${boardResult.currentPressure}/${boardResult.maxPressure}.`,
-    };
-    const pressureLine = isTutorial
-      ? "The board is monitoring your progress during the orientation year."
-      : (pressureLines[GameState.board.mood] || "");
-
-    const eventLines    = firedEvents.length > 0 ? `Notable items: ${firedEvents.map(e => e.headline).join(", ")}.` : "No material unusual items this quarter.";
-    const maturityLine  = maturityMsgs.length > 0 ? maturityMsgs.join(" ") : "";
-    const cycleChangeLine = marketResult.cycleResult?.cycleChanged ? `⚠️ Market cycle shift: Entering a ${marketResult.cycleResult.label} phase. ${marketResult.cycleResult.description}` : "";
-
-    const marketLine = marketResult.commentary;
-
-    const body = [opening, tutorialNote, "", noiLine, ffoLine, "", marketLine, rateLine, levLine, "", eventLines, maturityLine, cycleChangeLine, "", pressureLine]
-      .filter(l => l !== undefined && l !== null)
-      .join(" ").replace(/ {2,}/g, " ").trim();
-
-    const headlines = {
-      pleased:   `✅ ${period} — Strong Results`,
-      neutral:   `📋 ${period} — Steady Quarter`,
-      concerned: `⚠️ ${period} — Challenges Emerging`,
-      angry:     `🔴 ${period} — Board Dissatisfied`,
-      furious:   `🚨 ${period} — Crisis: Board Intervention Imminent`,
-    };
-    const tutorialHeadline = `📚 ${period} — Orientation Year`;
-    const headline = isTutorial ? tutorialHeadline : (headlines[GameState.board.mood] || `📋 ${period} Earnings Report`);
-
-    GameState.eventLog.push({ quarter: GameState.meta.quarter, year: GameState.meta.year, headline, body, events: firedEvents, pressure: boardResult });
-
-    return { headline, body, firedEvents, boardResult };
-  }
-
-  // ----------------------------------------------------------
-  // TERMINATION LETTER
-  // ----------------------------------------------------------
-  function generateTerminationLetter() {
-    const quarters = GameState.meta.totalQuarters;
-    const years    = GameState.meta.year;
-    const lastFail = GameState.board.pressureLog.length > 0
-      ? GameState.board.pressureLog[GameState.board.pressureLog.length - 1].reason
-      : "sustained underperformance";
-
-    return pick([
-      `After careful deliberation, the Board of ${GameState.company.name} has voted to remove ${GameState.player.name} as CEO, effective immediately. The final issue: ${lastFail}. The company operated for ${quarters} quarters (${years} years) under your leadership.`,
-      `${GameState.player.name}, the Board has lost confidence in your ability to manage ${GameState.company.name}. Accumulated pressure reached the maximum threshold. The final straw was: ${lastFail}. You survived ${quarters} quarters.`,
-      `NOTICE OF TERMINATION: Following ${quarters} quarters of leadership, the Board of ${GameState.company.name} has exercised its right to replace management. Key metrics including dividend coverage (${fmt(GameState.ratios.dividendCoverage)}x), leverage (${fmt(GameState.ratios.debtToAssets*100)}%), and occupancy (${fmt(GameState.ratios.occupancyPortfolio*100)}%) failed to meet required standards.`,
-    ]);
-  }
-
-  // ----------------------------------------------------------
-  // BOARD STATUS
-  // ----------------------------------------------------------
-  function getBoardStatus() {
-    const pressure = GameState.board.pressurePoints;
-    const max      = GameState.board.maxPressure;
-    const mood     = GameState.board.mood;
-    const pct      = pressure / max;
-    const moodLevel = MOOD_LEVELS.slice().reverse().find(m => pct > m.maxPct) || MOOD_LEVELS[0];
 
     return {
-      pressure, max, pct: fmt(pct * 100), mood,
-      moodLabel:  moodLevel.label,
-      color:      moodLevel.color,
-      isTutorial: GameState.meta.tutorialYear,
-      warningMsg: pct >= 0.75 ? "⚠️ Board patience nearly exhausted." : pct >= 0.50 ? "The board is watching closely." : null,
+      grossPotentialRent: fmt(grossPotentialRent),
+      vacancyLoss:        fmt(vacancyLoss),
+      netRentalRevenue:   fmt(netRentalRevenue),
+      operatingExpenses:  fmt(operatingExpenses),
+      noi:                fmt(noi),
     };
   }
 
   // ----------------------------------------------------------
-  // INIT
+  // STEP 2 — CALCULATE G&A EXPENSE
+  // Fixed base + scales with portfolio size
   // ----------------------------------------------------------
-  function init() {
-    GameState.board.pressurePoints = 0;
-    GameState.board.maxPressure    = 8;
-    GameState.board.mood           = "neutral";
-    GameState.board.pressureLog    = [];
-    GameState.board.currentGoals   = [];
-    GameState.board.lastYearGoals  = [];
-    GameState.board.year1Score     = { dividendMaintained: true, occupancyOk: true, leverageOk: true, cashOk: true, noiGrowth: true };
-    GameState.board.thresholds     = { dividendCoverage: 1.0, debtToAssets: 0.60, occupancy: 0.80, ffoGrowth: 0 };
-    GameState.eventLog             = [];
-    GameState.annualSnapshots      = [];
-    GameState.meta.tutorialYear    = true;
-
-    // Set initial Year 1 goals (coaching targets, not enforced)
-    GameState.board.currentGoals = [
-      { metric: "Dividend Coverage",   target: ">0.90x",  threshold: 0.90 },
-      { metric: "Portfolio Occupancy", target: ">75%",    threshold: 0.75 },
-      { metric: "Debt / Assets",       target: "<60%",    threshold: 0.60, inverse: true },
-      { metric: "Cash",                target: ">$10M",   threshold: 10 },
-    ];
+  function calcGA() {
+    const portfolioValue = GameState.portfolio.reduce(
+      (sum, p) => sum + p.currentValue, 0
+    );
+    return fmt(GA_BASE + portfolioValue * GA_PORTFOLIO_PCT);
   }
 
+  // ----------------------------------------------------------
+  // STEP 3 — CALCULATE INTEREST EXPENSE
+  // Sum across all debt tranches (quarterly = annual rate ÷ 4)
+  // ----------------------------------------------------------
+  function calcInterestExpense() {
+    return fmt(
+      GameState.debtTranches.reduce((sum, tranche) => {
+        return sum + (tranche.amount * (tranche.rate / 100) / 4);
+      }, 0)
+    );
+  }
+
+  // ----------------------------------------------------------
+  // STEP 4 — CALCULATE DEPRECIATION
+  // Non-cash charge; adds back to get FFO
+  // Annual rate applied quarterly
+  // ----------------------------------------------------------
+  function calcDepreciation() {
+    const totalAssetValue = GameState.portfolio.reduce(
+      (sum, p) => sum + p.currentValue, 0
+    );
+    return fmt(totalAssetValue * (DEPRECIATION_RATE / 4));
+  }
+
+  // ----------------------------------------------------------
+  // STEP 5 — CALCULATE NORMALIZED CAPEX RESERVE
+  // Not paid out in cash necessarily, but subtracted for AFFO
+  // ----------------------------------------------------------
+  function calcCapexReserve() {
+    const totalAssetValue = GameState.portfolio.reduce(
+      (sum, p) => sum + p.currentValue, 0
+    );
+    return fmt(totalAssetValue * (CAPEX_RESERVE_PCT / 4));
+  }
+
+  // ----------------------------------------------------------
+  // STEP 6 — ASSEMBLE FULL P&L
+  // ----------------------------------------------------------
+  function assemblePnL(noComponents, ga, interest, depreciation, capex) {
+    const unusualItems = GameState.pnl.unusualItems; // already set by events.js
+
+    // Net Income (GAAP)
+    const netIncome = fmt(
+      noComponents.noi
+      - ga
+      - interest
+      - depreciation
+      + unusualItems
+    );
+
+    // FFO = Net Income + Depreciation (add back non-cash)
+    const ffo = fmt(netIncome + depreciation);
+
+    // AFFO = FFO - Normalized Capex Reserve
+    const affo = fmt(ffo - capex);
+
+    // Dividends
+    const dividendsPaid = fmt(
+      GameState.company.dividendPerShare *
+      GameState.company.sharesOutstanding
+    );
+
+    // Retained cash (can be negative — danger signal)
+    const retainedCash = fmt(affo - dividendsPaid);
+
+    return {
+      grossPotentialRent:  noComponents.grossPotentialRent,
+      vacancyLoss:         noComponents.vacancyLoss,
+      netRentalRevenue:    noComponents.netRentalRevenue,
+      operatingExpenses:   noComponents.operatingExpenses,
+      noi:                 noComponents.noi,
+      gAndA:               ga,
+      interestExpense:     interest,
+      depreciation:        depreciation,
+      unusualItems:        unusualItems,
+      netIncome:           netIncome,
+      ffo:                 ffo,
+      affo:                affo,
+      capexReserve:        capex,
+      dividendsPaid:       dividendsPaid,
+      retainedCash:        retainedCash,
+    };
+  }
+
+  // ----------------------------------------------------------
+  // STEP 7 — UPDATE BALANCE SHEET
+  // Cash moves based on actual cash flows (not depreciation)
+  // ----------------------------------------------------------
+  function updateBalanceSheet(pnl) {
+    // Cash P&L: only real cash flows
+    // Overdraft interest on negative cash balance
+    var overdraftInterest = 0;
+    if (GameState.balance.cash < 0) {
+      var overdraftRate = (GameState.market.baseInterestRate + 8) / 100 / 4;
+      overdraftInterest = fmt(Math.abs(GameState.balance.cash) * overdraftRate);
+    }
+
+    const cashFlow = fmt(
+      pnl.noi
+      - pnl.gAndA
+      - pnl.interestExpense
+      + pnl.unusualItems
+      - pnl.dividendsPaid
+      - overdraftInterest
+    );
+
+    // No floor — cash can go negative (overdraft)
+    GameState.balance.cash = fmt(GameState.balance.cash + cashFlow);
+    GameState.pnl.overdraftInterest = overdraftInterest;
+
+    // Game over if overdraft exceeds $50M
+    if (GameState.balance.cash < -50) {
+      GameState.meta.gameOver = true;
+      GameState.meta.gameOverReason = GameState.player.name + ", your company has defaulted. The overdraft reached $" + fmt(Math.abs(GameState.balance.cash), 1) + "M and lenders have called their loans. " + GameState.company.name + " is placed into administration after " + GameState.meta.totalQuarters + " quarters.";
+    }
+
+    // Total portfolio value (recalculated by properties.js each quarter)
+    const portfolioValue = GameState.portfolio.reduce(
+      (sum, p) => sum + p.currentValue, 0
+    );
+
+    // Total assets
+    GameState.balance.totalAssets = fmt(
+      GameState.balance.cash + portfolioValue
+    );
+
+    // Total debt (sum of tranches)
+    GameState.balance.totalDebt = fmt(
+      GameState.debtTranches.reduce((sum, t) => sum + t.amount, 0)
+    );
+
+    // Total equity (residual)
+    GameState.balance.totalEquity = fmt(
+      GameState.balance.totalAssets - GameState.balance.totalDebt
+    );
+
+    // Market cap
+    GameState.company.marketCap = fmt(
+      GameState.company.sharePrice *
+      GameState.company.sharesOutstanding
+    );
+  }
+
+  // ----------------------------------------------------------
+  // STEP 8 — CALCULATE ALL RATIOS
+  // ----------------------------------------------------------
+  function calcRatios(pnl) {
+    const shares     = GameState.company.sharesOutstanding;
+    const price      = GameState.company.sharePrice;
+    const debt       = GameState.balance.totalDebt;
+    const assets     = GameState.balance.totalAssets;
+    const equity     = GameState.balance.totalEquity;
+
+    // FFO & AFFO per share
+    const ffoPerShare  = shares > 0 ? fmt(pnl.ffo / shares)  : 0;
+    const affoPerShare = shares > 0 ? fmt(pnl.affo / shares) : 0;
+
+    // Annualised FFO for valuation ratios
+    const annualFFO    = fmt(pnl.ffo * 4);
+    const annualAFFO   = fmt(pnl.affo * 4);
+    const annualFFOPS  = fmt(ffoPerShare * 4);
+
+    // Dividend coverage (FFO / dividends) — board threshold
+    const dividendCoverage = pnl.dividendsPaid > 0
+      ? fmt(pnl.ffo / pnl.dividendsPaid)
+      : 99;
+
+    // Payout ratio (dividends / AFFO) — >1.0 is danger
+    const payoutRatio = pnl.affo > 0
+      ? fmt(pnl.dividendsPaid / pnl.affo)
+      : 99;
+
+    // Leverage ratios
+    const debtToAssets  = assets > 0  ? fmt(debt / assets)  : 0;
+    const debtToEquity  = equity > 0  ? fmt(debt / equity)  : 99;
+
+    // EBITDA approx = NOI - G&A (no tax for REITs)
+    const ebitda        = fmt(pnl.noi - pnl.gAndA);
+    const annualEbitda  = fmt(ebitda * 4);
+    const debtToEbitda  = annualEbitda > 0 ? fmt(debt / annualEbitda) : 99;
+
+    // Interest coverage = NOI / Interest (quarterly)
+    const interestCoverage = pnl.interestExpense > 0
+      ? fmt(pnl.noi / pnl.interestExpense)
+      : 99;
+
+    // Portfolio occupancy (weighted by property value)
+    const totalPortfolioValue = GameState.portfolio.reduce(
+      (sum, p) => sum + p.currentValue, 0
+    );
+    const weightedOccupancy = totalPortfolioValue > 0
+      ? fmt(GameState.portfolio.reduce(
+          (sum, p) => sum + (p.occupancy * p.currentValue), 0
+        ) / totalPortfolioValue)
+      : 0;
+
+    // NOI margin = NOI / GPR
+    const noiMargin = pnl.grossPotentialRent > 0
+      ? fmt(pnl.noi / pnl.grossPotentialRent)
+      : 0;
+
+    // Implied cap rate = annualized NOI / portfolio value
+    const impliedCapRate = totalPortfolioValue > 0
+      ? fmt((pnl.noi * 4) / totalPortfolioValue * 100)
+      : 0;
+
+    // NAV per share
+    const navPerShare = shares > 0 ? fmt(equity / shares) : 0;
+
+    // P/FFO (annualized)
+    const pToFFO = annualFFOPS > 0 ? fmt(price / annualFFOPS) : 99;
+
+    // P/AFFO (annualized)
+    const annualAFFOPS = fmt(affoPerShare * 4);
+    const pToAFFO = annualAFFOPS > 0 ? fmt(price / annualAFFOPS) : 99;
+
+    // Dividend yield
+    const annualDividend = fmt(GameState.company.dividendPerShare * 4);
+    const dividendYield  = price > 0 ? fmt((annualDividend / price) * 100) : 0;
+
+    // Write to GameState
+    GameState.ratios = {
+      ffoPerShare,
+      affoPerShare,
+      annualFFOPS,
+      annualAFFOPS,
+      dividendCoverage,
+      payoutRatio,
+      debtToAssets,
+      debtToEquity,
+      debtToEbitda,
+      interestCoverage,
+      occupancyPortfolio: weightedOccupancy,
+      noiMargin,
+      impliedCapRate,
+      navPerShare,
+      pToFFO,
+      pToAFFO,
+      dividendYield,
+      ebitda,
+    };
+
+    return GameState.ratios;
+  }
+
+  // ----------------------------------------------------------
+  // STEP 9 — UPDATE SHARE PRICE
+  // Driven by: FFO growth, dividend changes, board mood,
+  // market cycle, leverage signals
+  // ----------------------------------------------------------
+  function updateSharePrice(pnl) {
+    const prev = GameState.history.length > 0
+      ? GameState.history[GameState.history.length - 1]
+      : null;
+
+    let priceMod = 1.0;
+
+    // FFO per share vs last quarter
+    if (prev) {
+      const ffoGrowth = prev.ffoPerShare > 0
+        ? (GameState.ratios.ffoPerShare - prev.ffoPerShare) / prev.ffoPerShare
+        : 0;
+      priceMod += ffoGrowth * 0.5; // share price partially reflects FFO growth
+    }
+
+    // Dividend coverage signal
+    const coverage = GameState.ratios.dividendCoverage;
+    if (coverage < 0.90)       priceMod -= 0.04;
+    else if (coverage < 1.00)  priceMod -= 0.02;
+    else if (coverage > 1.50)  priceMod += 0.01;
+
+    // Leverage signal
+    const d2a = GameState.ratios.debtToAssets;
+    if (d2a > 0.58)      priceMod -= 0.03;
+    else if (d2a > 0.52) priceMod -= 0.01;
+    else if (d2a < 0.35) priceMod += 0.01;
+
+    // Market cycle signal
+    const cycle = GameState.market.cycle;
+    if (cycle === "expanding")   priceMod += 0.01;
+    if (cycle === "contracting") priceMod -= 0.01;
+    if (cycle === "recession")   priceMod -= 0.02;
+
+    // Credit watch negative
+    if (GameState.credit.watchNegative) priceMod -= 0.02;
+
+    // Random market noise (±1%)
+    priceMod += (Math.random() - 0.5) * 0.02;
+
+    // P/FFO anchor — pull share price toward 15x annualised FFO per share
+    var annualFFOPS = GameState.ratios.annualFFOPS || 0;
+    if (annualFFOPS > 0) {
+      var fairValue = fmt(annualFFOPS * 15);
+      var currentPrice = GameState.company.sharePrice * priceMod;
+      // Gentle mean reversion toward fair value (10% pull per quarter)
+      priceMod = priceMod * 0.90 + (fairValue / GameState.company.sharePrice) * 0.10;
+    }
+
+    // Dividend yield anchor — low yield is a headwind
+    var divYield = GameState.ratios.dividendYield || 0;
+    if (divYield < 1.0) priceMod -= 0.03;
+    else if (divYield < 2.0) priceMod -= 0.01;
+
+    // Apply and floor at $1
+    GameState.company.sharePrice = fmt(
+      Math.max(1.0, GameState.company.sharePrice * priceMod)
+    );
+  }
+
+  // ----------------------------------------------------------
+  // STEP 10 — DEBT MATURITY TICK
+  // Reduce quartersUntilMaturity on all tranches
+  // Flag any tranches maturing this quarter
+  // ----------------------------------------------------------
+  function tickDebtMaturities() {
+    const matured = [];
+    GameState.debtTranches.forEach(tranche => {
+      tranche.quartersUntilMaturity =
+        GameState.quartersUntilMaturity(
+          tranche.maturityYear,
+          tranche.maturityQuarter
+        );
+      if (tranche.quartersUntilMaturity <= 0) {
+        matured.push(tranche);
+      }
+    });
+    return matured;
+  }
+
+  // ----------------------------------------------------------
+  // STEP 11 — HANDLE MATURED DEBT
+  // Auto-refinance if possible, else force cash repayment
+  // ----------------------------------------------------------
+  function handleMaturedDebt(maturedTranches) {
+    const messages = [];
+    maturedTranches.forEach(tranche => {
+      if (GameState.balance.cash >= tranche.amount) {
+        // Pay off with cash
+        GameState.balance.cash = fmt(GameState.balance.cash - tranche.amount);
+        GameState.debtTranches = GameState.debtTranches.filter(
+          t => t.id !== tranche.id
+        );
+        messages.push(
+          `${tranche.label} matured and was retired with $${tranche.amount}M cash.`
+        );
+      } else {
+        // Auto-refinance at current rate (punitive: 110% of amount)
+        const newRate = Market.getCurrentBorrowingRate();
+        const newAmount = fmt(tranche.amount * 1.02); // small penalty
+        const yearsToAdd = 5;
+        const newMaturityYear = GameState.meta.year + yearsToAdd;
+        const newMaturityQuarter = GameState.meta.quarter;
+
+        tranche.rate = newRate;
+        tranche.amount = newAmount;
+        tranche.maturityYear = newMaturityYear;
+        tranche.maturityQuarter = newMaturityQuarter;
+        tranche.quartersUntilMaturity = yearsToAdd * 4;
+        tranche.label = `${newRate}% Sr Notes due Y${newMaturityYear}Q${newMaturityQuarter}`;
+
+        messages.push(
+          `⚠️ ${tranche.label} matured but insufficient cash. Auto-refinanced at ${newRate}% for 5 years — $${newAmount}M outstanding.`
+        );
+      }
+    });
+    return messages;
+  }
+
+  // ----------------------------------------------------------
+  // STEP 12 — SAVE TO HISTORY
+  // One entry per quarter for charts and trend analysis
+  // ----------------------------------------------------------
+  function saveToHistory(pnl) {
+    GameState.history.push({
+      quarter:        GameState.meta.quarter,
+      year:           GameState.meta.year,
+      totalQuarters:  GameState.meta.totalQuarters,
+      label:          GameState.currentPeriodLabel(),
+
+      // P&L
+      grossPotentialRent: pnl.grossPotentialRent,
+      noi:                pnl.noi,
+      interestExpense:    pnl.interestExpense,
+      gAndA:              pnl.gAndA,
+      unusualItems:       pnl.unusualItems,
+      netIncome:          pnl.netIncome,
+      ffo:                pnl.ffo,
+      affo:               pnl.affo,
+      dividendsPaid:      pnl.dividendsPaid,
+      retainedCash:       pnl.retainedCash,
+
+      // Ratios
+      ffoPerShare:        GameState.ratios.ffoPerShare,
+      affoPerShare:       GameState.ratios.affoPerShare,
+      dividendPerShare:   GameState.company.dividendPerShare,
+      dividendCoverage:   GameState.ratios.dividendCoverage,
+      debtToAssets:       GameState.ratios.debtToAssets,
+      interestCoverage:   GameState.ratios.interestCoverage,
+      occupancy:          GameState.ratios.occupancyPortfolio,
+
+      // Balance sheet
+      cash:               GameState.balance.cash,
+      totalAssets:        GameState.balance.totalAssets,
+      totalDebt:          GameState.balance.totalDebt,
+      totalEquity:        GameState.balance.totalEquity,
+
+      // Market
+      sharePrice:         GameState.company.sharePrice,
+      marketCap:          GameState.company.marketCap,
+      baseInterestRate:   GameState.market.baseInterestRate,
+      creditRating:       GameState.credit.rating,
+      marketCycle:        GameState.market.cycle,
+
+      // Portfolio
+      portfolioSize:      GameState.portfolio.length,
+      pressurePoints:     GameState.board.pressurePoints,
+    });
+  }
+
+  // ----------------------------------------------------------
+  // CAPITAL ACTIONS
+  // These are called by the player before advancing the quarter
+  // ----------------------------------------------------------
+
+  // Issue new debt tranche
+  function getTermPremium(years) {
+    if (years <= 3)  return 0.00;
+    if (years <= 7)  return 0.25;
+    if (years <= 15) return 0.60;
+    return 1.00;
+  }
+
+  function getCurrentBorrowingRateForTerm(years) {
+    return fmt(Market.getCurrentBorrowingRate() + getTermPremium(years));
+  }
+
+  function issueDebt(amount, years) {
+    if (GameState.debtTranches.length >= 10) {
+      return { success: false, message: "Maximum 10 debt tranches reached. Retire existing debt first." };
+    }
+    if (amount <= 0) {
+      return { success: false, message: "Amount must be greater than zero." };
+    }
+
+    // Cap per issuance at 20% of total assets
+    var maxIssuance = fmt(GameState.balance.totalAssets * 0.20);
+    if (amount > maxIssuance) {
+      return { success: false, message: "Maximum single issuance is $" + maxIssuance + "M (20% of total assets). Your current capacity: $" + maxIssuance + "M." };
+    }
+
+    var rate    = getCurrentBorrowingRateForTerm(years);
+    var matYear = GameState.meta.year + years;
+    var matQ    = GameState.meta.quarter;
+    var id      = "d" + Date.now();
+    var label   = rate + "% Sr Notes due Y" + matYear + "Q" + matQ;
+
+    GameState.debtTranches.push({
+      id:                   id,
+      amount:               fmt(amount),
+      rate:                 rate,
+      maturityQuarter:      matQ,
+      maturityYear:         matYear,
+      quartersUntilMaturity:years * 4,
+      label:                label,
+    });
+
+    GameState.balance.cash = fmt(GameState.balance.cash + amount);
+
+    return {
+      success: true,
+      message: `Issued $${amount}M of ${rate}% notes due Y${matYear}Q${matQ}. Cash increased by $${amount}M.`,
+      rate,
+    };
+  }
+
+  // Retire debt tranche early
+  function retireDebt(trancheId) {
+    const tranche = GameState.debtTranches.find(t => t.id === trancheId);
+    if (!tranche) return { success: false, message: "Tranche not found." };
+
+    // Early repayment penalty if > 4 quarters remaining
+    const penalty = tranche.quartersUntilMaturity > 4
+      ? fmt(tranche.amount * 0.01)
+      : 0;
+    const totalCost = fmt(tranche.amount + penalty);
+
+    if (GameState.balance.cash < totalCost) {
+      return {
+        success: false,
+        message: `Insufficient cash. Need $${totalCost}M (including $${penalty}M prepayment penalty).`,
+      };
+    }
+
+    GameState.balance.cash = fmt(GameState.balance.cash - totalCost);
+    GameState.debtTranches = GameState.debtTranches.filter(t => t.id !== trancheId);
+
+    return {
+      success: true,
+      message: `Retired ${tranche.label}. Cash decreased by $${totalCost}M${penalty > 0 ? ` (incl. $${penalty}M penalty)` : ""}.`,
+    };
+  }
+
+  // Issue new equity
+  function issueEquity(shares) {
+    if (shares <= 0) return { success: false, message: "Shares must be greater than zero." };
+
+    // Cap at 20% of existing shares per issuance
+    var maxShares = fmt(GameState.company.sharesOutstanding * 0.20);
+    if (shares > maxShares) {
+      return { success: false, message: "Maximum issuance is " + maxShares + "M shares (20% of float)." };
+    }
+
+    // Price drop scales with issuance history and size
+    var count     = GameState.company.equityIssuanceCount || 0;
+    var sizeRatio = shares / GameState.company.sharesOutstanding;
+    var baseDrop  = count === 0 ? 0.05 : count === 1 ? 0.08 : count === 2 ? 0.12 : 0.18;
+    var totalDrop = Math.min(0.35, baseDrop + sizeRatio * 0.10);
+
+    var issuePrice = fmt(GameState.company.sharePrice * (1 - baseDrop));
+    var proceeds   = fmt(shares * issuePrice);
+
+    GameState.company.sharesOutstanding   = fmt(GameState.company.sharesOutstanding + shares);
+    GameState.balance.cash                = fmt(GameState.balance.cash + proceeds);
+    GameState.company.sharePrice          = fmt(GameState.company.sharePrice * (1 - totalDrop));
+    GameState.company.equityIssuanceCount = count + 1;
+
+    // Board pressure for repeated issuances
+    if (count >= 1) {
+      GameState.board.pressurePoints = Math.min(
+        GameState.board.maxPressure,
+        GameState.board.pressurePoints + 1
+      );
+    }
+
+    return {
+      success: true,
+      message: `Issued ${shares}M shares at $${issuePrice}/share. Raised $${proceeds}M. Existing shareholders diluted.`,
+    };
+  }
+
+  // Buy back shares
+  function buybackShares(shares) {
+    if (shares <= 0) return { success: false, message: "Shares must be greater than zero." };
+
+    const cost = fmt(shares * GameState.company.sharePrice);
+    if (GameState.balance.cash < cost) {
+      return { success: false, message: `Insufficient cash. Buyback costs $${cost}M.` };
+    }
+
+    GameState.company.sharesOutstanding = fmt(
+      Math.max(1, GameState.company.sharesOutstanding - shares)
+    );
+    GameState.balance.cash = fmt(GameState.balance.cash - cost);
+
+    // Buyback slightly boosts share price
+    GameState.company.sharePrice = fmt(
+      GameState.company.sharePrice * 1.01
+    );
+
+    return {
+      success: true,
+      message: `Bought back ${shares}M shares for $${cost}M. FFO per share will improve next quarter.`,
+    };
+  }
+
+  // Set quarterly dividend per share
+  function setDividend(newDividendPerShare) {
+    const old = GameState.company.dividendPerShare;
+    const change = newDividendPerShare - old;
+    const pct = old > 0 ? (change / old) * 100 : 0;
+
+    if (newDividendPerShare < 0) {
+      return { success: false, message: "Dividend cannot be negative." };
+    }
+
+    // Cutting the dividend — punishment scales with size of cut
+    if (change < -0.001) {
+      var cutPct     = Math.abs(pct);
+      var pressurePts = cutPct > 60 ? 4 : cutPct > 30 ? 3 : cutPct > 10 ? 2 : 1;
+      var priceHit    = cutPct > 60 ? 0.25 : cutPct > 30 ? 0.18 : cutPct > 10 ? 0.12 : 0.06;
+      GameState.company.sharePrice = fmt(
+        GameState.company.sharePrice * (1 - priceHit)
+      );
+      GameState.board.dividendCutQuarters = 0;
+      GameState.board.pressurePoints = Math.min(
+        GameState.board.maxPressure,
+        GameState.board.pressurePoints + pressurePts
+      );
+      GameState.board.pressureLog.push({
+        quarter: GameState.meta.quarter,
+        year:    GameState.meta.year,
+        reason:  "Dividend cut " + fmt(cutPct, 0) + "% from $" + old + " to $" + newDividendPerShare + "/share",
+        points:  pressurePts,
+      });
+    }
+
+    // Raising the dividend
+    if (change > 0.001) {
+      GameState.company.sharePrice = fmt(
+        GameState.company.sharePrice * (1 + Math.min(0.05, pct / 100 * 0.5))
+      );
+    }
+
+    GameState.company.dividendPerShare = fmt(newDividendPerShare);
+
+    const direction = change > 0.001 ? "raised" : change < -0.001 ? "cut" : "maintained";
+    return {
+      success: true,
+      message: `Dividend ${direction} to $${newDividendPerShare}/share per quarter ($${fmt(newDividendPerShare * 4)}/share annualized). ${change < -0.001 ? "Share price declined on the news." : ""}`,
+      direction,
+      pctChange: fmt(pct),
+    };
+  }
+
+  // ----------------------------------------------------------
+  // MASTER QUARTERLY RUN
+  // Call this once per quarter — runs all steps in order
+  // ----------------------------------------------------------
+  function runQuarter() {
+    // Increment counters
+    GameState.meta.totalQuarters += 1;
+    GameState.meta.quarter += 1;
+    if (GameState.meta.quarter > 4) {
+      GameState.meta.quarter = 1;
+      GameState.meta.year   += 1;
+      Market.applyYearlyEscalation();
+    }
+
+    // Reset unusual items (events.js will populate this before we run)
+    GameState.pnl.unusualItems = 0;
+
+    // 1. Roll random events (they modify portfolio and unusualItems)
+    const firedEvents = Events.rollEvents();
+
+    // 2. Update market conditions and property values
+    const marketResult = Market.quarterlyUpdate();
+    Properties.recalculatePropertyValues();
+    Properties.quarterlyUpdate();
+
+    // 3. Run P&L calculations
+    const noComponents   = calcPortfolioNOI();
+    const ga             = calcGA();
+    const interest       = calcInterestExpense();
+    const depreciation   = calcDepreciation();
+    const capex          = calcCapexReserve();
+    const pnl            = assemblePnL(noComponents, ga, interest, depreciation, capex);
+
+    // Write P&L to GameState
+    GameState.pnl = { ...GameState.pnl, ...pnl };
+
+    // 4. Update balance sheet
+    updateBalanceSheet(pnl);
+
+    // 5. Calculate ratios
+    const ratios = calcRatios(pnl);
+
+    // 6. Update credit rating (uses freshly computed ratios)
+    const creditResult = Market.computeCreditRating();
+
+    // 7. Update share price
+    updateSharePrice(pnl);
+
+    // 8. Handle debt maturities
+    const matured      = tickDebtMaturities();
+    const maturityMsgs = handleMaturedDebt(matured);
+
+    // 9. Save quarter to history
+    saveToHistory(pnl);
+
+    // 10. Return full summary for board.js and ui.js to consume
+    return {
+      pnl,
+      ratios,
+      marketResult,
+      creditResult,
+      firedEvents,
+      maturityMsgs,
+      period: GameState.currentPeriodLabel(),
+    };
+  }
+
+  // ----------------------------------------------------------
+  // INITIALISE — set starting financials
+  // ----------------------------------------------------------
+  function init() {
+    // Run initial property valuation
+    Properties.recalculatePropertyValues();
+
+    // Set starting balance sheet from initial portfolio
+    const portfolioValue = GameState.portfolio.reduce(
+      (sum, p) => sum + p.currentValue, 0
+    );
+    GameState.balance.totalAssets = fmt(GameState.balance.cash + portfolioValue);
+    GameState.balance.totalDebt   = fmt(
+      GameState.debtTranches.reduce((sum, t) => sum + t.amount, 0)
+    );
+    GameState.balance.totalEquity = fmt(
+      GameState.balance.totalAssets - GameState.balance.totalDebt
+    );
+    // Set share price dynamically at 95% of NAV per share
+    var navPerShare = fmt(
+      GameState.balance.totalEquity / GameState.company.sharesOutstanding
+    );
+    GameState.company.sharePrice = fmt(navPerShare * 0.95);
+    GameState.company.marketCap  = fmt(
+      GameState.company.sharePrice * GameState.company.sharesOutstanding
+    );
+  }
+
+  // ----------------------------------------------------------
+  // PUBLIC API
+  // ----------------------------------------------------------
   return {
-    init, evaluateQuarter, generateEarningsReport,
-    generateAnnualReport, getBoardStatus, assessYear1,
-    setAnnualGoals, getTutorialMessage,
-    PRESSURE_RULES, MOOD_LEVELS,
+    init,
+    runQuarter,
+    issueDebt,
+    retireDebt,
+    issueEquity,
+    buybackShares,
+    setDividend,
+    calcRatios,
+    getCurrentBorrowingRateForTerm,
+    getTermPremium,
   };
 
 })();
