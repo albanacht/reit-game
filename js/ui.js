@@ -3,9 +3,16 @@
 // REIT Simulator Game
 // ============================================================
 
-window.UI = (() => {
+window.UI = (function() {
 
-  function fmt(n, d) { d = d === undefined ? 2 : d; if (n === null || n === undefined || isNaN(n)) return "—"; return Number(n).toFixed(d); }
+  // ----------------------------------------------------------
+  // UTILITY
+  // ----------------------------------------------------------
+  function fmt(n, d) {
+    if (d === undefined) d = 2;
+    if (n === null || n === undefined || isNaN(n)) return "—";
+    return Number(n).toFixed(d);
+  }
   function fmtM(n)   { return "$" + fmt(n, 1) + "M"; }
   function fmtPct(n) { return fmt(n * 100, 1) + "%"; }
   function fmtPS(n)  { return "$" + fmt(n, 2); }
@@ -16,7 +23,7 @@ window.UI = (() => {
   // MODAL
   // ----------------------------------------------------------
   function showModal(title, body, actions) {
-    actions = actions || [];
+    if (!actions) actions = [];
     var overlay = el("modal-overlay");
     if (!overlay) return;
     el("modal-title").textContent = title;
@@ -46,7 +53,7 @@ window.UI = (() => {
   // TOAST
   // ----------------------------------------------------------
   function showToast(message, type) {
-    type = type || "info";
+    if (!type) type = "info";
     var container = el("toast-container");
     if (!container) return;
     var toast = document.createElement("div");
@@ -56,12 +63,12 @@ window.UI = (() => {
     setTimeout(function() { toast.classList.add("toast-visible"); }, 10);
     setTimeout(function() {
       toast.classList.remove("toast-visible");
-      setTimeout(function() { toast.remove(); }, 400);
+      setTimeout(function() { if (toast.parentNode) toast.remove(); }, 400);
     }, 3500);
   }
 
   // ----------------------------------------------------------
-  // HEADER
+  // RENDER FUNCTIONS
   // ----------------------------------------------------------
   function renderHeader() {
     setText("hdr-company",   GameState.company.name);
@@ -85,9 +92,6 @@ window.UI = (() => {
     }
   }
 
-  // ----------------------------------------------------------
-  // P&L
-  // ----------------------------------------------------------
   function renderPnL() {
     var p = GameState.pnl;
     setText("pnl-gpr",       fmtM(p.grossPotentialRent));
@@ -109,36 +113,30 @@ window.UI = (() => {
     if (niEl) niEl.className = p.netIncome >= 0 ? "text-green" : "text-yellow";
   }
 
-  // ----------------------------------------------------------
-  // RATIOS
-  // ----------------------------------------------------------
   function renderRatios() {
     var r = GameState.ratios;
-    function setRatio(id, val, good, bad) {
+    function sr(id, val, good, bad) {
       var e = el(id);
       if (!e) return;
       e.textContent = val;
       if (good !== undefined) e.className = good ? "text-green" : bad ? "text-red" : "text-yellow";
     }
-    setRatio("ratio-ffo-ps",     fmtPS(r.ffoPerShare));
-    setRatio("ratio-affo-ps",    fmtPS(r.affoPerShare));
-    setRatio("ratio-div-cov",    fmt(r.dividendCoverage, 2) + "x",  r.dividendCoverage >= 1.2, r.dividendCoverage < 1.0);
-    setRatio("ratio-payout",     fmtPct(r.payoutRatio),             r.payoutRatio < 0.85,      r.payoutRatio > 1.0);
-    setRatio("ratio-d2a",        fmtPct(r.debtToAssets),            r.debtToAssets < 0.40,     r.debtToAssets > 0.60);
-    setRatio("ratio-d2e",        fmt(r.debtToEbitda, 1) + "x",      r.debtToEbitda < 5,        r.debtToEbitda > 8);
-    setRatio("ratio-int-cov",    fmt(r.interestCoverage, 1) + "x",  r.interestCoverage >= 2.5, r.interestCoverage < 1.5);
-    setRatio("ratio-occ",        fmtPct(r.occupancyPortfolio),      r.occupancyPortfolio >= 0.92, r.occupancyPortfolio < 0.80);
-    setRatio("ratio-noi-margin", fmtPct(r.noiMargin),               r.noiMargin >= 0.45,       r.noiMargin < 0.30);
-    setRatio("ratio-cap-rate",   fmt(r.impliedCapRate, 2) + "%");
-    setRatio("ratio-nav",        fmtPS(r.navPerShare));
-    setRatio("ratio-pffo",       fmt(r.pToFFO, 1) + "x");
-    setRatio("ratio-paffo",      fmt(r.pToAFFO, 1) + "x");
-    setRatio("ratio-div-yield",  fmt(r.dividendYield, 2) + "%",     r.dividendYield > 4,       r.dividendYield < 2);
+    sr("ratio-ffo-ps",     fmtPS(r.ffoPerShare));
+    sr("ratio-affo-ps",    fmtPS(r.affoPerShare));
+    sr("ratio-div-cov",    fmt(r.dividendCoverage, 2) + "x",  r.dividendCoverage >= 1.2,    r.dividendCoverage < 1.0);
+    sr("ratio-payout",     fmtPct(r.payoutRatio),             r.payoutRatio < 0.85,         r.payoutRatio > 1.0);
+    sr("ratio-d2a",        fmtPct(r.debtToAssets),            r.debtToAssets < 0.40,        r.debtToAssets > 0.60);
+    sr("ratio-d2e",        fmt(r.debtToEbitda, 1) + "x",      r.debtToEbitda < 5,           r.debtToEbitda > 8);
+    sr("ratio-int-cov",    fmt(r.interestCoverage, 1) + "x",  r.interestCoverage >= 2.5,    r.interestCoverage < 1.5);
+    sr("ratio-occ",        fmtPct(r.occupancyPortfolio),      r.occupancyPortfolio >= 0.92, r.occupancyPortfolio < 0.80);
+    sr("ratio-noi-margin", fmtPct(r.noiMargin),               r.noiMargin >= 0.45,          r.noiMargin < 0.30);
+    sr("ratio-cap-rate",   fmt(r.impliedCapRate, 2) + "%");
+    sr("ratio-nav",        fmtPS(r.navPerShare));
+    sr("ratio-pffo",       fmt(r.pToFFO, 1) + "x");
+    sr("ratio-paffo",      fmt(r.pToAFFO, 1) + "x");
+    sr("ratio-div-yield",  fmt(r.dividendYield, 2) + "%",     r.dividendYield > 4,          r.dividendYield < 2);
   }
 
-  // ----------------------------------------------------------
-  // BALANCE SHEET
-  // ----------------------------------------------------------
   function renderBalanceSheet() {
     var b = GameState.balance;
     setText("bs-cash",   fmtM(b.cash));
@@ -151,158 +149,131 @@ window.UI = (() => {
     if (cashEl) cashEl.className = b.cash < 10 ? "text-red" : b.cash < 25 ? "text-yellow" : "text-green";
   }
 
-  // ----------------------------------------------------------
-  // DEBT PANEL
-  // ----------------------------------------------------------
   function renderDebtPanel() {
     var container = el("debt-tranches-list");
     if (!container) return;
     if (GameState.debtTranches.length === 0) {
-      container.innerHTML = '<p class="text-muted">No debt outstanding.</p>'; return;
+      container.innerHTML = '<p class="text-muted">No debt outstanding.</p>';
+      return;
     }
     var html = "";
     GameState.debtTranches.forEach(function(t) {
-      var urgency = t.quartersUntilMaturity <= 3 ? "tranche-red" : t.quartersUntilMaturity <= 7 ? "tranche-yellow" : "tranche-green";
-      html += '<div class="tranche-row ' + urgency + '">' +
+      var u = t.quartersUntilMaturity <= 3 ? "tranche-red" : t.quartersUntilMaturity <= 7 ? "tranche-yellow" : "tranche-green";
+      html += '<div class="tranche-row ' + u + '">' +
         '<div class="tranche-info">' +
         '<span class="tranche-label">' + t.label + '</span>' +
-        '<span class="tranche-meta">' + t.quartersUntilMaturity + 'q remaining · ' + t.rate + '% · $' + fmt(t.amount, 1) + 'M</span>' +
-        '</div>' +
-        '<div class="tranche-actions">' +
-        '<button class="btn btn-sm btn-danger" onclick="UI.confirmRetireDebt(\'' + t.id + '\')">Retire Early</button>' +
+        '<span class="tranche-meta">' + t.quartersUntilMaturity + 'q · ' + t.rate + '% · $' + fmt(t.amount, 1) + 'M</span>' +
+        '</div><div class="tranche-actions">' +
+        '<button class="btn btn-sm btn-danger" onclick="UI.confirmRetireDebt(\'' + t.id + '\')">Retire</button>' +
         '</div></div>';
     });
     container.innerHTML = html;
     var countEl = el("debt-tranche-count");
     if (countEl) {
-      var count = GameState.debtTranches.length;
-      countEl.textContent = count + "/10 tranches";
-      countEl.className = count >= 9 ? "text-red" : count >= 7 ? "text-yellow" : "text-green";
+      var c = GameState.debtTranches.length;
+      countEl.textContent = c + "/10 tranches";
+      countEl.className = c >= 9 ? "text-red" : c >= 7 ? "text-yellow" : "text-green";
     }
   }
 
-  // ----------------------------------------------------------
-  // PORTFOLIO
-  // ----------------------------------------------------------
   function renderPortfolio() {
     var container = el("portfolio-list");
     if (!container) return;
     if (GameState.portfolio.length === 0) {
-      container.innerHTML = '<p class="text-muted">No properties owned. Buy from the market.</p>'; return;
+      container.innerHTML = '<p class="text-muted">No properties owned. Buy from the market.</p>';
+      return;
     }
     var html = "";
     GameState.portfolio.forEach(function(p) {
-      var occColor = p.occupancy >= 0.90 ? "text-green" : p.occupancy >= 0.80 ? "text-yellow" : "text-red";
-      var gainLoss = p.purchasePrice ? fmt(p.currentValue - p.purchasePrice, 1) : 0;
-      var glColor  = gainLoss >= 0 ? "text-green" : "text-red";
+      var oc = p.occupancy >= 0.90 ? "text-green" : p.occupancy >= 0.80 ? "text-yellow" : "text-red";
+      var gl = p.purchasePrice ? fmt(p.currentValue - p.purchasePrice, 1) : 0;
+      var gc = gl >= 0 ? "text-green" : "text-red";
       html += '<div class="property-card">' +
-        '<div class="prop-header">' +
-        '<span class="prop-name">' + p.name + '</span>' +
-        '<span class="prop-tag tag-' + p.sector + '">' + p.sector + ' · ' + p.location + '</span>' +
-        '</div>' +
+        '<div class="prop-header"><span class="prop-name">' + p.name + '</span>' +
+        '<span class="prop-tag tag-' + p.sector + '">' + p.sector + ' · ' + p.location + '</span></div>' +
         '<div class="prop-stats">' +
         '<span>Value: <strong>' + fmtM(p.currentValue) + '</strong></span>' +
         '<span>NOI: <strong>' + fmtM(p.annualNOI) + '/yr</strong></span>' +
-        '<span>Occ: <strong class="' + occColor + '">' + fmtPct(p.occupancy) + '</strong></span>' +
-        '<span>G/L: <strong class="' + glColor + '">' + (gainLoss >= 0 ? "+" : "") + gainLoss + 'M</strong></span>' +
-        '</div>' +
-        '<div class="prop-actions">' +
+        '<span>Occ: <strong class="' + oc + '">' + fmtPct(p.occupancy) + '</strong></span>' +
+        '<span>G/L: <strong class="' + gc + '">' + (gl >= 0 ? "+" : "") + gl + 'M</strong></span>' +
+        '</div><div class="prop-actions">' +
         '<button class="btn btn-sm btn-danger" onclick="UI.confirmSellProperty(\'' + p.id + '\')">Sell</button>' +
         '</div></div>';
     });
     container.innerHTML = html;
   }
 
-  // ----------------------------------------------------------
-  // PROPERTY MARKET
-  // ----------------------------------------------------------
   function renderPropertyMarket() {
     var container = el("market-list");
     if (!container) return;
     var html = "";
     GameState.propertyMarket.forEach(function(p) {
-      var capRate   = GameState.market.capRates[p.sector][p.location];
-      var canAfford = GameState.balance.cash >= p.askingPrice;
-      html += '<div class="property-card ' + (canAfford ? "" : "prop-unaffordable") + '">' +
-        '<div class="prop-header">' +
-        '<span class="prop-name">' + p.name + '</span>' +
-        '<span class="prop-tag tag-' + p.sector + '">' + p.sector + ' · ' + p.location + '</span>' +
-        '</div>' +
+      var cr = GameState.market.capRates[p.sector][p.location];
+      var ca = GameState.balance.cash >= p.askingPrice;
+      html += '<div class="property-card ' + (ca ? "" : "prop-unaffordable") + '">' +
+        '<div class="prop-header"><span class="prop-name">' + p.name + '</span>' +
+        '<span class="prop-tag tag-' + p.sector + '">' + p.sector + ' · ' + p.location + '</span></div>' +
         '<div class="prop-stats">' +
         '<span>Ask: <strong>' + fmtM(p.askingPrice) + '</strong></span>' +
         '<span>NOI: <strong>' + fmtM(p.annualNOI) + '/yr</strong></span>' +
         '<span>Occ: <strong>' + fmtPct(p.occupancy) + '</strong></span>' +
-        '<span>Cap Rate: <strong>' + capRate + '%</strong></span>' +
-        '</div>' +
-        '<div class="prop-actions">' +
-        '<button class="btn btn-sm btn-primary" onclick="UI.confirmBuyProperty(\'' + p.id + '\')" ' + (canAfford ? "" : 'disabled title="Insufficient cash"') + '>Buy ' + fmtM(p.askingPrice) + '</button>' +
+        '<span>Cap: <strong>' + cr + '%</strong></span>' +
+        '</div><div class="prop-actions">' +
+        '<button class="btn btn-sm btn-primary" onclick="UI.confirmBuyProperty(\'' + p.id + '\')" ' +
+        (ca ? "" : 'disabled') + '>Buy ' + fmtM(p.askingPrice) + '</button>' +
         '</div></div>';
     });
     container.innerHTML = html;
   }
 
-  // ----------------------------------------------------------
-  // EARNINGS REPORT
-  // ----------------------------------------------------------
   function renderEarningsReport(report) {
     if (!report) return;
     var container = el("earnings-report");
     if (!container) return;
-    var isTutorial = GameState.meta.tutorialYear;
-
+    var isTut = GameState.meta.tutorialYear;
     var goalsHTML = "";
-    if (isTutorial && GameState.board.currentGoals.length > 0) {
-      goalsHTML = '<div class="goals-panel"><div class="goals-title">Year 1 Orientation Targets (not enforced)</div>';
-      GameState.board.currentGoals.forEach(function(g) { goalsHTML += '<div class="goal-item">▸ ' + g.metric + ': ' + g.target + '</div>'; });
-      goalsHTML += '</div>';
-    } else if (!isTutorial && GameState.board.currentGoals.length > 0) {
-      goalsHTML = '<div class="goals-panel"><div class="goals-title">Current Year Targets</div>';
-      GameState.board.currentGoals.forEach(function(g) { goalsHTML += '<div class="goal-item">▸ ' + g.metric + ': ' + g.target + '</div>'; });
-      goalsHTML += '</div>';
-    }
-
-    var eventsHTML = "";
-    if (report.firedEvents.length > 0) {
-      eventsHTML = '<div class="events-list">';
-      report.firedEvents.forEach(function(e) {
-        eventsHTML += '<div class="event-item"><strong>' + e.headline + '</strong><p>' + e.body + '</p><span class="event-impact">' + e.impact + '</span></div>';
+    if (GameState.board.currentGoals.length > 0) {
+      var title = isTut ? "Year 1 Orientation Targets (not enforced)" : "Current Year Targets";
+      goalsHTML = '<div class="goals-panel"><div class="goals-title">' + title + '</div>';
+      GameState.board.currentGoals.forEach(function(g) {
+        goalsHTML += '<div class="goal-item">▸ ' + g.metric + ': ' + g.target + '</div>';
       });
-      eventsHTML += '</div>';
+      goalsHTML += '</div>';
     }
-
-    var pressureHTML = "";
-    if (report.boardResult.pressureChanges.length > 0) {
-      pressureHTML = '<div class="pressure-changes">';
+    var evHTML = "";
+    if (report.firedEvents && report.firedEvents.length > 0) {
+      evHTML = '<div class="events-list">';
+      report.firedEvents.forEach(function(e) {
+        evHTML += '<div class="event-item"><strong>' + e.headline + '</strong><p>' + e.body + '</p><span class="event-impact">' + e.impact + '</span></div>';
+      });
+      evHTML += '</div>';
+    }
+    var prHTML = "";
+    if (report.boardResult && report.boardResult.pressureChanges && report.boardResult.pressureChanges.length > 0) {
+      prHTML = '<div class="pressure-changes">';
       report.boardResult.pressureChanges.forEach(function(p) {
         var cls = p.type === "pressure" ? "pressure-bad" : p.type === "warning" ? "pressure-warn" : "pressure-good";
-        var arrow = p.type === "pressure" ? "▲" : p.type === "warning" ? "⚠" : "▼";
-        pressureHTML += '<div class="pressure-item ' + cls + '"><span>' + arrow + ' ' + p.points + 'pt — ' + p.reason + '</span></div>';
+        var ar  = p.type === "pressure" ? "▲" : p.type === "warning" ? "⚠" : "▼";
+        prHTML += '<div class="pressure-item ' + cls + '">' + ar + ' ' + p.points + 'pt — ' + p.reason + '</div>';
       });
-      pressureHTML += '</div>';
+      prHTML += '</div>';
     }
-
     container.innerHTML =
       '<div class="panel-header"><span class="panel-title">CFO Earnings Report</span></div>' +
       '<div class="panel-body">' +
-      '<div class="report-header"><h3>' + report.headline + '</h3></div>' +
-      '<div class="report-body"><p>' + report.body.replace(/\n/g, "<br>") + '</p></div>' +
-      goalsHTML + eventsHTML + pressureHTML +
+      '<h3 style="margin-bottom:10px">' + report.headline + '</h3>' +
+      '<p style="color:var(--text-muted);line-height:1.7;margin-bottom:12px">' + report.body.replace(/\n/g, "<br>") + '</p>' +
+      goalsHTML + evHTML + prHTML +
       '</div>';
   }
 
-  // ----------------------------------------------------------
-  // CAPITAL ACTIONS
-  // ----------------------------------------------------------
   function renderCapitalActions() {
     setText("action-borrow-rate", "Current rate: " + fmt(Market.getCurrentBorrowingRate(), 2) + "%");
-    setText("action-div-current", "Current: $" + fmt(GameState.company.dividendPerShare, 2) + "/share/quarter");
-    setText("action-shares-out",  "Shares outstanding: " + fmt(GameState.company.sharesOutstanding, 1) + "M");
+    setText("action-div-current", "Current: $" + fmt(GameState.company.dividendPerShare, 2) + "/share/qtr");
+    setText("action-shares-out",  "Shares: " + fmt(GameState.company.sharesOutstanding, 1) + "M outstanding");
     setText("action-cash-avail",  "Cash available: " + fmtM(GameState.balance.cash));
   }
 
-  // ----------------------------------------------------------
-  // RENDER ALL
-  // ----------------------------------------------------------
   function renderAll(report) {
     renderHeader();
     renderPnL();
@@ -324,16 +295,12 @@ window.UI = (() => {
     var overlay = el("annual-report-overlay");
     var content = el("annual-report-content");
     if (!overlay || !content) return;
-
-    var isYear1 = snapshot.year === 1;
-
+    var isY1 = snapshot.year === 1;
     function arw(a, b) { return a < b ? '<span class="text-green">▲</span>' : a > b ? '<span class="text-red">▼</span>' : "→"; }
-
     var ratingOrder = ["CCC","B","BB","BBB","A","AA","AAA"];
     var si = ratingOrder.indexOf(snapshot.startRating);
     var ei = ratingOrder.indexOf(snapshot.endRating);
-    var ratingArrow = ei > si ? '<span class="text-green">▲</span>' : ei < si ? '<span class="text-red">▼</span>' : "→";
-
+    var ra = ei > si ? '<span class="text-green">▲</span>' : ei < si ? '<span class="text-red">▼</span>' : "→";
     var goalsHTML = "";
     if (snapshot.boardAssessment && snapshot.boardAssessment.goalResults) {
       goalsHTML = '<div class="ar-section"><div class="ar-section-title">Goal Performance</div>';
@@ -342,64 +309,54 @@ window.UI = (() => {
       });
       goalsHTML += '</div>';
     }
-
-    var nextGoalsHTML = "";
+    var ngHTML = "";
     if (snapshot.nextYearGoals && snapshot.nextYearGoals.length > 0) {
-      nextGoalsHTML = '<div class="ar-section"><div class="ar-section-title">Year ' + (snapshot.year + 1) + ' Board Targets</div>';
-      snapshot.nextYearGoals.forEach(function(g) { nextGoalsHTML += '<div class="ar-goal">▸ ' + g.metric + ': ' + g.target + '</div>'; });
-      nextGoalsHTML += '</div>';
+      ngHTML = '<div class="ar-section"><div class="ar-section-title">Year ' + (snapshot.year + 1) + ' Board Targets</div>';
+      snapshot.nextYearGoals.forEach(function(g) { ngHTML += '<div class="ar-goal">▸ ' + g.metric + ': ' + g.target + '</div>'; });
+      ngHTML += '</div>';
     }
-
-    var eventsHTML = "";
+    var evHTML = "";
     if (snapshot.yearEvents && snapshot.yearEvents.length > 0) {
-      eventsHTML = '<div class="ar-section"><div class="ar-section-title">Key Events</div>';
-      snapshot.yearEvents.forEach(function(e) { eventsHTML += '<div class="ar-event">▸ ' + e.headline + '</div>'; });
-      eventsHTML += '</div>';
+      evHTML = '<div class="ar-section"><div class="ar-section-title">Key Events</div>';
+      snapshot.yearEvents.forEach(function(e) { evHTML += '<div class="ar-event">▸ ' + e.headline + '</div>'; });
+      evHTML += '</div>';
     }
-
-    var pressureNote = isYear1
-      ? '<p class="ar-pressure-note">Starting Year 2 with <strong>' + (snapshot.boardAssessment ? snapshot.boardAssessment.startingPressure || 0 : 0) + ' pressure point(s)</strong> already on record.</p>'
-      : "";
-
+    var sp = snapshot.boardAssessment ? (snapshot.boardAssessment.startingPressure || 0) : 0;
+    var pnote = isY1 ? '<p class="ar-pressure-note">Starting Year 2 with <strong>' + sp + ' pressure point(s)</strong> on record.</p>' : "";
     content.innerHTML =
       '<div class="ar-header">' +
       '<div class="ar-logo">' + GameState.company.name + '</div>' +
       '<div class="ar-year">Annual Report — Year ' + snapshot.year + '</div>' +
-      (isYear1 ? '<div class="ar-badge">Orientation Year Complete</div>' : '') +
+      (isY1 ? '<div class="ar-badge">Orientation Year Complete</div>' : '') +
       '</div>' +
       '<div class="ar-grid">' +
       '<div class="ar-section"><div class="ar-section-title">Share Performance</div>' +
-      '<div class="ar-row"><span>Share Price</span><span>' + arw(snapshot.endPrice, snapshot.startPrice) + ' $' + snapshot.startPrice + ' → $' + snapshot.endPrice + ' (' + (snapshot.priceChg >= 0 ? "+" : "") + snapshot.priceChg + '%)</span></div>' +
-      '</div>' +
+      '<div class="ar-row"><span>Share Price</span><span>' + arw(snapshot.endPrice, snapshot.startPrice) + ' $' + snapshot.startPrice + ' → $' + snapshot.endPrice + ' (' + (snapshot.priceChg >= 0 ? "+" : "") + snapshot.priceChg + '%)</span></div></div>' +
       '<div class="ar-section"><div class="ar-section-title">Full Year Financials</div>' +
       '<div class="ar-row"><span>Total Revenue</span><span>' + fmtM(snapshot.totalRevenue) + '</span></div>' +
       '<div class="ar-row"><span>Total NOI</span><span>' + fmtM(snapshot.totalNOI) + '</span></div>' +
       '<div class="ar-row"><span>Total FFO</span><span class="text-green">' + fmtM(snapshot.totalFFO) + '</span></div>' +
-      '<div class="ar-row"><span>Total AFFO</span><span>' + fmtM(snapshot.totalAFFO) + '</span></div>' +
       '<div class="ar-row"><span>Dividends Paid</span><span>' + fmtM(snapshot.totalDividends) + '</span></div>' +
       '<div class="ar-row"><span>Avg Coverage</span><span class="' + (snapshot.avgCoverage >= 1.0 ? "text-green" : "text-red") + '">' + fmt(snapshot.avgCoverage, 2) + 'x</span></div>' +
-      '<div class="ar-row"><span>Retained Cash</span><span class="' + (snapshot.totalRetained >= 0 ? "text-green" : "text-red") + '">' + fmtM(snapshot.totalRetained) + '</span></div>' +
       '</div>' +
       '<div class="ar-section"><div class="ar-section-title">Balance Sheet</div>' +
       '<div class="ar-row"><span>Total Assets</span><span>' + arw(snapshot.endAssets, snapshot.startAssets) + ' ' + fmtM(snapshot.startAssets) + ' → ' + fmtM(snapshot.endAssets) + '</span></div>' +
       '<div class="ar-row"><span>Total Debt</span><span>' + fmtM(snapshot.startDebt) + ' → ' + fmtM(snapshot.endDebt) + '</span></div>' +
-      '<div class="ar-row"><span>Credit Rating</span><span>' + ratingArrow + ' ' + snapshot.startRating + ' → ' + snapshot.endRating + '</span></div>' +
+      '<div class="ar-row"><span>Credit Rating</span><span>' + ra + ' ' + snapshot.startRating + ' → ' + snapshot.endRating + '</span></div>' +
       '</div>' +
       '<div class="ar-section"><div class="ar-section-title">Portfolio</div>' +
       '<div class="ar-row"><span>Properties</span><span>' + snapshot.startProps + ' → ' + snapshot.endProps + '</span></div>' +
       '<div class="ar-row"><span>Avg Occupancy</span><span class="' + (snapshot.avgOccupancy >= 0.85 ? "text-green" : "text-yellow") + '">' + fmtPct(snapshot.avgOccupancy) + '</span></div>' +
-      (snapshot.bestProp  ? '<div class="ar-row"><span>Best Asset</span><span class="text-green">'  + snapshot.bestProp.name  + ' (' + snapshot.bestProp.occ  + '%)</span></div>' : '') +
-      (snapshot.worstProp ? '<div class="ar-row"><span>Needs Work</span><span class="text-red">'    + snapshot.worstProp.name + ' (' + snapshot.worstProp.occ + '%)</span></div>' : '') +
+      (snapshot.bestProp  ? '<div class="ar-row"><span>Best</span><span class="text-green">'  + snapshot.bestProp.name  + ' (' + snapshot.bestProp.occ  + '%)</span></div>' : '') +
+      (snapshot.worstProp ? '<div class="ar-row"><span>Worst</span><span class="text-red">'   + snapshot.worstProp.name + ' (' + snapshot.worstProp.occ + '%)</span></div>' : '') +
       '</div>' +
-      eventsHTML + goalsHTML +
+      evHTML + goalsHTML +
       '</div>' +
       '<div class="ar-board-letter"><div class="ar-section-title">Board Assessment</div>' +
-      '<p>' + (snapshot.boardAssessment ? snapshot.boardAssessment.letter || "" : "") + '</p>' +
-      pressureNote +
-      '</div>' +
-      nextGoalsHTML +
+      '<p>' + (snapshot.boardAssessment ? (snapshot.boardAssessment.letter || "") : "") + '</p>' +
+      pnote + '</div>' +
+      ngHTML +
       '<div class="ar-footer"><button class="btn btn-primary btn-lg" onclick="UI.closeAnnualReport()">Continue to Year ' + (snapshot.year + 1) + ' →</button></div>';
-
     overlay.classList.remove("hidden");
   }
 
@@ -430,13 +387,13 @@ window.UI = (() => {
     if (!prop) return;
     showModal("Acquire " + prop.name,
       "Sector: " + prop.sector + " | Location: " + prop.location + "\n" +
-      "Asking Price: " + fmtM(prop.askingPrice) + "\nAnnual NOI: " + fmtM(prop.annualNOI) + "\n" +
-      "Occupancy: " + fmtPct(prop.occupancy) + "\nCap Rate: " + GameState.market.capRates[prop.sector][prop.location] + "%\n\n" +
-      "Your cash: " + fmtM(GameState.balance.cash) + "\nCash after: " + fmtM(GameState.balance.cash - prop.askingPrice),
+      "Asking: " + fmtM(prop.askingPrice) + "  |  NOI: " + fmtM(prop.annualNOI) + "/yr\n" +
+      "Occupancy: " + fmtPct(prop.occupancy) + "  |  Cap Rate: " + GameState.market.capRates[prop.sector][prop.location] + "%\n\n" +
+      "Cash now: " + fmtM(GameState.balance.cash) + "  →  after: " + fmtM(GameState.balance.cash - prop.askingPrice),
       [{ label: "Buy for " + fmtM(prop.askingPrice), style: "btn-primary", onClick: function() {
-        var result = Properties.buyProperty(propertyId);
-        showToast(result.message, result.success ? "success" : "error");
-        if (result.success) renderAll();
+        var r = Properties.buyProperty(propertyId);
+        showToast(r.message, r.success ? "success" : "error");
+        if (r.success) renderAll();
       }}]);
   }
 
@@ -444,94 +401,88 @@ window.UI = (() => {
     var prop = GameState.portfolio.find(function(p) { return p.id === propertyId; });
     if (!prop) return;
     showModal("Sell " + prop.name,
-      "Current Value: " + fmtM(prop.currentValue) + "\nPurchase Price: " + fmtM(prop.purchasePrice) + "\n" +
-      "Market Cycle: " + GameState.market.cycle + "\n\nAre you sure? This cannot be undone.",
+      "Current Value: " + fmtM(prop.currentValue) + "\nPurchase Price: " + fmtM(prop.purchasePrice) + "\nCycle: " + GameState.market.cycle + "\n\nConfirm sale?",
       [{ label: "Confirm Sale", style: "btn-danger", onClick: function() {
-        var result = Properties.sellProperty(propertyId);
-        showToast(result.message, result.success ? "success" : "error");
-        if (result.success) renderAll();
+        var r = Properties.sellProperty(propertyId);
+        showToast(r.message, r.success ? "success" : "error");
+        if (r.success) renderAll();
       }}]);
   }
 
   function confirmRetireDebt(trancheId) {
-    var tranche = GameState.debtTranches.find(function(t) { return t.id === trancheId; });
-    if (!tranche) return;
-    var penalty   = tranche.quartersUntilMaturity > 4 ? Math.round(tranche.amount * 0.01 * 10) / 10 : 0;
-    var totalCost = Math.round((tranche.amount + penalty) * 10) / 10;
-    showModal("Retire " + tranche.label,
-      "Amount: " + fmtM(tranche.amount) + "\nRate: " + tranche.rate + "%\n" +
-      "Quarters remaining: " + tranche.quartersUntilMaturity + "\n" +
-      "Prepayment penalty: " + (penalty > 0 ? fmtM(penalty) : "None") + "\n" +
-      "Total cost: " + fmtM(totalCost) + "\nCash available: " + fmtM(GameState.balance.cash),
+    var t = GameState.debtTranches.find(function(x) { return x.id === trancheId; });
+    if (!t) return;
+    var pen  = t.quartersUntilMaturity > 4 ? Math.round(t.amount * 0.01 * 10) / 10 : 0;
+    var cost = Math.round((t.amount + pen) * 10) / 10;
+    showModal("Retire " + t.label,
+      "Amount: " + fmtM(t.amount) + "  |  Rate: " + t.rate + "%\n" +
+      "Quarters left: " + t.quartersUntilMaturity + "\nPenalty: " + (pen > 0 ? fmtM(pen) : "None") + "\nTotal cost: " + fmtM(cost) + "\nCash: " + fmtM(GameState.balance.cash),
       [{ label: "Retire Debt", style: "btn-danger", onClick: function() {
-        var result = Financials.retireDebt(trancheId);
-        showToast(result.message, result.success ? "success" : "error");
-        if (result.success) renderAll();
+        var r = Financials.retireDebt(trancheId);
+        showToast(r.message, r.success ? "success" : "error");
+        if (r.success) renderAll();
       }}]);
   }
 
   function handleIssueDebt() {
-    var amount = parseFloat(el("input-debt-amount") ? el("input-debt-amount").value : 0);
-    var years  = parseInt(el("input-debt-years") ? el("input-debt-years").value : 0);
-    if (isNaN(amount) || amount <= 0) { showToast("Enter a valid amount", "error"); return; }
-    if (isNaN(years) || years < 1 || years > 30) { showToast("Enter a valid term (1-30 years)", "error"); return; }
+    var amtEl = el("input-debt-amount"), yrEl = el("input-debt-years");
+    var amount = amtEl ? parseFloat(amtEl.value) : NaN;
+    var years  = yrEl  ? parseInt(yrEl.value)    : NaN;
+    if (isNaN(amount) || amount <= 0)            { showToast("Enter a valid amount", "error"); return; }
+    if (isNaN(years) || years < 1 || years > 30) { showToast("Enter term 1-30 years", "error"); return; }
     var rate = Market.getCurrentBorrowingRate();
     showModal("Issue New Debt",
-      "Amount: " + fmtM(amount) + "\nTerm: " + years + " years\nRate: " + fmt(rate, 2) + "%\n" +
-      "Annual interest: " + fmtM(amount * rate / 100) + "\nTranches used: " + GameState.debtTranches.length + "/10",
+      "Amount: " + fmtM(amount) + "  |  Term: " + years + " yrs  |  Rate: " + fmt(rate, 2) + "%\n" +
+      "Annual interest: " + fmtM(amount * rate / 100) + "  |  Tranches: " + GameState.debtTranches.length + "/10",
       [{ label: "Issue at " + fmt(rate, 2) + "%", style: "btn-primary", onClick: function() {
-        var result = Financials.issueDebt(amount, years);
-        showToast(result.message, result.success ? "success" : "error");
-        if (result.success) { if (el("input-debt-amount")) el("input-debt-amount").value = ""; renderAll(); }
+        var r = Financials.issueDebt(amount, years);
+        showToast(r.message, r.success ? "success" : "error");
+        if (r.success) { if (amtEl) amtEl.value = ""; renderAll(); }
       }}]);
   }
 
   function handleIssueEquity() {
-    var shares = parseFloat(el("input-equity-shares") ? el("input-equity-shares").value : 0);
-    if (isNaN(shares) || shares <= 0) { showToast("Enter a valid number of shares", "error"); return; }
-    var issueP   = GameState.company.sharePrice * 0.95;
-    var proceeds = shares * issueP;
-    showModal("Issue New Equity",
-      "Shares: " + fmt(shares, 1) + "M\nIssue price: " + fmtPS(issueP) + " (5% discount)\n" +
-      "Proceeds: " + fmtM(proceeds) + "\nDilution: ~" + fmt(shares / GameState.company.sharesOutstanding * 100, 1) + "%",
+    var sharesEl = el("input-equity-shares");
+    var shares = sharesEl ? parseFloat(sharesEl.value) : NaN;
+    if (isNaN(shares) || shares <= 0) { showToast("Enter valid shares", "error"); return; }
+    var ip = GameState.company.sharePrice * 0.95;
+    showModal("Issue Equity",
+      "Shares: " + fmt(shares, 1) + "M  |  Price: " + fmtPS(ip) + " (5% disc)\n" +
+      "Proceeds: " + fmtM(shares * ip) + "  |  Dilution: " + fmt(shares / GameState.company.sharesOutstanding * 100, 1) + "%",
       [{ label: "Issue Shares", style: "btn-primary", onClick: function() {
-        var result = Financials.issueEquity(shares);
-        showToast(result.message, result.success ? "success" : "error");
-        if (result.success) { if (el("input-equity-shares")) el("input-equity-shares").value = ""; renderAll(); }
+        var r = Financials.issueEquity(shares);
+        showToast(r.message, r.success ? "success" : "error");
+        if (r.success) { if (sharesEl) sharesEl.value = ""; renderAll(); }
       }}]);
   }
 
   function handleBuyback() {
-    var shares = parseFloat(el("input-buyback-shares") ? el("input-buyback-shares").value : 0);
-    if (isNaN(shares) || shares <= 0) { showToast("Enter a valid number of shares", "error"); return; }
+    var sharesEl = el("input-buyback-shares");
+    var shares = sharesEl ? parseFloat(sharesEl.value) : NaN;
+    if (isNaN(shares) || shares <= 0) { showToast("Enter valid shares", "error"); return; }
     var cost = shares * GameState.company.sharePrice;
     showModal("Share Buyback",
-      "Shares: " + fmt(shares, 1) + "M\nPrice: " + fmtPS(GameState.company.sharePrice) + "\n" +
-      "Total cost: " + fmtM(cost) + "\nCash after: " + fmtM(GameState.balance.cash - cost),
-      [{ label: "Buy Back Shares", style: "btn-primary", onClick: function() {
-        var result = Financials.buybackShares(shares);
-        showToast(result.message, result.success ? "success" : "error");
-        if (result.success) { if (el("input-buyback-shares")) el("input-buyback-shares").value = ""; renderAll(); }
+      "Shares: " + fmt(shares, 1) + "M  |  Cost: " + fmtM(cost) + "\nCash after: " + fmtM(GameState.balance.cash - cost),
+      [{ label: "Buy Back", style: "btn-primary", onClick: function() {
+        var r = Financials.buybackShares(shares);
+        showToast(r.message, r.success ? "success" : "error");
+        if (r.success) { if (sharesEl) sharesEl.value = ""; renderAll(); }
       }}]);
   }
 
   function handleSetDividend() {
-    var newDiv = parseFloat(el("input-dividend") ? el("input-dividend").value : -1);
-    if (isNaN(newDiv) || newDiv < 0) { showToast("Enter a valid dividend amount", "error"); return; }
-    var old    = GameState.company.dividendPerShare;
-    var change = newDiv - old;
-    var isCut  = change < -0.001;
-    var warning = isCut
-      ? "WARNING: Cutting the dividend causes a significant share price drop and +2 board pressure points."
-      : change > 0.001 ? "Raising the dividend signals confidence but locks in a higher commitment."
-      : "No change from current dividend.";
+    var divEl = el("input-dividend");
+    var newDiv = divEl ? parseFloat(divEl.value) : NaN;
+    if (isNaN(newDiv) || newDiv < 0) { showToast("Enter valid dividend", "error"); return; }
+    var old   = GameState.company.dividendPerShare;
+    var isCut = newDiv < old - 0.001;
+    var warn  = isCut ? "WARNING: Cutting dividend causes share price drop and +2 board pressure." : newDiv > old + 0.001 ? "Raising dividend signals confidence." : "No change.";
     showModal("Set Quarterly Dividend",
-      "Current: " + fmtPS(old) + "/share/quarter\nNew: " + fmtPS(newDiv) + "/share/quarter\n" +
-      "Quarterly cost: " + fmtM(newDiv * GameState.company.sharesOutstanding) + "\n\n" + warning,
+      "Current: " + fmtPS(old) + "  →  New: " + fmtPS(newDiv) + "\nQuarterly cost: " + fmtM(newDiv * GameState.company.sharesOutstanding) + "\n\n" + warn,
       [{ label: isCut ? "Cut Dividend" : "Set Dividend", style: isCut ? "btn-danger" : "btn-primary", onClick: function() {
-        var result = Financials.setDividend(newDiv);
-        showToast(result.message, result.success ? "success" : "error");
-        if (result.success) { if (el("input-dividend")) el("input-dividend").value = ""; renderAll(); }
+        var r = Financials.setDividend(newDiv);
+        showToast(r.message, r.success ? "success" : "error");
+        if (r.success) { if (divEl) divEl.value = ""; renderAll(); }
       }}]);
   }
 
@@ -543,53 +494,49 @@ window.UI = (() => {
     if (GameState._pendingOffer) {
       var offer = GameState._pendingOffer;
       showModal("Offer Expiring: " + offer.propertyName,
-        "Acquisition offer of " + fmtM(offer.offerPrice) + " (" + offer.premium + "% premium) expires this quarter.\nAccept or decline?",
+        "Offer: " + fmtM(offer.offerPrice) + " (" + offer.premium + "% premium)\nExpires this quarter — accept or decline?",
         [
           { label: "Accept " + fmtM(offer.offerPrice), style: "btn-primary", onClick: function() {
-            var result = Properties.sellProperty(offer.propertyId);
-            if (result.success) {
-              GameState.balance.cash = Math.round((GameState.balance.cash - result.salePrice + offer.offerPrice) * 100) / 100;
-              showToast("Accepted offer: " + fmtM(offer.offerPrice), "success");
+            var r = Properties.sellProperty(offer.propertyId);
+            if (r.success) {
+              GameState.balance.cash = Math.round((GameState.balance.cash - r.salePrice + offer.offerPrice) * 100) / 100;
+              showToast("Accepted: " + fmtM(offer.offerPrice), "success");
             }
             GameState._pendingOffer = null;
-            doAdvanceQuarter();
+            doAdvance();
           }},
-          { label: "Decline Offer", style: "btn-secondary", onClick: function() { GameState._pendingOffer = null; doAdvanceQuarter(); }}
+          { label: "Decline", style: "btn-secondary", onClick: function() { GameState._pendingOffer = null; doAdvance(); }}
         ]);
       return;
     }
-    doAdvanceQuarter();
+    doAdvance();
   }
 
-  function doAdvanceQuarter() {
-    var quarterResult = Financials.runQuarter();
-    var boardResult   = Board.evaluateQuarter();
-    var report        = Board.generateEarningsReport(quarterResult, boardResult);
-
+  function doAdvance() {
+    var qr = Financials.runQuarter();
+    var br = Board.evaluateQuarter();
+    var rp = Board.generateEarningsReport(qr, br);
     var justEndedYear = GameState.meta.quarter === 1 && GameState.meta.totalQuarters > 1;
     if (justEndedYear) {
       if (GameState.meta.year === 2) GameState.meta.tutorialYear = false;
-      var snapshot = Board.generateAnnualReport();
-      renderAll(report);
-      setTimeout(function() { showAnnualReport(snapshot); }, 600);
+      var snap = Board.generateAnnualReport();
+      renderAll(rp);
+      setTimeout(function() { showAnnualReport(snap); }, 600);
     } else {
-      renderAll(report);
+      renderAll(rp);
     }
-
-    var reportEl = el("earnings-report");
-    if (reportEl) reportEl.scrollIntoView({ behavior: "smooth", block: "start" });
-
+    var re = el("earnings-report");
+    if (re) re.scrollIntoView({ behavior: "smooth", block: "start" });
     if (GameState.meta.gameOver && !justEndedYear) {
-      var scoreData = Leaderboard.calculateScore();
+      var sd = Leaderboard.calculateScore();
       setTimeout(function() {
         showGameOver();
-        setTimeout(function() { Leaderboard.showSubmitScreen(scoreData); }, 800);
+        setTimeout(function() { Leaderboard.showSubmitScreen(sd); }, 800);
       }, 1200);
     }
-
-    if (quarterResult.marketResult && quarterResult.marketResult.cycleResult && quarterResult.marketResult.cycleResult.cycleChanged) {
-      var cycle = quarterResult.marketResult.cycleResult;
-      setTimeout(function() { showToast("Market shift: " + cycle.label + " — " + cycle.description, "warning"); }, 800);
+    if (qr.marketResult && qr.marketResult.cycleResult && qr.marketResult.cycleResult.cycleChanged) {
+      var cy = qr.marketResult.cycleResult;
+      setTimeout(function() { showToast("Market shift: " + cy.label, "warning"); }, 800);
     }
   }
 
@@ -597,25 +544,25 @@ window.UI = (() => {
   // GAME OVER
   // ----------------------------------------------------------
   function showGameOver() {
-    var overlay = el("gameover-overlay");
-    if (!overlay) return;
+    var o = el("gameover-overlay");
+    if (!o) return;
     setText("gameover-reason",   GameState.meta.gameOverReason);
-    setText("gameover-quarters", "You survived " + GameState.meta.totalQuarters + " quarters (" + GameState.meta.year + " years)");
+    setText("gameover-quarters", "Survived " + GameState.meta.totalQuarters + " quarters (" + GameState.meta.year + " years)");
     setText("gameover-ffo",      fmtPS(GameState.ratios.ffoPerShare));
     setText("gameover-occ",      fmtPct(GameState.ratios.occupancyPortfolio));
     setText("gameover-d2a",      fmtPct(GameState.ratios.debtToAssets));
     setText("gameover-props",    GameState.portfolio.length + " properties");
-    overlay.classList.remove("hidden");
+    o.classList.remove("hidden");
   }
 
   // ----------------------------------------------------------
-  // NEW GAME
+  // NEW GAME — called ONLY when Start Game button is clicked
   // ----------------------------------------------------------
   function newGame() {
-    var nameInput = el("input-player-name");
-    var reitInput = el("input-reit-name");
-    var playerName = nameInput && nameInput.value.trim() ? nameInput.value.trim() : "CEO";
-    var reitName   = reitInput && reitInput.value.trim() ? reitInput.value.trim() : "My";
+    var ni = el("input-player-name");
+    var ri = el("input-reit-name");
+    var playerName = (ni && ni.value.trim()) ? ni.value.trim() : "CEO";
+    var reitName   = (ri && ri.value.trim()) ? ri.value.trim() : "My";
 
     GameState.player.name     = playerName;
     GameState.player.reitName = reitName;
@@ -635,8 +582,7 @@ window.UI = (() => {
     GameState.company.dividendPerShare    = 0.10;
     GameState.company.dividendHistory     = [];
     GameState.company.dividendCutQuarters = 0;
-
-    GameState.balance.cash = 100;
+    GameState.balance.cash                = 100;
 
     GameState.debtTranches = [
       { id: "d001", amount: 130, rate: 5.0, maturityQuarter: 2, maturityYear: 4, quartersUntilMaturity: 13, label: "5.0% Sr Notes due Y4Q2" },
@@ -655,8 +601,11 @@ window.UI = (() => {
     Financials.init();
     Charts.init();
 
-    ["gameover-overlay","start-overlay","annual-report-overlay","help-overlay"].forEach(function(id) {
-      var o = el(id); if (o) o.classList.add("hidden");
+    // Hide all overlays
+    var overlayIds = ["gameover-overlay", "start-overlay", "annual-report-overlay", "help-overlay"];
+    overlayIds.forEach(function(id) {
+      var o = el(id);
+      if (o) o.classList.add("hidden");
     });
 
     renderAll();
@@ -665,10 +614,11 @@ window.UI = (() => {
   }
 
   // ----------------------------------------------------------
-  // INIT
+  // INIT — called once on page load, shows start screen only
   // ----------------------------------------------------------
   function init() {
-    var btnMap = {
+    // Wire up buttons
+    var buttons = {
       "btn-advance-quarter": advanceQuarter,
       "btn-new-game":        newGame,
       "btn-new-game-go":     newGame,
@@ -679,36 +629,60 @@ window.UI = (() => {
       "btn-help":            showHelp,
       "btn-help-close":      closeHelp,
     };
-    Object.keys(btnMap).forEach(function(id) {
+    Object.keys(buttons).forEach(function(id) {
       var btn = el(id);
-      if (btn) btn.addEventListener("click", btnMap[id]);
+      if (btn) btn.addEventListener("click", buttons[id]);
     });
 
+    // Keyboard shortcuts
     document.addEventListener("keydown", function(e) {
-      if (e.key === "F1") { e.preventDefault(); showHelp(); }
+      if (e.key === "F1")     { e.preventDefault(); showHelp(); }
       if (e.key === "Escape") { closeHelp(); closeModal(); }
     });
 
-    var modalOverlay = el("modal-overlay");
-    if (modalOverlay) modalOverlay.addEventListener("click", function(e) { if (e.target === modalOverlay) closeModal(); });
-    var helpOverlay = el("help-overlay");
-    if (helpOverlay) helpOverlay.addEventListener("click", function(e) { if (e.target === helpOverlay) closeHelp(); });
+    // Close overlays on background click
+    var mo = el("modal-overlay");
+    if (mo) mo.addEventListener("click", function(e) { if (e.target === mo) closeModal(); });
+    var ho = el("help-overlay");
+    if (ho) ho.addEventListener("click", function(e) { if (e.target === ho) closeHelp(); });
 
+    // Init charts
     Charts.init();
 
-    var startOverlay = el("start-overlay");
-    if (startOverlay) startOverlay.classList.remove("hidden");
+    // Show start screen — THIS IS ALL INIT DOES
+    var so = el("start-overlay");
+    if (so) so.classList.remove("hidden");
+
+    // Load leaderboard in background
     Leaderboard.renderLeaderboard("leaderboard-container");
   }
 
+  // ----------------------------------------------------------
+  // PUBLIC API
+  // ----------------------------------------------------------
   return {
-    init, newGame, renderAll, showModal, closeModal, showToast,
-    showGameOver, advanceQuarter, showAnnualReport, closeAnnualReport,
-    showHelp, closeHelp, switchHelpTab,
-    confirmBuyProperty, confirmSellProperty, confirmRetireDebt,
-    handleIssueDebt, handleIssueEquity, handleBuyback, handleSetDividend,
+    init:                init,
+    newGame:             newGame,
+    renderAll:           renderAll,
+    showModal:           showModal,
+    closeModal:          closeModal,
+    showToast:           showToast,
+    showGameOver:        showGameOver,
+    advanceQuarter:      advanceQuarter,
+    showAnnualReport:    showAnnualReport,
+    closeAnnualReport:   closeAnnualReport,
+    showHelp:            showHelp,
+    closeHelp:           closeHelp,
+    switchHelpTab:       switchHelpTab,
+    confirmBuyProperty:  confirmBuyProperty,
+    confirmSellProperty: confirmSellProperty,
+    confirmRetireDebt:   confirmRetireDebt,
+    handleIssueDebt:     handleIssueDebt,
+    handleIssueEquity:   handleIssueEquity,
+    handleBuyback:       handleBuyback,
+    handleSetDividend:   handleSetDividend,
   };
 
-})();
+}());
 
 document.addEventListener("DOMContentLoaded", UI.init);
