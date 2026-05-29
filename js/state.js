@@ -32,9 +32,9 @@ window.GameState = {
   // ----------------------------------------------------------
   company: {
     name:                 "My REIT",   // built from player.reitName
-    sharePrice:           20.00,
-    sharesOutstanding:    50,          // millions
-    marketCap:            1000,        // $ millions
+    sharePrice:           10.00,
+    sharesOutstanding:    10,          // millions
+    marketCap:            100,         // $ millions
     dividendPerShare:     0.10,        // $ per share per quarter (rebalanced)
     dividendHistory:      [],
     dividendCutQuarters:  0,
@@ -46,7 +46,7 @@ window.GameState = {
   balance: {
     cash:         50,     // modest cash reserve
     totalAssets:  0,      // calculated on init
-    totalDebt:    70,     // two small tranches matching property values
+    totalDebt:    50,     // two small tranches matching property values
     totalEquity:  0,      // calculated on init
   },
 
