@@ -105,6 +105,20 @@ window.Board = (() => {
       },
     },
     {
+      id: "minimum_payout", label: "Minimum Payout",
+      evaluate() {
+        // REITs must distribute at least 60% of AFFO
+        var affo = GameState.pnl.affo || 0;
+        var divPaid = GameState.pnl.dividendsPaid || 0;
+        if (affo <= 0) return null;
+        var payoutRatio = divPaid / affo;
+        if (payoutRatio < 0.40) return { points: 3, reason: "Payout ratio critically low at " + fmt(payoutRatio * 100, 0) + "% — board expects minimum 60% of AFFO distributed" };
+        if (payoutRatio < 0.60) return { points: 2, reason: "Payout ratio below 60% threshold: " + fmt(payoutRatio * 100, 0) + "% — board expects REIT to distribute earnings" };
+        if (payoutRatio >= 0.85) return { relief: 1, reason: "Strong payout ratio of " + fmt(payoutRatio * 100, 0) + "% — board pleased with distributions" };
+        return null;
+      },
+    },
+    {
       id: "dividend_growth", label: "Dividend Growth",
       evaluate() {
         // Only evaluate from Year 2 onwards, at year end (Q4)
