@@ -11,7 +11,7 @@
 // - It never renders anything — ui.js does that
 // ============================================================
 
-const Financials = (() => {
+window.Financials = (() => {
 
   // ----------------------------------------------------------
   // CONSTANTS
