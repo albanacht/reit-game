@@ -238,7 +238,7 @@ window.Board = (() => {
   // Called at end of Q4 each year
   // ----------------------------------------------------------
   function generateAnnualReport() {
-    const year    = GameState.meta.year;
+    const year    = GameState.meta.year - 1;  // year just completed
     const history = GameState.history;
     const isYear1 = year === 1;
 
