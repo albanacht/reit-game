@@ -513,7 +513,10 @@ window.UI = (function() {
   }
 
   function doAdvance() {
-    var qr = Financials.runQuarter();
+var qr = Financials.runQuarter();
+    if (GameState.meta.year === 2 && GameState.meta.quarter === 1) {
+      GameState.meta.tutorialYear = false;
+    }
     var br = Board.evaluateQuarter();
     var rp = Board.generateEarningsReport(qr, br);
     var justEndedYear = GameState.meta.quarter === 1 && GameState.meta.totalQuarters > 1;
