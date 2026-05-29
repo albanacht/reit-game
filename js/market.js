@@ -10,7 +10,7 @@
 // - Call Market.quarterlyUpdate() once per quarter advance
 // ============================================================
 
-const Market = (() => {
+window.Market = (() => {
 
   // ----------------------------------------------------------
   // CYCLE DEFINITIONS
@@ -280,7 +280,7 @@ const Market = (() => {
   // INITIALISE — call once at game start
   // ----------------------------------------------------------
   function init() {
-    GameState.market.baseInterestRate = 5.0;
+    GameState.market.baseInterestRate = 3.5;
     GameState.market.cycle = "stable";
     GameState.market.cycleQuartersRemaining = randInt(4, 8);
     GameState.market.rateDirection = "flat";
