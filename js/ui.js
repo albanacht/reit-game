@@ -5,9 +5,6 @@
 
 window.UI = (function() {
 
-  // ----------------------------------------------------------
-  // UTILITY
-  // ----------------------------------------------------------
   function fmt(n, d) {
     if (d === undefined) d = 2;
     if (n === null || n === undefined || isNaN(n)) return "—";
@@ -176,6 +173,43 @@ window.UI = (function() {
     }
   }
 
+  // NEW: Goals panel — live green/red indicators
+  function renderGoalsPanel() {
+    var container = el("goals-list");
+    var yearLabel = el("goals-year-label");
+    if (!container) return;
+    var goals = GameState.board.currentGoals;
+    if (!goals || goals.length === 0) {
+      container.innerHTML = '<p class="text-muted" style="font-size:12px">Goals set after Year 1.</p>';
+      return;
+    }
+    if (yearLabel) yearLabel.textContent = "Year " + GameState.meta.year + " Targets";
+    var html = "";
+    goals.forEach(function(g) {
+      var met = false;
+      var r = GameState.ratios;
+      var c = GameState.company;
+      if (g.key === "dividendCoverage")   met = r.dividendCoverage >= g.threshold;
+      if (g.key === "dividendPerShare")   met = c.dividendPerShare >= g.threshold;
+      if (g.key === "occupancyPortfolio") met = r.occupancyPortfolio >= g.threshold;
+      if (g.key === "debtToAssets")       met = r.debtToAssets <= g.threshold;
+      if (g.key === "ffoGrowth")          met = (GameState.board.thresholds.ffoGrowth || 0) >= g.threshold;
+      if (g.key === "interestCoverage")   met = r.interestCoverage >= g.threshold;
+      if (g.key === "creditRating") {
+        var order = ["CCC","B","BB","BBB","A","AA","AAA"];
+        met = order.indexOf(GameState.credit.rating) >= order.indexOf(g.threshold);
+      }
+      var color = met ? "text-green" : "text-red";
+      var icon  = met ? "✅" : "❌";
+      html += '<div class="goal-row">' +
+        '<span class="goal-icon">' + icon + '</span>' +
+        '<span class="goal-metric">' + g.metric + '</span>' +
+        '<span class="goal-target ' + color + '">' + g.target + '</span>' +
+        '</div>';
+    });
+    container.innerHTML = html;
+  }
+
   function renderPortfolio() {
     var container = el("portfolio-list");
     if (!container) return;
@@ -188,6 +222,10 @@ window.UI = (function() {
       var oc = p.occupancy >= 0.90 ? "text-green" : p.occupancy >= 0.80 ? "text-yellow" : "text-red";
       var gl = p.purchasePrice ? fmt(p.currentValue - p.purchasePrice, 1) : 0;
       var gc = gl >= 0 ? "text-green" : "text-red";
+      // NEW: Lease Up button shown when occupancy below 90%
+      var leaseUpBtn = p.occupancy < 0.90
+        ? '<button class="btn btn-sm btn-secondary" onclick="UI.leaseUp(\'' + p.id + '\')">Lease Up</button>'
+        : '';
       html += '<div class="property-card">' +
         '<div class="prop-header"><span class="prop-name">' + p.name + '</span>' +
         '<span class="prop-tag tag-' + p.sector + '">' + p.sector + ' · ' + p.location + '</span></div>' +
@@ -197,6 +235,7 @@ window.UI = (function() {
         '<span>Occ: <strong class="' + oc + '">' + fmtPct(p.occupancy) + '</strong></span>' +
         '<span>G/L: <strong class="' + gc + '">' + (gl >= 0 ? "+" : "") + gl + 'M</strong></span>' +
         '</div><div class="prop-actions">' +
+        leaseUpBtn +
         '<button class="btn btn-sm btn-danger" onclick="UI.confirmSellProperty(\'' + p.id + '\')">Sell</button>' +
         '</div></div>';
     });
@@ -267,8 +306,13 @@ window.UI = (function() {
       '</div>';
   }
 
+  // NEW: Updated to show term-adjusted rates
   function renderCapitalActions() {
-    setText("action-borrow-rate", "Current rate: " + fmt(Market.getCurrentBorrowingRate(), 2) + "%");
+    var baseRate = Market.getCurrentBorrowingRate();
+    var rate5  = Financials.getCurrentBorrowingRateForTerm ? fmt(Financials.getCurrentBorrowingRateForTerm(5), 2) : fmt(baseRate, 2);
+    var rate10 = Financials.getCurrentBorrowingRateForTerm ? fmt(Financials.getCurrentBorrowingRateForTerm(10), 2) : fmt(baseRate, 2);
+    var rate20 = Financials.getCurrentBorrowingRateForTerm ? fmt(Financials.getCurrentBorrowingRateForTerm(20), 2) : fmt(baseRate, 2);
+    setText("action-borrow-rate", "5yr: " + rate5 + "% | 10yr: " + rate10 + "% | 20yr: " + rate20 + "%");
     setText("action-div-current", "Current: $" + fmt(GameState.company.dividendPerShare, 2) + "/share/qtr");
     setText("action-shares-out",  "Shares: " + fmt(GameState.company.sharesOutstanding, 1) + "M outstanding");
     setText("action-cash-avail",  "Cash available: " + fmtM(GameState.balance.cash));
@@ -280,6 +324,7 @@ window.UI = (function() {
     renderRatios();
     renderBalanceSheet();
     renderDebtPanel();
+    renderGoalsPanel();
     renderPortfolio();
     renderPropertyMarket();
     renderCapitalActions();
@@ -424,16 +469,41 @@ window.UI = (function() {
       }}]);
   }
 
+  // NEW: Lease Up action
+  function leaseUp(propertyId) {
+    var prop = GameState.portfolio.find(function(p) { return p.id === propertyId; });
+    if (!prop) return;
+    if (prop.occupancy >= 0.90) { showToast("Occupancy already above 90% — no lease up needed.", "info"); return; }
+    var cost = Math.round(prop.annualNOI * 0.12 * 10) / 10;
+    var boost = prop.occupancy < 0.65 ? 0.08 : prop.occupancy < 0.75 ? 0.06 : prop.occupancy < 0.85 ? 0.05 : 0.03;
+    showModal("Lease Up: " + prop.name,
+      "Current occupancy: " + fmtPct(prop.occupancy) + "\n" +
+      "Expected boost: +" + fmt(boost * 100, 0) + "% immediately\n" +
+      "Cost: $" + cost + "M (12% of annual NOI)\n" +
+      "Cash available: " + fmtM(GameState.balance.cash) + "\n\n" +
+      "Covers broker commissions, tenant improvements and free rent periods.",
+      [{ label: "Lease Up — $" + cost + "M", style: "btn-primary", onClick: function() {
+        if (GameState.balance.cash < cost) { showToast("Insufficient cash.", "error"); return; }
+        GameState.balance.cash = Math.round((GameState.balance.cash - cost) * 100) / 100;
+        prop.occupancy = Math.min(0.97, Math.round((prop.occupancy + boost) * 1000) / 1000);
+        showToast(prop.name + " occupancy boosted to " + fmtPct(prop.occupancy), "success");
+        renderAll();
+      }}]);
+  }
+
   function handleIssueDebt() {
     var amtEl = el("input-debt-amount"), yrEl = el("input-debt-years");
     var amount = amtEl ? parseFloat(amtEl.value) : NaN;
     var years  = yrEl  ? parseInt(yrEl.value)    : NaN;
     if (isNaN(amount) || amount <= 0)            { showToast("Enter a valid amount", "error"); return; }
     if (isNaN(years) || years < 1 || years > 30) { showToast("Enter term 1-30 years", "error"); return; }
-    var rate = Market.getCurrentBorrowingRate();
+    // NEW: term-adjusted rate
+    var rate = Financials.getCurrentBorrowingRateForTerm ? Financials.getCurrentBorrowingRateForTerm(years) : Market.getCurrentBorrowingRate();
+    var maxIssuance = Math.round(GameState.balance.totalAssets * 0.20 * 10) / 10;
     showModal("Issue New Debt",
       "Amount: " + fmtM(amount) + "  |  Term: " + years + " yrs  |  Rate: " + fmt(rate, 2) + "%\n" +
-      "Annual interest: " + fmtM(amount * rate / 100) + "  |  Tranches: " + GameState.debtTranches.length + "/10",
+      "Annual interest: " + fmtM(amount * rate / 100) + "  |  Tranches: " + GameState.debtTranches.length + "/10\n" +
+      "Max single issuance: " + fmtM(maxIssuance) + " (20% of assets)",
       [{ label: "Issue at " + fmt(rate, 2) + "%", style: "btn-primary", onClick: function() {
         var r = Financials.issueDebt(amount, years);
         showToast(r.message, r.success ? "success" : "error");
@@ -487,6 +557,20 @@ window.UI = (function() {
   }
 
   // ----------------------------------------------------------
+  // MACRO EVENT POPUP — shows before earnings report for major events
+  // ----------------------------------------------------------
+  function showMacroEventPopup(firedEvents, callback) {
+    var macroEvents = firedEvents.filter(function(e) { return e.isMacro === true; });
+    if (macroEvents.length === 0) { callback(); return; }
+    var body = macroEvents.map(function(e) {
+      return e.headline + "\n" + e.body + "\n\nImpact: " + e.impact;
+    }).join("\n\n─────────────────\n\n");
+    showModal("⚡ Major Market Event — " + GameState.currentPeriodLabel(), body,
+      [{ label: "Understood — Continue", style: "btn-primary", onClick: callback }]
+    );
+  }
+
+  // ----------------------------------------------------------
   // ADVANCE QUARTER
   // ----------------------------------------------------------
   function advanceQuarter() {
@@ -513,34 +597,40 @@ window.UI = (function() {
   }
 
   function doAdvance() {
-var qr = Financials.runQuarter();
+    var qr = Financials.runQuarter();
+    // Turn off tutorial BEFORE generating report
     if (GameState.meta.year === 2 && GameState.meta.quarter === 1) {
       GameState.meta.tutorialYear = false;
     }
     var br = Board.evaluateQuarter();
     var rp = Board.generateEarningsReport(qr, br);
     var justEndedYear = GameState.meta.quarter === 1 && GameState.meta.totalQuarters > 1;
-    if (justEndedYear) {
-      if (GameState.meta.year === 2) GameState.meta.tutorialYear = false;
-      var snap = Board.generateAnnualReport();
-      renderAll(rp);
-      setTimeout(function() { showAnnualReport(snap); }, 600);
-    } else {
-      renderAll(rp);
+
+    // NEW: Show macro event popup if any fired, then continue
+    function continueAfterEvents() {
+      if (justEndedYear) {
+        var snap = Board.generateAnnualReport();
+        renderAll(rp);
+        setTimeout(function() { showAnnualReport(snap); }, 600);
+      } else {
+        renderAll(rp);
+      }
+      var re = el("earnings-report");
+      if (re) re.scrollIntoView({ behavior: "smooth", block: "start" });
+      if (GameState.meta.gameOver && !justEndedYear) {
+        var sd = Leaderboard.calculateScore();
+        setTimeout(function() {
+          showGameOver();
+          setTimeout(function() { Leaderboard.showSubmitScreen(sd); }, 800);
+        }, 1200);
+      }
+      if (qr.marketResult && qr.marketResult.cycleResult && qr.marketResult.cycleResult.cycleChanged) {
+        var cy = qr.marketResult.cycleResult;
+        setTimeout(function() { showToast("Market shift: " + cy.label, "warning"); }, 800);
+      }
     }
-    var re = el("earnings-report");
-    if (re) re.scrollIntoView({ behavior: "smooth", block: "start" });
-    if (GameState.meta.gameOver && !justEndedYear) {
-      var sd = Leaderboard.calculateScore();
-      setTimeout(function() {
-        showGameOver();
-        setTimeout(function() { Leaderboard.showSubmitScreen(sd); }, 800);
-      }, 1200);
-    }
-    if (qr.marketResult && qr.marketResult.cycleResult && qr.marketResult.cycleResult.cycleChanged) {
-      var cy = qr.marketResult.cycleResult;
-      setTimeout(function() { showToast("Market shift: " + cy.label, "warning"); }, 800);
-    }
+
+    showMacroEventPopup(qr.firedEvents, continueAfterEvents);
   }
 
   // ----------------------------------------------------------
@@ -559,7 +649,7 @@ var qr = Financials.runQuarter();
   }
 
   // ----------------------------------------------------------
-  // NEW GAME — called ONLY when Start Game button is clicked
+  // NEW GAME
   // ----------------------------------------------------------
   function newGame() {
     var ni = el("input-player-name");
@@ -604,11 +694,9 @@ var qr = Financials.runQuarter();
     Financials.init();
     Charts.init();
 
-    // Hide all overlays
     var overlayIds = ["gameover-overlay", "start-overlay", "annual-report-overlay", "help-overlay"];
     overlayIds.forEach(function(id) {
-      var o = el(id);
-      if (o) o.classList.add("hidden");
+      var o = el(id); if (o) o.classList.add("hidden");
     });
 
     renderAll();
@@ -619,18 +707,19 @@ var qr = Financials.runQuarter();
         "Dear " + playerName + ",\n\n" +
         "The Board of Directors is pleased to appoint you as Chief Executive Officer of " + reitName + " REIT.\n\n" +
         "YEAR 1 — ORIENTATION PERIOD\n" +
-        "You cannot be fired this year. However the board is scoring you silently and any failures carry forward as pressure points into Year 2. A bad Year 1 puts you immediately in danger when full scrutiny begins.\n\n" +
+        "You cannot be fired this year. However the board is scoring you silently and any failures carry forward as pressure points into Year 2.\n\n" +
         "YOUR STARTING POSITION\n" +
-        "▸ Cash: $100M\n" +
-        "▸ Two properties already owned\n" +
-        "▸ Debt: $250M across two tranches\n" +
+        "▸ Cash: $50M\n" +
+        "▸ Four properties already owned\n" +
+        "▸ Debt: $50M across two tranches\n" +
         "▸ Dividend: $0.10/share/quarter\n\n" +
         "WHAT THE BOARD WATCHES\n" +
-        "▸ Dividend coverage above 1.0x (FFO must cover dividends)\n" +
+        "▸ Dividend growth — raise it as earnings grow\n" +
+        "▸ Dividend coverage above 1.0x\n" +
         "▸ Leverage below 60% debt/assets\n" +
         "▸ Portfolio occupancy above 80%\n" +
         "▸ FFO growing year over year\n\n" +
-        "Use Year 1 to acquire properties, grow your NOI, and make sure your dividend is covered before Year 2 begins. Press F1 at any time for help.\n\n" +
+        "Use Year 1 to acquire properties and grow your NOI base. Press F1 anytime for help.\n\n" +
         "— The Board of Directors",
         []
       );
@@ -638,10 +727,9 @@ var qr = Financials.runQuarter();
   }
 
   // ----------------------------------------------------------
-  // INIT — called once on page load, shows start screen only
+  // INIT
   // ----------------------------------------------------------
   function init() {
-    // Wire up buttons
     var buttons = {
       "btn-advance-quarter": advanceQuarter,
       "btn-new-game":        newGame,
@@ -658,26 +746,21 @@ var qr = Financials.runQuarter();
       if (btn) btn.addEventListener("click", buttons[id]);
     });
 
-    // Keyboard shortcuts
     document.addEventListener("keydown", function(e) {
       if (e.key === "F1")     { e.preventDefault(); showHelp(); }
       if (e.key === "Escape") { closeHelp(); closeModal(); }
     });
 
-    // Close overlays on background click
     var mo = el("modal-overlay");
     if (mo) mo.addEventListener("click", function(e) { if (e.target === mo) closeModal(); });
     var ho = el("help-overlay");
     if (ho) ho.addEventListener("click", function(e) { if (e.target === ho) closeHelp(); });
 
-    // Init charts
     Charts.init();
 
-    // Show start screen — THIS IS ALL INIT DOES
     var so = el("start-overlay");
     if (so) so.classList.remove("hidden");
 
-    // Load leaderboard in background
     Leaderboard.renderLeaderboard("leaderboard-container");
   }
 
@@ -705,6 +788,7 @@ var qr = Financials.runQuarter();
     handleIssueEquity:   handleIssueEquity,
     handleBuyback:       handleBuyback,
     handleSetDividend:   handleSetDividend,
+    leaseUp:             leaseUp,
   };
 
 }());
