@@ -165,17 +165,31 @@ window.Financials = (() => {
   // ----------------------------------------------------------
   function updateBalanceSheet(pnl) {
     // Cash P&L: only real cash flows
+    // Overdraft interest on negative cash balance
+    var overdraftInterest = 0;
+    if (GameState.balance.cash < 0) {
+      var overdraftRate = (GameState.market.baseInterestRate + 8) / 100 / 4;
+      overdraftInterest = fmt(Math.abs(GameState.balance.cash) * overdraftRate);
+    }
+
     const cashFlow = fmt(
       pnl.noi
       - pnl.gAndA
       - pnl.interestExpense
       + pnl.unusualItems
       - pnl.dividendsPaid
+      - overdraftInterest
     );
 
-    GameState.balance.cash = fmt(
-      Math.max(0, GameState.balance.cash + cashFlow)
-    );
+    // No floor — cash can go negative (overdraft)
+    GameState.balance.cash = fmt(GameState.balance.cash + cashFlow);
+    GameState.pnl.overdraftInterest = overdraftInterest;
+
+    // Game over if overdraft exceeds $50M
+    if (GameState.balance.cash < -50) {
+      GameState.meta.gameOver = true;
+      GameState.meta.gameOverReason = GameState.player.name + ", your company has defaulted. The overdraft reached $" + fmt(Math.abs(GameState.balance.cash), 1) + "M and lenders have called their loans. " + GameState.company.name + " is placed into administration after " + GameState.meta.totalQuarters + " quarters.";
+    }
 
     // Total portfolio value (recalculated by properties.js each quarter)
     const portfolioValue = GameState.portfolio.reduce(
@@ -564,22 +578,36 @@ window.Financials = (() => {
   }
 
   // Issue new equity
-  function issueEquity(shares, priceDiscount = 0.05) {
+  function issueEquity(shares) {
     if (shares <= 0) return { success: false, message: "Shares must be greater than zero." };
 
-    // New shares issued at a discount to current price (realistic)
-    const issuePrice = fmt(GameState.company.sharePrice * (1 - priceDiscount));
-    const proceeds   = fmt(shares * issuePrice);
+    // Cap at 20% of existing shares per issuance
+    var maxShares = fmt(GameState.company.sharesOutstanding * 0.20);
+    if (shares > maxShares) {
+      return { success: false, message: "Maximum issuance is " + maxShares + "M shares (20% of float)." };
+    }
 
-    GameState.company.sharesOutstanding = fmt(
-      GameState.company.sharesOutstanding + shares
-    );
-    GameState.balance.cash = fmt(GameState.balance.cash + proceeds);
+    // Price drop scales with issuance history and size
+    var count     = GameState.company.equityIssuanceCount || 0;
+    var sizeRatio = shares / GameState.company.sharesOutstanding;
+    var baseDrop  = count === 0 ? 0.05 : count === 1 ? 0.08 : count === 2 ? 0.12 : 0.18;
+    var totalDrop = Math.min(0.35, baseDrop + sizeRatio * 0.10);
 
-    // Dilution pushes share price down slightly
-    GameState.company.sharePrice = fmt(
-      GameState.company.sharePrice * (1 - priceDiscount * 0.5)
-    );
+    var issuePrice = fmt(GameState.company.sharePrice * (1 - baseDrop));
+    var proceeds   = fmt(shares * issuePrice);
+
+    GameState.company.sharesOutstanding   = fmt(GameState.company.sharesOutstanding + shares);
+    GameState.balance.cash                = fmt(GameState.balance.cash + proceeds);
+    GameState.company.sharePrice          = fmt(GameState.company.sharePrice * (1 - totalDrop));
+    GameState.company.equityIssuanceCount = count + 1;
+
+    // Board pressure for repeated issuances
+    if (count >= 1) {
+      GameState.board.pressurePoints = Math.min(
+        GameState.board.maxPressure,
+        GameState.board.pressurePoints + 1
+      );
+    }
 
     return {
       success: true,
