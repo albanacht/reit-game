@@ -301,8 +301,6 @@ const Leaderboard = (() => {
       .replace(/"/g, "&quot;");
   }
 
-  // Cache for detail view
-  Leaderboard._cachedScores = [];
 
   // ----------------------------------------------------------
   // PUBLIC API
