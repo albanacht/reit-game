@@ -608,25 +608,33 @@ window.UI = (function() {
       if (o) o.classList.add("hidden");
     });
 
-renderAll();
-    showModal(
-      "📜 Letter from the Board of Directors",
-      "Dear " + playerName + ",\n\n" +
-      "The Board of Directors is pleased to appoint you as Chief Executive Officer of " + reitName + " REIT.\n\n" +
-      "Year 1 is an orientation period. We will not terminate your contract regardless of performance, but we are watching and scoring you silently. At year end we will issue a formal assessment and set binding targets for Year 2 onwards.\n\n" +
-      "The board's priorities are simple:\n" +
-      "▸ Dividend coverage — FFO must cover what you pay out (target >1.0x)\n" +
-      "▸ Leverage — debt must not exceed 60% of assets\n" +
-      "▸ Occupancy — keep your properties tenanted (target >80%)\n" +
-      "▸ FFO growth — the board expects earnings to grow each year\n\n" +
-      "You have $100M cash, two properties, and $250M of debt. The market is stable. Use Year 1 wisely — acquire properties to grow your NOI base and make sure your dividend is covered before Year 2 begins.\n\n" +
-      "The world is unpredictable. Good management is about surviving the bad quarters, not just enjoying the good ones.\n\n" +
-      "— The Board of Directors",
-      []
-    );
+    renderAll();
+    Leaderboard.renderLeaderboard("leaderboard-container");
+    setTimeout(function() {
+      showModal(
+        "Letter from the Board of Directors",
+        "Dear " + playerName + ",\n\n" +
+        "The Board of Directors is pleased to appoint you as Chief Executive Officer of " + reitName + " REIT.\n\n" +
+        "YEAR 1 — ORIENTATION PERIOD\n" +
+        "You cannot be fired this year. However the board is scoring you silently and any failures carry forward as pressure points into Year 2. A bad Year 1 puts you immediately in danger when full scrutiny begins.\n\n" +
+        "YOUR STARTING POSITION\n" +
+        "▸ Cash: $100M\n" +
+        "▸ Two properties already owned\n" +
+        "▸ Debt: $250M across two tranches\n" +
+        "▸ Dividend: $0.10/share/quarter\n\n" +
+        "WHAT THE BOARD WATCHES\n" +
+        "▸ Dividend coverage above 1.0x (FFO must cover dividends)\n" +
+        "▸ Leverage below 60% debt/assets\n" +
+        "▸ Portfolio occupancy above 80%\n" +
+        "▸ FFO growing year over year\n\n" +
+        "Use Year 1 to acquire properties, grow your NOI, and make sure your dividend is covered before Year 2 begins. Press F1 at any time for help.\n\n" +
+        "— The Board of Directors",
+        []
+      );
+    }, 400);
+  }
 
-    
-    // ----------------------------------------------------------
+  // ----------------------------------------------------------
   // INIT — called once on page load, shows start screen only
   // ----------------------------------------------------------
   function init() {
