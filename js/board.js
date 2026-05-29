@@ -99,8 +99,34 @@ window.Board = (() => {
       id: "negative_retained_cash", label: "Cash Flow Sustainability",
       evaluate() {
         const retained = GameState.pnl.retainedCash;
-        if (retained < -5) return { points: 2, reason: `Paying $${fmt(Math.abs(retained))}M more in dividends than AFFO` };
-        if (retained < 0)  return { points: 1, reason: `Dividend exceeds AFFO by $${fmt(Math.abs(retained))}M` };
+        if (retained < -5) return { points: 2, reason: "Paying $" + fmt(Math.abs(retained)) + "M more in dividends than AFFO" };
+        if (retained < 0)  return { points: 1, reason: "Dividend exceeds AFFO by $" + fmt(Math.abs(retained)) + "M" };
+        return null;
+      },
+    },
+    {
+      id: "dividend_growth", label: "Dividend Growth",
+      evaluate() {
+        // Only evaluate from Year 2 onwards, at year end (Q4)
+        if (GameState.meta.year < 2) return null;
+        if (GameState.meta.quarter !== 4) return null;
+
+        // Find the dividend target goal
+        var divGoal = GameState.board.currentGoals.find(function(g) { return g.key === "dividendPerShare"; });
+        if (!divGoal) return null;
+
+        var current = GameState.company.dividendPerShare;
+        var target  = divGoal.threshold;
+
+        if (current < target * 0.85) {
+          return { points: 3, reason: "Dividend $" + current + "/share far below board target of $" + target + "/share" };
+        }
+        if (current < target) {
+          return { points: 2, reason: "Dividend $" + current + "/share below board target of $" + target + "/share" };
+        }
+        if (current >= target * 1.05) {
+          return { relief: 1, reason: "Dividend exceeded board growth target at $" + current + "/share" };
+        }
         return null;
       },
     },
@@ -183,20 +209,38 @@ window.Board = (() => {
     const goals = [];
 
     // Goals tighten each year
-    const coverageTarget = Math.round((1.05 + (year - 1) * 0.05) * 100) / 100;
+    const coverageTarget  = Math.round((1.05 + (year - 1) * 0.05) * 100) / 100;
     const occupancyTarget = Math.round((0.82 + (year - 1) * 0.01) * 100) / 100;
     const leverageTarget  = Math.round((0.55 - (year - 2) * 0.01) * 100) / 100;
 
-    goals.push({ metric: "Dividend Coverage",    target: `>${coverageTarget}x`,          key: "dividendCoverage",    threshold: coverageTarget });
-    goals.push({ metric: "Portfolio Occupancy",  target: `>${fmt(occupancyTarget*100)}%`, key: "occupancyPortfolio",  threshold: occupancyTarget });
-    goals.push({ metric: "Debt / Assets",        target: `<${fmt(leverageTarget*100)}%`,  key: "debtToAssets",        threshold: leverageTarget, inverse: true });
-    goals.push({ metric: "FFO Growth (YoY)",     target: ">0%",                           key: "ffoGrowth",           threshold: 0 });
+    // Dynamic dividend growth target based on prior year FFO growth
+    var divGrowthTarget = 0.05; // default 5%
+    if (GameState.history.length >= 4) {
+      var h = GameState.history;
+      var currFFO = h[h.length - 1].ffo || 0;
+      var prevFFO = h.length >= 8 ? h[h.length - 5].ffo || currFFO : currFFO;
+      var ffoGrowth = prevFFO > 0 ? (currFFO - prevFFO) / prevFFO : 0;
+      if (ffoGrowth >= 0.15)      divGrowthTarget = 0.25;  // great year: 25% raise expected
+      else if (ffoGrowth >= 0.08) divGrowthTarget = 0.12;  // good year: 12% raise
+      else if (ffoGrowth >= 0.03) divGrowthTarget = 0.07;  // decent year: 7% raise
+      else if (ffoGrowth > 0)     divGrowthTarget = 0.03;  // modest year: 3% raise
+      else                        divGrowthTarget = 0;      // decline: just maintain
+    }
+    var currentDiv    = GameState.company.dividendPerShare;
+    var targetDiv     = Math.round(currentDiv * (1 + divGrowthTarget) * 100) / 100;
+    var divGrowthPct  = Math.round(divGrowthTarget * 100);
+
+    goals.push({ metric: "Dividend Coverage",    target: ">" + coverageTarget + "x",           key: "dividendCoverage",   threshold: coverageTarget });
+    goals.push({ metric: "Dividend per Share",   target: ">$" + targetDiv + " (+" + divGrowthPct + "%)", key: "dividendPerShare", threshold: targetDiv, divTarget: true });
+    goals.push({ metric: "Portfolio Occupancy",  target: ">" + fmt(occupancyTarget*100) + "%",  key: "occupancyPortfolio", threshold: occupancyTarget });
+    goals.push({ metric: "Debt / Assets",        target: "<" + fmt(leverageTarget*100) + "%",   key: "debtToAssets",       threshold: leverageTarget, inverse: true });
+    goals.push({ metric: "FFO Growth (YoY)",     target: ">0%",                                 key: "ffoGrowth",          threshold: 0 });
 
     if (year >= 3) goals.push({ metric: "Interest Coverage", target: ">1.8x", key: "interestCoverage", threshold: 1.8 });
     if (year >= 4) goals.push({ metric: "Credit Rating",     target: "BBB+",  key: "creditRating",     threshold: "BBB" });
 
-    GameState.board.lastYearGoals  = GameState.board.currentGoals;
-    GameState.board.currentGoals   = goals;
+    GameState.board.lastYearGoals = GameState.board.currentGoals;
+    GameState.board.currentGoals  = goals;
     return goals;
   }
 
@@ -220,6 +264,8 @@ window.Board = (() => {
       } else if (goal.key === "debtToAssets") {
         const avg = lastYearHistory.reduce((s, h) => s + (h.debtToAssets || 0), 0) / lastYearHistory.length;
         met = avg <= goal.threshold;
+      } else if (goal.key === "dividendPerShare") {
+        met = GameState.company.dividendPerShare >= goal.threshold;
       } else if (goal.key === "ffoGrowth") {
         met = (GameState.board.thresholds.ffoGrowth || 0) >= goal.threshold;
       } else if (goal.key === "interestCoverage") {
