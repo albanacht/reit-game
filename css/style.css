@@ -301,3 +301,7 @@ input::placeholder { color:var(--text-muted); }
   .ratios-grid { grid-template-columns:1fr; }
   .header-stats { gap:10px; }
 }
+.start-board-letter { background:var(--surface); border:1px solid var(--border); border-left:3px solid var(--blue); border-radius:var(--radius); padding:18px 22px; max-width:720px; width:100%; }
+.start-board-title { font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.6px; color:var(--text-muted); margin-bottom:12px; }
+.start-board-letter p { font-size:13px; color:var(--text-muted); line-height:1.7; margin-bottom:8px; }
+.start-board-letter strong { color:var(--text); }
