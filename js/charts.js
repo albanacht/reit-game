@@ -148,7 +148,7 @@ const Charts = (() => {
       return;
     }
 
-    // Build 28-quarter buckets
+    // Build 20-quarter buckets
     const BUCKETS = 28;
     const buckets = Array(BUCKETS).fill(0);
     const bucketTranches = Array.from({ length: BUCKETS }, () => []);
@@ -688,6 +688,8 @@ const Charts = (() => {
     }
   }
 
+  // Expose maturity bucket data for click detection
+  Charts._maturityBuckets = null;
 
   // ----------------------------------------------------------
   // PUBLIC API
