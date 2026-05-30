@@ -404,10 +404,23 @@ window.UI = (function() {
   // NEW: Updated to show term-adjusted rates
   function renderCapitalActions() {
     var baseRate = Market.getCurrentBorrowingRate();
-    var rate5  = Financials.getCurrentBorrowingRateForTerm ? fmt(Financials.getCurrentBorrowingRateForTerm(5), 2) : fmt(baseRate, 2);
-    var rate10 = Financials.getCurrentBorrowingRateForTerm ? fmt(Financials.getCurrentBorrowingRateForTerm(10), 2) : fmt(baseRate, 2);
-    var rate20 = Financials.getCurrentBorrowingRateForTerm ? fmt(Financials.getCurrentBorrowingRateForTerm(20), 2) : fmt(baseRate, 2);
-    setText("action-borrow-rate", "5yr: " + rate5 + "% | 10yr: " + rate10 + "% | 20yr: " + rate20 + "%");
+    var getRateStr = function(y) { return Financials.getCurrentBorrowingRateForTerm ? fmt(Financials.getCurrentBorrowingRateForTerm(y), 2) : fmt(baseRate, 2); };
+    setText("action-borrow-rate",
+      "1yr: " + getRateStr(1) + "% | " +
+      "3yr: " + getRateStr(3) + "% | " +
+      "5yr: " + getRateStr(5) + "% | " +
+      "7yr: " + getRateStr(7) + "% | " +
+      "10yr: " + getRateStr(10) + "%"
+    );
+    // Update dropdown to show rates next to each option
+    var sel = el("input-debt-years");
+    if (sel) {
+      [[1,"1yr"],[2,"2yr"],[3,"3yr"],[5,"5yr"],[7,"7yr"],[10,"10yr"]].forEach(function(t, i) {
+        if (sel.options[i]) {
+          sel.options[i].text = t[1] + " — " + getRateStr(t[0]) + "%";
+        }
+      });
+    }
     setText("action-div-current", "Current: $" + fmt(GameState.company.dividendPerShare, 2) + "/share/qtr");
     var equityUsedThisYear = GameState.company.equityIssuanceYear === GameState.meta.year;
     var debtCooldown = GameState.company.debtIssuanceQuarter > 0 ?
@@ -613,7 +626,7 @@ window.UI = (function() {
     var amount = amtEl ? parseFloat(amtEl.value) : NaN;
     var years  = yrEl  ? parseInt(yrEl.value)    : NaN;
     if (isNaN(amount) || amount <= 0)            { showToast("Enter a valid amount", "error"); return; }
-    if (isNaN(years) || years < 1 || years > 30) { showToast("Enter term 1-30 years", "error"); return; }
+    if (isNaN(years) || years < 1 || years > 10) { showToast("Select a valid term.", "error"); return; }
     // NEW: term-adjusted rate
     var rate = Financials.getCurrentBorrowingRateForTerm ? Financials.getCurrentBorrowingRateForTerm(years) : Market.getCurrentBorrowingRate();
     var maxIssuance = Math.round(GameState.balance.totalAssets * 0.20 * 10) / 10;
@@ -662,8 +675,15 @@ window.UI = (function() {
     var newDiv = divEl ? parseFloat(divEl.value) : NaN;
     if (isNaN(newDiv) || newDiv < 0) { showToast("Enter valid dividend", "error"); return; }
     var old   = GameState.company.dividendPerShare;
-    var isCut = newDiv < old - 0.001;
-    var warn  = isCut ? "WARNING: Cutting dividend causes share price drop and +2 board pressure." : newDiv > old + 0.001 ? "Raising dividend signals confidence." : "No change.";
+    var isCut    = newDiv < old - 0.001;
+    var startDiv = GameState.board.startYearDividend || 0.10;
+    var minDiv   = GameState.meta.year <= 1 ? fmt(old, 2) : fmt(startDiv * 0.50, 2);
+    var floorNote = GameState.meta.year <= 1
+      ? "\n⚠ Year 1: dividend is locked — no cuts allowed."
+      : "\nFloor this year: $" + minDiv + "/share (50% of year-start $" + fmt(startDiv,2) + ")";
+    var warn = isCut
+      ? "WARNING: Cutting dividend causes share price drop and board pressure." + floorNote
+      : newDiv > old + 0.001 ? "Raising dividend signals confidence." : "No change.";
     showModal("Set Quarterly Dividend",
       "Current: " + fmtPS(old) + "  →  New: " + fmtPS(newDiv) + "\nQuarterly cost: " + fmtM(newDiv * GameState.company.sharesOutstanding) + "\n\n" + warn,
       [{ label: isCut ? "Cut Dividend" : "Set Dividend", style: isCut ? "btn-danger" : "btn-primary", onClick: function() {
