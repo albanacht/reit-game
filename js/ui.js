@@ -219,6 +219,39 @@ window.UI = (function() {
     container.innerHTML = html;
   }
 
+  function getPropertyIndicator(p) {
+    // Check if hit by event this quarter
+    var recentEvents = GameState.eventLog;
+    var lastEvent = recentEvents.length > 0 ? recentEvents[recentEvents.length - 1] : null;
+    var hitByEvent = lastEvent && lastEvent.events && lastEvent.events.some(function(e) {
+      return e.headline && (
+        e.headline.includes("Tenant Bankruptcy") ||
+        e.headline.includes("Natural Disaster") ||
+        e.headline.includes("Emergency Repair") ||
+        e.headline.includes("WFH") ||
+        e.headline.includes("Pandemic") ||
+        e.headline.includes("Retail")
+      );
+    });
+
+    // Check if boosted by event
+    var boostedByEvent = lastEvent && lastEvent.events && lastEvent.events.some(function(e) {
+      return e.headline && (
+        e.headline.includes("Industrial Boom") ||
+        e.headline.includes("Lease Signed") ||
+        e.headline.includes("Zoning") ||
+        e.headline.includes("Housing Shortage")
+      );
+    });
+
+    if (p.occupancy < 0.70)  return { icon: "🔴", tip: "Critical — occupancy below 70%" };
+    if (hitByEvent)           return { icon: "⚡", tip: "Hit by event this quarter" };
+    if (boostedByEvent)       return { icon: "📈", tip: "Boosted by market event" };
+    if (p.occupancy < 0.80)  return { icon: "🟡", tip: "Needs attention — occupancy below 80%" };
+    if (p.occupancy >= 0.93) return { icon: "🟢", tip: "Performing well" };
+    return { icon: "🔵", tip: "Stable" };
+  }
+
   function renderPortfolio() {
     var container = el("portfolio-list");
     if (!container) return;
@@ -235,8 +268,11 @@ window.UI = (function() {
       var leaseUpBtn = p.occupancy < 0.90
         ? '<button class="btn btn-sm btn-secondary" onclick="UI.leaseUp(\'' + p.id + '\')">Lease Up</button>'
         : '';
+      var indicator = getPropertyIndicator(p);
       html += '<div class="property-card">' +
-        '<div class="prop-header"><span class="prop-name">' + p.name + '</span>' +
+        '<div class="prop-header">' +
+        '<span class="prop-indicator" title="' + indicator.tip + '">' + indicator.icon + '</span>' +
+        '<span class="prop-name">' + p.name + '</span>' +
         '<span class="prop-tag tag-' + p.sector + '">' + p.sector + ' · ' + p.location + '</span></div>' +
         '<div class="prop-stats">' +
         '<span>Value: <strong>' + fmtM(p.currentValue) + '</strong></span>' +
@@ -323,7 +359,13 @@ window.UI = (function() {
     var rate20 = Financials.getCurrentBorrowingRateForTerm ? fmt(Financials.getCurrentBorrowingRateForTerm(20), 2) : fmt(baseRate, 2);
     setText("action-borrow-rate", "5yr: " + rate5 + "% | 10yr: " + rate10 + "% | 20yr: " + rate20 + "%");
     setText("action-div-current", "Current: $" + fmt(GameState.company.dividendPerShare, 2) + "/share/qtr");
-    setText("action-shares-out",  "Shares: " + fmt(GameState.company.sharesOutstanding, 1) + "M outstanding");
+    var equityUsedThisYear = GameState.company.equityIssuanceYear === GameState.meta.year;
+    var debtCooldown = GameState.company.debtIssuanceQuarter > 0 ?
+      Math.max(0, 2 - (GameState.meta.totalQuarters - GameState.company.debtIssuanceQuarter)) : 0;
+    setText("action-shares-out", "Shares: " + fmt(GameState.company.sharesOutstanding, 1) + "M" +
+      (equityUsedThisYear ? " ⚠ Equity used this year — available Year " + (GameState.meta.year + 1) : ""));
+    setText("action-debt-cooldown", debtCooldown > 0 ?
+      "⚠ Debt on cooldown — available in " + debtCooldown + " quarter(s)" : "");
     setText("action-cash-avail",  "Cash available: " + fmtM(GameState.balance.cash));
   }
 
@@ -684,7 +726,10 @@ window.UI = (function() {
     GameState.company.dividendPerShare    = 0.10;
     GameState.company.dividendHistory     = [];
     GameState.company.dividendCutQuarters = 0;
-    GameState.company.equityIssuanceCount  = 0;
+    GameState.company.equityIssuanceCount    = 0;
+    GameState.company.equityIssuanceYear     = 0;
+    GameState.company.equitySuppressQuarters = 0;
+    GameState.company.debtIssuanceQuarter    = 0;
     GameState.balance.cash                = 5;
 
     GameState.debtTranches = [
