@@ -459,7 +459,12 @@ window.UI = (function() {
   function closeAnnualReport() {
     var o = el("annual-report-overlay");
     if (o) o.classList.add("hidden");
-    if (GameState.meta.gameOver) setTimeout(showGameOver, 400);
+    if (GameState.meta.gameOver) {
+      setTimeout(showGameOver, 400);
+    } else if (GameState._pendingBoardMeeting) {
+      GameState._pendingBoardMeeting = false;
+      setTimeout(showBoardMeeting, 400);
+    }
   }
 
   // ----------------------------------------------------------
@@ -489,7 +494,10 @@ window.UI = (function() {
       [{ label: "Buy for " + fmtM(prop.askingPrice), style: "btn-primary", onClick: function() {
         var r = Properties.buyProperty(propertyId);
         showToast(r.message, r.success ? "success" : "error");
-        if (r.success) renderAll();
+        if (r.success) {
+          GameState.board.acquisitionsThisYear = (GameState.board.acquisitionsThisYear || 0) + 1;
+          renderAll();
+        }
       }}]);
   }
 
@@ -538,6 +546,7 @@ window.UI = (function() {
         GameState.balance.cash = Math.round((GameState.balance.cash - cost) * 100) / 100;
         prop.occupancy = Math.min(0.97, Math.round((prop.occupancy + boost) * 1000) / 1000);
         showToast(prop.name + " occupancy boosted to " + fmtPct(prop.occupancy), "success");
+        GameState.board.leaseUpsThisYear = (GameState.board.leaseUpsThisYear || 0) + 1;
         renderAll();
       }}]);
   }
@@ -608,6 +617,295 @@ window.UI = (function() {
   }
 
   // ----------------------------------------------------------
+  // BOARD MEETING SYSTEM
+  // ----------------------------------------------------------
+
+  var _boardMeetingState = {
+    mandates:       [],
+    currentIndex:   0,
+    voteResult:     null,
+    earnedCapital:  [],
+    mandateResults: [],
+    typingTimer:    null,
+  };
+
+  function showBoardMeeting() {
+    // Generate mandates and evaluate last year
+    var capital = Board.earnPoliticalCapital();
+    var mandates = Board.generateMandates();
+    var mandateResults = Board.evaluateMandates();
+
+    _boardMeetingState.mandates       = mandates;
+    _boardMeetingState.currentIndex   = 0;
+    _boardMeetingState.earnedCapital  = capital;
+    _boardMeetingState.mandateResults = mandateResults;
+
+    var overlay = el("board-meeting-overlay");
+    if (overlay) overlay.classList.remove("hidden");
+
+    renderBoardMeetingHeader();
+    showCurrentMandate();
+  }
+
+  function renderBoardMeetingHeader() {
+    var dirs = Board.DIRECTORS;
+    var headerEl = el("bm-directors-row");
+    if (!headerEl) return;
+
+    headerEl.innerHTML = dirs.map(function(d) {
+      var ds   = Board.getDirectorState(d.id);
+      var att  = ds ? ds.attitude : 5;
+      var expr = Board.getExpression(att);
+      var stars = "";
+      for (var i = 0; i < 10; i++) {
+        stars += i < Math.round(att) ? "★" : "☆";
+      }
+      var isCurrent = _boardMeetingState.mandates[_boardMeetingState.currentIndex] &&
+        _boardMeetingState.mandates[_boardMeetingState.currentIndex].directorId === d.id;
+
+      return '<div class="bm-director ' + (isCurrent ? "bm-director-active" : "") + '" id="bm-dir-' + d.id + '">' +
+        '<div class="bm-portrait-wrap">' +
+        '<img class="bm-portrait" src="' + d.image + '" ' +
+          'style="object-position: ' + (expr === "neutral" ? "0%" : expr === "happy" ? "25%" : expr === "angry" ? "50%" : "75%") + ' 100%"' +
+          ' alt="' + d.name + '">' +
+        '</div>' +
+        '<div class="bm-dir-name">' + d.name.split(" ")[1] + '</div>' +
+        '<div class="bm-dir-stars ' + (att < 3 ? "text-red" : att >= 7 ? "text-green" : "text-yellow") + '">' + fmt(att, 1) + '/10</div>' +
+        '</div>';
+    }).join("");
+  }
+
+  function showCurrentMandate() {
+    var mandates = _boardMeetingState.mandates;
+    var idx      = _boardMeetingState.currentIndex;
+
+    if (idx >= mandates.length) {
+      showBoardVote();
+      return;
+    }
+
+    var mandate = mandates[idx];
+    var director = Board.DIRECTORS.find(function(d) { return d.id === mandate.directorId; });
+    var ds       = Board.getDirectorState(mandate.directorId);
+    var attitude = ds ? ds.attitude : 5;
+
+    // Update header — highlight speaking director
+    renderBoardMeetingHeader();
+
+    // Set speaking director info
+    setText("bm-speaker-name", director ? director.name : "");
+    setText("bm-speaker-title", director ? director.title : "");
+    setText("bm-mandate-counter", "Mandate " + (idx + 1) + " of " + mandates.length);
+    setText("bm-capital-display", "Political Capital: " + GameState.board.politicalCapital + "/" + GameState.board.maxCapital);
+
+    // Generate and type speech
+    var speech = Board.generateSpeech(mandate.directorId, mandate, attitude);
+    typeText("bm-speech-text", speech);
+
+    // Update buttons
+    var btnArea = el("bm-response-buttons");
+    if (btnArea) {
+      var bmButtons = [
+      {r:"accept",    cls:"btn-primary",   label:"Accept",       icon:"Accept",    cost:""},
+      {r:"negotiate", cls:"btn-secondary",  label:"Negotiate Down",icon:"Negotiate", cost:" (1 capital)"},
+      {r:"doubledown",cls:"btn-secondary",  label:"Double Down",  icon:"Double",    cost:""},
+      {r:"reject",    cls:"btn-danger",     label:"Reject",       icon:"Reject",    cost:" (2 capital)"},
+    ];
+    var html = "";
+    bmButtons.forEach(function(b) {
+      var btn = document.createElement("button");
+      btn.className = "btn " + b.cls + " bm-btn";
+      btn.textContent = b.label + b.cost;
+      btn.setAttribute("data-response", b.r);
+      btn.onclick = function() { UI.boardResponse(b.r); };
+      btnArea.appendChild(btn);
+    });
+    }
+
+    // Update portrait to speaking expression
+    var portraitImg = el("bm-dir-" + mandate.directorId) ?
+      el("bm-dir-" + mandate.directorId).querySelector(".bm-portrait") : null;
+    if (portraitImg) portraitImg.style.objectPosition = "75% 100%"; // speaking face
+  }
+
+  function boardResponse(response) {
+    var mandates = _boardMeetingState.mandates;
+    var idx      = _boardMeetingState.currentIndex;
+    if (idx >= mandates.length) return;
+
+    var mandate = mandates[idx];
+    var capital = GameState.board.politicalCapital;
+
+    // Check capital cost
+    if (response === "negotiate" && capital < 1) {
+      showToast("Insufficient political capital. Need 1.", "error"); return;
+    }
+    if (response === "reject" && capital < 2) {
+      showToast("Insufficient political capital. Need 2.", "error"); return;
+    }
+
+    // Spend capital
+    if (response === "negotiate") GameState.board.politicalCapital--;
+    if (response === "reject")    GameState.board.politicalCapital -= 2;
+
+    // Handle negotiate roll
+    if (response === "negotiate") {
+      var director = Board.DIRECTORS.find(function(d) { return d.id === mandate.directorId; });
+      var successRate = director ? director.negotiateSuccessRate : 0.5;
+      var success = Math.random() < successRate;
+
+      if (success) {
+        mandate.response = "negotiate";
+        mandate.target   = mandate.target * 0.55;
+        showToast("Negotiation successful! Target reduced by 45%.", "success");
+      } else {
+        var ds = Board.getDirectorState(mandate.directorId);
+        if (ds) ds.attitude = Math.max(0, ds.attitude - 0.5);
+        mandate.response = "accept"; // falls back to accept at original target
+        showToast("Negotiation failed. Director is not pleased. Target unchanged.", "error");
+      }
+    } else {
+      mandate.response = response;
+    }
+
+    // Show result feedback
+    var feedback = {
+      accept:     "You have accepted the mandate. Deliver on your promise.",
+      negotiate:  "",
+      doubledown: "Bold commitment. The director is watching closely.",
+      reject:     "Mandate rejected. The director is displeased but it is removed.",
+    };
+    if (feedback[response]) showToast(feedback[response], "info");
+
+    // Advance to next mandate
+    _boardMeetingState.currentIndex++;
+    setTimeout(function() {
+      showCurrentMandate();
+      renderBoardMeetingHeader();
+      setText("bm-capital-display", "Political Capital: " + GameState.board.politicalCapital + "/" + GameState.board.maxCapital);
+    }, 800);
+  }
+
+  function showBoardVote() {
+    var voteResult = Board.conductVote();
+    _boardMeetingState.voteResult = voteResult;
+
+    var btnArea = el("bm-response-buttons");
+    if (btnArea) btnArea.innerHTML = "";
+
+    // Show backroom deal option if any hostile and have capital
+    var hostileDirs = voteResult.votes.filter(function(v) { return v.hostile; });
+    var canDeal = hostileDirs.length > 0 && GameState.board.politicalCapital >= 3;
+
+    var voteHTML = '<div class="bm-vote-header">BOARD VOTE — Year ' + (GameState.meta.year - 1) + '</div>' +
+      '<div class="bm-vote-grid">' +
+      voteResult.votes.map(function(v) {
+        return '<div class="bm-vote-item">' +
+          '<div class="bm-vote-name">' + v.name + '</div>' +
+          '<div class="bm-vote-att">' + fmt(v.attitude, 1) + '/10</div>' +
+          '<div class="bm-vote-result ' + (v.hostile ? "text-red" : "text-green") + '">' +
+          (v.hostile ? "⚑ HOSTILE" : "✓ CONFIDENCE") +
+          (v.veto ? " (VETO)" : "") + '</div>' +
+          '</div>';
+      }).join("") +
+      '</div>' +
+      '<div class="bm-vote-summary">' +
+      'Confidence: ' + voteResult.confidenceCount + ' | Hostile: ' + voteResult.hostileCount +
+      (voteResult.williamsVeto ? ' | Williams VETO active — need 4 confidence' : ' | Need 3 confidence') +
+      '</div>';
+
+    typeText("bm-speech-text", voteResult.fired
+      ? "The motion to remove management has passed. " + voteResult.hostileCount + " directors have lost confidence."
+      : "Management retains the board's confidence. " + voteResult.confidenceCount + " votes in favour.");
+
+    var speechEl = el("bm-speech-text");
+    if (speechEl) speechEl.insertAdjacentHTML("afterend", '<div class="bm-vote-box">' + voteHTML + '</div>');
+
+    setText("bm-speaker-name", "BOARD VOTE");
+    setText("bm-speaker-title", voteResult.fired ? "Vote to remove — PASSED" : "Vote of confidence — PASSED");
+
+    // Backroom deal button
+    if (canDeal) {
+      if (btnArea) btnArea.innerHTML =
+        '<button class="btn btn-danger bm-btn" onclick="UI.backroomDeal()">' +
+        '🤝 Backroom Deal — Reset 1 hostile director to 3 (costs 3 capital)</button>' +
+        '<button class="btn btn-primary bm-btn" onclick="UI.closeBoardMeeting()">' +
+        (voteResult.fired ? "Accept Termination" : "Continue to Year " + GameState.meta.year) + '</button>';
+    } else {
+      if (btnArea) btnArea.innerHTML =
+        '<button class="btn btn-primary bm-btn" onclick="UI.closeBoardMeeting()">' +
+        (voteResult.fired ? "Accept Termination" : "Continue to Year " + GameState.meta.year) + '</button>';
+    }
+
+    renderBoardMeetingHeader();
+  }
+
+  function backroomDeal() {
+    var voteResult = _boardMeetingState.voteResult;
+    if (!voteResult) return;
+    if (GameState.board.politicalCapital < 3) { showToast("Need 3 political capital.", "error"); return; }
+
+    // Find most hostile director (lowest attitude)
+    var hostile = voteResult.votes.filter(function(v) { return v.hostile; });
+    if (hostile.length === 0) return;
+
+    hostile.sort(function(a, b) { return a.attitude - b.attitude; });
+    var target = hostile[0];
+    var ds = Board.getDirectorState(target.id);
+    if (ds) ds.attitude = 3;
+    target.hostile = false;
+    target.attitude = 3;
+
+    GameState.board.politicalCapital -= 3;
+    showToast("Backroom deal done. " + target.name + " reset to 3/10.", "success");
+
+    // Re-run vote
+    var newResult = Board.conductVote();
+    _boardMeetingState.voteResult = newResult;
+
+    var voteBox = document.querySelector(".bm-vote-box");
+    if (voteBox) voteBox.remove();
+
+    showBoardVote();
+  }
+
+  function closeBoardMeeting() {
+    var overlay = el("board-meeting-overlay");
+    if (overlay) overlay.classList.add("hidden");
+
+    var voteResult = _boardMeetingState.voteResult;
+    if (voteResult && voteResult.fired) {
+      GameState.meta.gameOver = true;
+      GameState.meta.gameOverReason = "The board voted " + voteResult.hostileCount + "-" + voteResult.confidenceCount +
+        " to remove you as CEO of " + GameState.company.name + " after Year " + (GameState.meta.year - 1) + ".";
+      setTimeout(function() {
+        showGameOver();
+        var scoreData = Leaderboard.calculateScore();
+        setTimeout(function() { Leaderboard.showSubmitScreen(scoreData); }, 800);
+      }, 400);
+    } else {
+      // Reset year tracking for new year
+      Board.resetYearTracking();
+    }
+  }
+
+  function typeText(elementId, text) {
+    var e = el(elementId);
+    if (!e) return;
+    if (_boardMeetingState.typingTimer) clearInterval(_boardMeetingState.typingTimer);
+    e.textContent = "";
+    var i = 0;
+    _boardMeetingState.typingTimer = setInterval(function() {
+      if (i < text.length) {
+        e.textContent += text[i];
+        i++;
+      } else {
+        clearInterval(_boardMeetingState.typingTimer);
+      }
+    }, 18);
+  }
+
+  // ----------------------------------------------------------
   // MACRO EVENT POPUP — shows before earnings report for major events
   // ----------------------------------------------------------
   function showMacroEventPopup(firedEvents, callback) {
@@ -662,7 +960,14 @@ window.UI = (function() {
       if (justEndedYear) {
         var snap = Board.generateAnnualReport();
         renderAll(rp);
-        setTimeout(function() { showAnnualReport(snap); }, 600);
+        if (GameState.meta.year === 2) {
+          // Just ended Year 1 — safe year, show annual report only
+          setTimeout(function() { showAnnualReport(snap); }, 600);
+        } else {
+          // Ended Year 2+ — show annual report, then board meeting
+          GameState._pendingBoardMeeting = true;
+          setTimeout(function() { showAnnualReport(snap); }, 600);
+        }
       } else {
         renderAll(rp);
       }
@@ -730,6 +1035,12 @@ window.UI = (function() {
     GameState.company.equityIssuanceYear     = 0;
     GameState.company.equitySuppressQuarters = 0;
     GameState.company.debtIssuanceQuarter    = 0;
+    GameState.board.acquisitionsThisYear     = 0;
+    GameState.board.leaseUpsThisYear         = 0;
+    GameState.board.noOverdraftBroken        = false;
+    GameState.board.noEquityBroken           = false;
+    GameState.board.politicalCapital         = 2;
+    GameState.board.activeMandates           = [];
     GameState.balance.cash                = 5;
 
     GameState.debtTranches = [
@@ -846,6 +1157,10 @@ window.UI = (function() {
     handleBuyback:       handleBuyback,
     handleSetDividend:   handleSetDividend,
     leaseUp:             leaseUp,
+    showBoardMeeting:    showBoardMeeting,
+    boardResponse:       boardResponse,
+    backroomDeal:        backroomDeal,
+    closeBoardMeeting:   closeBoardMeeting,
   };
 
 }());
