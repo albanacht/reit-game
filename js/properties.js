@@ -338,6 +338,161 @@ window.Properties = (() => {
   }
 
   // ----------------------------------------------------------
+  // UPGRADE FUNCTIONS
+  // ----------------------------------------------------------
+
+  // Check if renovation is available for a property
+  function canRenovate(prop) {
+    if (!prop) return { ok: false, reason: "Property not found." };
+    if (prop.location === "tier1") return { ok: false, reason: "Tier 1 properties are already premium — renovation not applicable." };
+    if (prop.renovated) return { ok: false, reason: "Already renovated." };
+    if (prop.underConstruction) return { ok: false, reason: "Already under construction." };
+    if (prop.repositioning) return { ok: false, reason: "Repositioning in progress." };
+    if ((prop.quarterOwned || 0) < 2) return { ok: false, reason: "Must own property for at least 2 quarters before renovating." };
+    if (prop.occupancy >= 0.90) return { ok: false, reason: "Occupancy already above 90% — renovation would not improve returns sufficiently." };
+    return { ok: true };
+  }
+
+  function canReposition(prop) {
+    if (!prop) return { ok: false, reason: "Property not found." };
+    if (prop.location === "tier1") return { ok: false, reason: "Tier 1 properties cannot be repositioned." };
+    if (prop.repositioned) return { ok: false, reason: "Already repositioned." };
+    if (prop.underConstruction) return { ok: false, reason: "Already under construction." };
+    if (prop.renovating) return { ok: false, reason: "Renovation in progress." };
+    if ((prop.quarterOwned || 0) < 2) return { ok: false, reason: "Must own for at least 2 quarters." };
+
+    // Must have a valid target sector
+    var targets = getRepositionTargets(prop);
+    if (targets.length === 0) return { ok: false, reason: "No valid repositioning targets for this property type." };
+    return { ok: true };
+  }
+
+  function getRepositionTargets(prop) {
+    var targets = [];
+    if (prop.location === "suburban") {
+      if (prop.sector === "office")      targets = ["industrial"];
+      if (prop.sector === "retail")      targets = ["industrial", "multifamily"];
+      if (prop.sector === "multifamily") targets = ["office"];
+      if (prop.sector === "industrial")  targets = [];
+    }
+    if (prop.location === "tier2") {
+      if (prop.sector === "office")      targets = ["multifamily"];
+      if (prop.sector === "retail")      targets = ["multifamily", "industrial"];
+      if (prop.sector === "multifamily") targets = ["office"];
+      if (prop.sector === "industrial")  targets = [];
+    }
+    return targets;
+  }
+
+  function startRenovation(propId) {
+    var prop = GameState.portfolio.find(function(p) { return p.id === propId; });
+    var check = canRenovate(prop);
+    if (!check.ok) return { success: false, message: check.reason };
+
+    var cost = Math.round(prop.currentValue * 0.10 * 10) / 10;
+    if (GameState.balance.cash < cost) {
+      return { success: false, message: "Insufficient cash. Need $" + cost + "M." };
+    }
+
+    GameState.balance.cash = Math.round((GameState.balance.cash - cost) * 100) / 100;
+    prop.underConstruction = true;
+    prop.renovating        = true;
+    prop.constructionQuartersLeft = 1;
+    prop.constructionType  = "renovation";
+    prop.preConstructionOccupancy = prop.occupancy;
+    prop.occupancy         = 0; // offline
+
+    return {
+      success: true,
+      message: prop.name + " renovation started. $" + cost + "M spent. Property offline for 1 quarter.",
+      cost: cost
+    };
+  }
+
+  function startRepositioning(propId, targetSector) {
+    var prop = GameState.portfolio.find(function(p) { return p.id === propId; });
+    var check = canReposition(prop);
+    if (!check.ok) return { success: false, message: check.reason };
+
+    var targets = getRepositionTargets(prop);
+    if (targets.indexOf(targetSector) === -1) {
+      return { success: false, message: "Cannot reposition " + prop.sector + " to " + targetSector + " at this location." };
+    }
+
+    var cost = Math.round(prop.currentValue * 0.15 * 10) / 10;
+    if (GameState.balance.cash < cost) {
+      return { success: false, message: "Insufficient cash. Need $" + cost + "M." };
+    }
+
+    GameState.balance.cash = Math.round((GameState.balance.cash - cost) * 100) / 100;
+    prop.underConstruction  = true;
+    prop.repositioning      = true;
+    prop.constructionQuartersLeft = 2;
+    prop.constructionType   = "repositioning";
+    prop.targetSector       = targetSector;
+    prop.preConstructionOccupancy = prop.occupancy;
+    prop.occupancy          = 0;
+
+    return {
+      success: true,
+      message: prop.name + " repositioning to " + targetSector + " started. $" + cost + "M spent. Offline for 2 quarters.",
+      cost: cost
+    };
+  }
+
+  function processConstructionProgress() {
+    GameState.portfolio.forEach(function(prop) {
+      if (!prop.underConstruction) return;
+
+      prop.constructionQuartersLeft--;
+
+      if (prop.constructionQuartersLeft <= 0) {
+        // Construction complete
+        prop.underConstruction = false;
+
+        if (prop.constructionType === "renovation") {
+          prop.renovating  = false;
+          prop.renovated   = true;
+          // Apply renovation benefits: NOI +15%, value recalculates automatically
+          prop.annualNOI   = Math.round(prop.annualNOI * 1.15 * 100) / 100;
+          prop.occupancy   = Math.min(0.97, Math.round((prop.preConstructionOccupancy + 0.08) * 1000) / 1000);
+          prop.constructionType = null;
+          GameState.eventLog.push({
+            quarter: GameState.meta.quarter,
+            year:    GameState.meta.year,
+            headline:"🔨 Renovation Complete",
+            body:    prop.name + " renovation complete. NOI increased 15%. Occupancy restored.",
+            events:  [{ headline: "🔨 " + prop.name + " Renovation Complete", body: "NOI +15%, occupancy restored.", impact: "+$" + Math.round(prop.annualNOI * 0.15 * 10)/10 + "M annual NOI" }]
+          });
+        }
+
+        if (prop.constructionType === "repositioning") {
+          var oldSector    = prop.sector;
+          prop.sector      = prop.targetSector;
+          prop.repositioning = false;
+          prop.repositioned  = true;
+          // Recalculate NOI at new sector cap rate — use new sector's tier2/suburban profile
+          var newProfile   = PROFILES[prop.targetSector][prop.location];
+          var newCapRate   = GameState.market.capRates[prop.targetSector][prop.location] / 100;
+          // New NOI = current value × new cap rate (value unchanged, income improves)
+          prop.annualNOI   = Math.round(prop.currentValue * newCapRate * 100) / 100;
+          prop.occupancy   = Math.round((newProfile.occupancyMid * 0.90) * 1000) / 1000; // start at 90% of sector midpoint
+          prop.label       = newProfile.label;
+          prop.targetSector = null;
+          prop.constructionType = null;
+          GameState.eventLog.push({
+            quarter: GameState.meta.quarter,
+            year:    GameState.meta.year,
+            headline:"🔄 Repositioning Complete",
+            body:    prop.name + " repositioned from " + oldSector + " to " + prop.sector + ".",
+            events:  [{ headline: "🔄 " + prop.name + " Repositioned", body: "Sector: " + oldSector + " → " + prop.sector, impact: "New NOI: $" + prop.annualNOI + "M/yr" }]
+          });
+        }
+      }
+    });
+  }
+
+  // ----------------------------------------------------------
   // PUBLIC API
   // ----------------------------------------------------------
   return {
@@ -348,6 +503,12 @@ window.Properties = (() => {
     quarterlyUpdate,
     refreshMarket,
     generateProperty,
+    canRenovate,
+    canReposition,
+    getRepositionTargets,
+    startRenovation,
+    startRepositioning,
+    processConstructionProgress,
     PROFILES,
   };
 
