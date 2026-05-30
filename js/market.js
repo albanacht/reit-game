@@ -65,13 +65,13 @@ window.Market = (() => {
   // Maps debt/asset and coverage ratios to a rating and spread
   // ----------------------------------------------------------
   const CREDIT_RATINGS = [
-    { rating: "AAA", spread: 0.80, maxDebtToAssets: 0.25, minCoverage: 5.0 },
-    { rating: "AA",  spread: 1.30, maxDebtToAssets: 0.30, minCoverage: 4.0 },
-    { rating: "A",   spread: 2.00, maxDebtToAssets: 0.38, minCoverage: 3.0 },
-    { rating: "BBB", spread: 3.00, maxDebtToAssets: 0.45, minCoverage: 2.2 },
-    { rating: "BB",  spread: 4.50, maxDebtToAssets: 0.52, minCoverage: 1.6 },
-    { rating: "B",   spread: 6.00, maxDebtToAssets: 0.60, minCoverage: 1.1 },
-    { rating: "CCC", spread: 8.00, maxDebtToAssets: 1.00, minCoverage: 0.0 },
+    { rating: "AAA", spread: 0.50, maxDebtToAssets: 0.25, minCoverage: 5.0 },
+    { rating: "AA",  spread: 0.80, maxDebtToAssets: 0.30, minCoverage: 4.0 },
+    { rating: "A",   spread: 1.20, maxDebtToAssets: 0.38, minCoverage: 3.0 },
+    { rating: "BBB", spread: 1.80, maxDebtToAssets: 0.45, minCoverage: 2.2 },
+    { rating: "BB",  spread: 3.00, maxDebtToAssets: 0.52, minCoverage: 1.6 },
+    { rating: "B",   spread: 4.50, maxDebtToAssets: 0.60, minCoverage: 1.1 },
+    { rating: "CCC", spread: 7.00, maxDebtToAssets: 1.00, minCoverage: 0.0 },
   ];
 
   // ----------------------------------------------------------
@@ -294,7 +294,7 @@ window.Market = (() => {
     };
 
     GameState.credit.rating = "BBB";
-    GameState.credit.spread = 3.00;
+    GameState.credit.spread = 1.80;
     GameState.credit.watchNegative = false;
   }
 
