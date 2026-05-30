@@ -182,6 +182,79 @@ window.UI = (function() {
     }
   }
 
+  // BOARD ATTITUDES PANEL
+  function renderBoardAttitudes() {
+    var container = el("board-attitudes-list");
+    var capEl     = el("ba-capital-display");
+    if (!container) return;
+
+    var directors = GameState.board.directors;
+    if (!directors || directors.length === 0) {
+      container.innerHTML = '<p class="text-muted" style="font-size:11px">Start game to see board.</p>';
+      return;
+    }
+
+    var names = { williams:"Williams", chen:"Chen", okafor:"Okafor", petrova:"Petrova", hassan:"Hassan" };
+    var html = "";
+    directors.forEach(function(d) {
+      var att      = Math.round(d.attitude * 10) / 10;
+      var pct      = (d.attitude / 10) * 100;
+      var color    = d.attitude < 3 ? "#ef4444" : d.attitude >= 7 ? "#22c55e" : "#f59e0b";
+      var hostile  = d.attitude < 3 ? " 🔴" : "";
+      html += '<div class="ba-row">' +
+        '<span class="ba-name">' + (names[d.id] || d.id) + hostile + '</span>' +
+        '<div class="ba-bar"><div class="ba-bar-fill" style="width:' + pct + '%;background:' + color + '"></div></div>' +
+        '<span class="ba-score" style="color:' + color + '">' + fmt(att, 1) + '</span>' +
+        '</div>';
+    });
+    container.innerHTML = html;
+
+    if (capEl) {
+      var cap = GameState.board.politicalCapital || 0;
+      var max = GameState.board.maxCapital || 5;
+      var dots = "";
+      for (var i = 0; i < max; i++) dots += i < cap ? "●" : "○";
+      capEl.textContent = dots + " (" + cap + "/" + max + ")";
+    }
+  }
+
+  // MARKET CONDITIONS PANEL
+  function renderMarketConditions() {
+    var container = el("market-conditions-list");
+    if (!container) return;
+
+    var capRates  = GameState.market.capRates;
+    var baselines = { office: 6.1, industrial: 5.0, multifamily: 5.5, retail: 6.6 };
+    var sectors   = ["office", "industrial", "multifamily", "retail"];
+    var labels    = { office:"Office", industrial:"Industrial", multifamily:"Multifamily", retail:"Retail" };
+
+    var html = "";
+    sectors.forEach(function(s) {
+      // Average cap rate across locations for this sector
+      var avg = (capRates[s].tier1 + capRates[s].tier2 + capRates[s].suburban) / 3;
+      avg = Math.round(avg * 100) / 100;
+      var base = baselines[s];
+      var diff = avg - base;
+
+      var icon, signal;
+      if (diff > 1.5)       { icon = "🔴"; signal = "Distressed — buy opportunity"; }
+      else if (diff > 0.5)  { icon = "🟡"; signal = "Weakening — values falling"; }
+      else if (diff > -0.5) { icon = "🔵"; signal = "Stable"; }
+      else                   { icon = "🟢"; signal = "Booming — values rising"; }
+
+      var arrow = diff > 0.1 ? "↑" : diff < -0.1 ? "↓" : "≈";
+      var rateColor = diff > 0.5 ? "text-red" : diff < -0.5 ? "text-green" : "";
+
+      html += '<div class="mc-row">' +
+        '<span class="mc-icon">' + icon + '</span>' +
+        '<span class="mc-sector">' + labels[s] + '</span>' +
+        '<span class="mc-rate ' + rateColor + '">' + fmt(avg, 1) + '% ' + arrow + '</span>' +
+        '<span class="mc-signal">' + signal + '</span>' +
+        '</div>';
+    });
+    container.innerHTML = html;
+  }
+
   // NEW: Goals panel — live green/red indicators
   function renderGoalsPanel() {
     var container = el("goals-list");
@@ -220,36 +293,10 @@ window.UI = (function() {
   }
 
   function getPropertyIndicator(p) {
-    // Check if hit by event this quarter
-    var recentEvents = GameState.eventLog;
-    var lastEvent = recentEvents.length > 0 ? recentEvents[recentEvents.length - 1] : null;
-    var hitByEvent = lastEvent && lastEvent.events && lastEvent.events.some(function(e) {
-      return e.headline && (
-        e.headline.includes("Tenant Bankruptcy") ||
-        e.headline.includes("Natural Disaster") ||
-        e.headline.includes("Emergency Repair") ||
-        e.headline.includes("WFH") ||
-        e.headline.includes("Pandemic") ||
-        e.headline.includes("Retail")
-      );
-    });
-
-    // Check if boosted by event
-    var boostedByEvent = lastEvent && lastEvent.events && lastEvent.events.some(function(e) {
-      return e.headline && (
-        e.headline.includes("Industrial Boom") ||
-        e.headline.includes("Lease Signed") ||
-        e.headline.includes("Zoning") ||
-        e.headline.includes("Housing Shortage")
-      );
-    });
-
     if (p.occupancy < 0.70)  return { icon: "🔴", tip: "Critical — occupancy below 70%" };
-    if (hitByEvent)           return { icon: "⚡", tip: "Hit by event this quarter" };
-    if (boostedByEvent)       return { icon: "📈", tip: "Boosted by market event" };
-    if (p.occupancy < 0.80)  return { icon: "🟡", tip: "Needs attention — occupancy below 80%" };
-    if (p.occupancy >= 0.93) return { icon: "🟢", tip: "Performing well" };
-    return { icon: "🔵", tip: "Stable" };
+    if (p.occupancy < 0.80)  return { icon: "🟡", tip: "Needs attention — below 80%" };
+    if (p.occupancy < 0.90)  return { icon: "🔵", tip: "Stable — 80-90% occupied" };
+    return { icon: "🟢", tip: "Performing well — above 90%" };
   }
 
   function renderPortfolio() {
@@ -376,6 +423,8 @@ window.UI = (function() {
     renderBalanceSheet();
     renderDebtPanel();
     renderGoalsPanel();
+    renderBoardAttitudes();
+    renderMarketConditions();
     renderPortfolio();
     renderPropertyMarket();
     renderCapitalActions();
@@ -533,6 +582,10 @@ window.UI = (function() {
     var prop = GameState.portfolio.find(function(p) { return p.id === propertyId; });
     if (!prop) return;
     if (prop.occupancy >= 0.90) { showToast("Occupancy already above 90% — no lease up needed.", "info"); return; }
+    // Once per property per year
+    if (prop.leaseUpYear === GameState.meta.year) {
+      showToast("Already leased up " + prop.name + " this year. Wait until next year.", "error"); return;
+    }
     var cost = Math.round(prop.annualNOI * 0.12 * 10) / 10;
     var boost = prop.occupancy < 0.65 ? 0.08 : prop.occupancy < 0.75 ? 0.06 : prop.occupancy < 0.85 ? 0.05 : 0.03;
     showModal("Lease Up: " + prop.name,
@@ -547,6 +600,7 @@ window.UI = (function() {
         prop.occupancy = Math.min(0.97, Math.round((prop.occupancy + boost) * 1000) / 1000);
         showToast(prop.name + " occupancy boosted to " + fmtPct(prop.occupancy), "success");
         GameState.board.leaseUpsThisYear = (GameState.board.leaseUpsThisYear || 0) + 1;
+        prop.leaseUpYear = GameState.meta.year;
         renderAll();
       }}]);
   }
@@ -666,7 +720,7 @@ window.UI = (function() {
       return '<div class="bm-director ' + (isCurrent ? "bm-director-active" : "") + '" id="bm-dir-' + d.id + '">' +
         '<div class="bm-portrait-wrap">' +
         '<img class="bm-portrait" src="' + d.image + '" ' +
-          'style="object-position: ' + (expr === "neutral" ? "0%" : expr === "happy" ? "25%" : expr === "angry" ? "50%" : "75%") + ' 100%"' +
+          'style="object-position: ' + (expr === "neutral" ? "0%" : expr === "happy" ? "33%" : expr === "angry" ? "66%" : "99%") + ' 0%"' +
           ' alt="' + d.name + '">' +
         '</div>' +
         '<div class="bm-dir-name">' + d.name.split(" ")[1] + '</div>' +
