@@ -759,9 +759,16 @@ window.UI = (function() {
     var speech = Board.generateSpeech(mandate.directorId, mandate, attitude);
     typeText("bm-speech-text", speech);
 
+    // Clear previous state
+    var speechEl2 = el("bm-speech-text");
+    if (speechEl2) speechEl2.textContent = "";
+    var voteBox = document.querySelector(".bm-vote-box");
+    if (voteBox) voteBox.remove();
+
     // Update buttons
     var btnArea = el("bm-response-buttons");
     if (btnArea) {
+      btnArea.innerHTML = "";
       var bmButtons = [
       {r:"accept",    cls:"btn-primary",   label:"Accept",       icon:"Accept",    cost:""},
       {r:"negotiate", cls:"btn-secondary",  label:"Negotiate Down",icon:"Negotiate", cost:" (1 capital)"},
@@ -849,6 +856,8 @@ window.UI = (function() {
 
     var btnArea = el("bm-response-buttons");
     if (btnArea) btnArea.innerHTML = "";
+    var speechEl3 = el("bm-speech-text");
+    if (speechEl3) speechEl3.textContent = "";
 
     // Show backroom deal option if any hostile and have capital
     var hostileDirs = voteResult.votes.filter(function(v) { return v.hostile; });
