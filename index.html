@@ -360,7 +360,17 @@
               <div class="action-group-title">Issue Debt</div>
               <div class="action-meta" id="action-borrow-rate">Current rate: —</div>
               <div class="input-row" style="margin-bottom:6px;"><input type="number" id="input-debt-amount" placeholder="Amount $M" min="1" step="5"></div>
-              <div class="input-row"><input type="number" id="input-debt-years" placeholder="Term (years)" min="1" max="30"><button class="btn btn-primary btn-sm" id="btn-issue-debt">Issue</button></div>
+              <div class="input-row">
+                <select id="input-debt-years" style="flex:1;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:var(--radius-sm);padding:6px 8px;font-size:12px;">
+                  <option value="1">1 year</option>
+                  <option value="2">2 years</option>
+                  <option value="3">3 years</option>
+                  <option value="5" selected>5 years</option>
+                  <option value="7">7 years</option>
+                  <option value="10">10 years</option>
+                </select>
+                <button class="btn btn-primary btn-sm" id="btn-issue-debt">Issue</button>
+              </div>
             </div>
             <div class="action-group">
               <div class="action-group-title">Retire Debt Early</div>
