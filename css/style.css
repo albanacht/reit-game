@@ -382,3 +382,6 @@ input::placeholder { color:var(--text-muted); }
 .mc-sector { color:var(--text-muted); min-width:80px; }
 .mc-rate { font-family:monospace; font-weight:700; font-size:11px; }
 .mc-signal { font-size:10px; color:var(--text-muted); }
+
+/* COPYRIGHT */
+.start-copyright { font-size:10px; color:var(--text-muted); opacity:0.5; letter-spacing:0.3px; }
