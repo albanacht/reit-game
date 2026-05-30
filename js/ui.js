@@ -314,10 +314,14 @@ window.UI = (function() {
       var oc = p.occupancy >= 0.90 ? "text-green" : p.occupancy >= 0.80 ? "text-yellow" : "text-red";
       var gl = p.purchasePrice ? fmt(p.currentValue - p.purchasePrice, 1) : 0;
       var gc = gl >= 0 ? "text-green" : "text-red";
-      // NEW: Lease Up button shown when occupancy below 90%
-      var leaseUpBtn = p.occupancy < 0.90
-        ? '<button class="btn btn-sm btn-secondary" onclick="UI.leaseUp(\'' + p.id + '\')">Lease Up</button>'
-        : '';
+      // Lease Up button — grey/disabled if already used this year
+      var leaseUpBtn = "";
+      if (p.occupancy < 0.90) {
+        var usedThisYear = p.leaseUpYear === GameState.meta.year;
+        leaseUpBtn = usedThisYear
+          ? '<button class="btn btn-sm btn-secondary" disabled style="opacity:0.4;cursor:not-allowed" title="Already leased up this year — available Year ' + (GameState.meta.year + 1) + '">✓ Leased Up</button>'
+          : '<button class="btn btn-sm btn-primary" onclick="UI.leaseUp(\'' + p.id + '\')">Lease Up</button>';
+      }
       var indicator = getPropertyIndicator(p);
       html += '<div class="property-card">' +
         '<div class="prop-header">' +
@@ -742,9 +746,15 @@ window.UI = (function() {
 
       return '<div class="bm-director ' + (isCurrent ? "bm-director-active" : "") + '" id="bm-dir-' + d.id + '">' +
         '<div class="bm-portrait-wrap">' +
-        '<img class="bm-portrait" src="' + d.image + '" ' +
-          'style="object-position: ' + (expr === "neutral" ? "0%" : expr === "happy" ? "33%" : expr === "angry" ? "66%" : "99%") + ' 0%"' +
-          ' alt="' + d.name + '">' +
+        (function() {
+          var dims = { williams:{w:987,h:253}, chen:{w:949,h:263}, okafor:{w:938,h:266}, petrova:{w:950,h:262}, hassan:{w:949,h:263} };
+          var dim  = dims[d.id] || {w:949,h:263};
+          var containerH = 130;
+          var scale = containerH / dim.h;
+          var scaledW = Math.round(dim.w * scale);
+          var xPos = expr === "neutral" ? "0%" : expr === "happy" ? "33.33%" : expr === "angry" ? "66.66%" : "100%";
+          return '<div class="bm-portrait" id="bm-sprite-' + d.id + '" style="background-image:url(\'' + d.image + '\');background-size:' + scaledW + 'px ' + containerH + 'px;background-position:' + xPos + ' 0%;background-repeat:no-repeat;"></div>';
+        })() +
         '</div>' +
         '<div class="bm-dir-name">' + d.name.split(" ")[1] + '</div>' +
         '<div class="bm-dir-stars ' + (att < 3 ? "text-red" : att >= 7 ? "text-green" : "text-yellow") + '">' + fmt(att, 1) + '/10</div>' +
@@ -806,10 +816,9 @@ window.UI = (function() {
     });
     }
 
-    // Update portrait to speaking expression
-    var portraitImg = el("bm-dir-" + mandate.directorId) ?
-      el("bm-dir-" + mandate.directorId).querySelector(".bm-portrait") : null;
-    if (portraitImg) portraitImg.style.objectPosition = "75% 100%"; // speaking face
+    // Update speaking director portrait to speaking expression
+    var portraitDiv = el("bm-sprite-" + mandate.directorId);
+    if (portraitDiv) portraitDiv.style.backgroundPosition = "100% 0%";
   }
 
   function boardResponse(response) {
@@ -1191,6 +1200,7 @@ window.UI = (function() {
     GameState.board.politicalCapital         = 2;
     GameState.board.activeMandates           = [];
     Decisions.init();
+    GameState._lastTenantDistressYear = 0;
     GameState.balance.cash                = 5;
 
     GameState.debtTranches = [
