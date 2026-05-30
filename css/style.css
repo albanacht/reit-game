@@ -331,8 +331,8 @@ input::placeholder { color:var(--text-muted); }
 .bm-directors-row { display:flex; justify-content:space-around; align-items:flex-end; position:relative; z-index:2; gap:8px; }
 .bm-director { display:flex; flex-direction:column; align-items:center; gap:3px; opacity:0.6; transition:opacity 0.3s, transform 0.3s; }
 .bm-director-active { opacity:1; transform:scale(1.08); }
-.bm-portrait-wrap { width:120px; height:110px; overflow:hidden; border-radius:4px 4px 0 0; }
-.bm-portrait { width:480px; height:110px; object-fit:cover; object-position:0% 100%; display:block; transition:object-position 0.3s; }
+.bm-portrait-wrap { width:120px; height:140px; overflow:hidden; border-radius:4px 4px 0 0; }
+.bm-portrait { width:480px; height:140px; object-fit:cover; object-position:0% 0%; display:block; transition:object-position 0.3s; }
 .bm-dir-name { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-muted); }
 .bm-dir-stars { font-size:11px; font-family:monospace; font-weight:700; }
 
@@ -363,3 +363,22 @@ input::placeholder { color:var(--text-muted); }
 .bm-vote-att { font-size:11px; font-family:monospace; color:var(--text); }
 .bm-vote-result { font-size:11px; font-weight:700; }
 .bm-vote-summary { font-size:12px; color:var(--text-muted); text-align:center; font-family:monospace; }
+
+/* BOARD ATTITUDES PANEL */
+.board-attitudes { display:flex; flex-direction:column; gap:4px; }
+.ba-row { display:flex; align-items:center; justify-content:space-between; padding:4px 0; border-bottom:1px solid rgba(51,65,85,.3); }
+.ba-name { font-size:11px; color:var(--text-muted); min-width:80px; }
+.ba-score { font-family:monospace; font-size:12px; font-weight:700; }
+.ba-bar { flex:1; height:4px; background:var(--surface2); border-radius:2px; margin:0 8px; overflow:hidden; }
+.ba-bar-fill { height:100%; border-radius:2px; transition:width .4s; }
+.ba-capital { display:flex; align-items:center; gap:6px; padding-top:6px; font-size:11px; color:var(--yellow); font-family:monospace; }
+
+/* MARKET CONDITIONS PANEL */
+.market-panel { display:flex; gap:10px; align-items:flex-start; }
+.jenkins-portrait { width:64px; height:84px; object-fit:cover; object-position:center top; border-radius:var(--radius-sm); flex-shrink:0; }
+.market-conditions { flex:1; display:flex; flex-direction:column; gap:4px; }
+.mc-row { display:flex; align-items:center; gap:6px; font-size:11px; padding:2px 0; }
+.mc-icon { font-size:13px; width:18px; }
+.mc-sector { color:var(--text-muted); min-width:80px; }
+.mc-rate { font-family:monospace; font-weight:700; font-size:11px; }
+.mc-signal { font-size:10px; color:var(--text-muted); }
