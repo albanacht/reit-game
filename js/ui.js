@@ -296,6 +296,10 @@ window.UI = (function() {
   }
 
   function getPropertyIndicator(p) {
+    if (p.underConstruction) {
+      var label = p.constructionType === "renovation" ? "Renovating" : "Repositioning";
+      return { icon: "🔨", tip: label + " — " + p.constructionQuartersLeft + " quarter(s) remaining" };
+    }
     if (p.occupancy < 0.70)  return { icon: "🔴", tip: "Critical — occupancy below 70%" };
     if (p.occupancy < 0.80)  return { icon: "🟡", tip: "Needs attention — below 80%" };
     if (p.occupancy < 0.90)  return { icon: "🔵", tip: "Stable — 80-90% occupied" };
@@ -316,11 +320,33 @@ window.UI = (function() {
       var gc = gl >= 0 ? "text-green" : "text-red";
       // Lease Up button — grey/disabled if already used this year
       var leaseUpBtn = "";
-      if (p.occupancy < 0.90) {
+      if (p.occupancy < 0.90 && !p.underConstruction) {
         var usedThisYear = p.leaseUpYear === GameState.meta.year;
         leaseUpBtn = usedThisYear
           ? '<button class="btn btn-sm btn-secondary" disabled style="opacity:0.4;cursor:not-allowed" title="Already leased up this year — available Year ' + (GameState.meta.year + 1) + '">✓ Leased Up</button>'
           : '<button class="btn btn-sm btn-primary" onclick="UI.leaseUp(\'' + p.id + '\')">Lease Up</button>';
+      }
+
+      // Upgrade buttons
+      var upgradeHTML = "";
+      if (p.underConstruction) {
+        var constructionLabel = p.constructionType === "renovation" ? "🔨 Renovating" : "🔄 Repositioning";
+        upgradeHTML = '<span class="upgrade-badge">' + constructionLabel + ' — ' + p.constructionQuartersLeft + 'q left</span>';
+      } else {
+        var canRen = Properties.canRenovate(p);
+        var canRepo = Properties.canReposition(p);
+        if (canRen.ok) {
+          var renCost = fmt(p.currentValue * 0.10, 1);
+          upgradeHTML += '<button class="btn btn-sm btn-upgrade" onclick="UI.confirmRenovate(\'' + p.id + '\')">🔨 Renovate $' + renCost + 'M</button>';
+        } else if (p.renovated) {
+          upgradeHTML += '<span class="upgrade-badge upgrade-done">✓ Renovated</span>';
+        }
+        if (canRepo.ok) {
+          var repoCost = fmt(p.currentValue * 0.15, 1);
+          upgradeHTML += '<button class="btn btn-sm btn-upgrade-repo" onclick="UI.confirmReposition(\'' + p.id + '\')">🔄 Reposition $' + repoCost + 'M</button>';
+        } else if (p.repositioned) {
+          upgradeHTML += '<span class="upgrade-badge upgrade-done">✓ Repositioned</span>';
+        }
       }
       var indicator = getPropertyIndicator(p);
       html += '<div class="property-card">' +
@@ -335,6 +361,7 @@ window.UI = (function() {
         '<span>G/L: <strong class="' + gc + '">' + (gl >= 0 ? "+" : "") + gl + 'M</strong></span>' +
         '</div><div class="prop-actions">' +
         leaseUpBtn +
+        upgradeHTML +
         '<button class="btn btn-sm btn-danger" onclick="UI.confirmSellProperty(\'' + p.id + '\')">Sell</button>' +
         '</div></div>';
     });
@@ -598,6 +625,57 @@ window.UI = (function() {
   }
 
   // NEW: Lease Up action
+  function confirmRenovate(propertyId) {
+    var prop = GameState.portfolio.find(function(p) { return p.id === propertyId; });
+    if (!prop) return;
+    var cost = fmt(prop.currentValue * 0.10, 1);
+    showModal("Renovate: " + prop.name,
+      "Cost: $" + cost + "M (10% of value)\n" +
+      "Duration: 1 quarter offline (zero NOI)\n" +
+      "Effect: NOI +15% permanently | Occupancy +" + fmt(Math.min(8, (0.97 - prop.occupancy) * 100), 0) + "% on completion\n\n" +
+      "Cash available: " + fmtM(GameState.balance.cash) + "\n" +
+      "Current NOI: " + fmtM(prop.annualNOI) + "/yr — After: " + fmtM(prop.annualNOI * 1.15) + "/yr\n\n" +
+      "Payback: ~2.5-3 years from NOI gain + value appreciation.",
+      [{ label: "Start Renovation — $" + cost + "M", style: "btn-primary", onClick: function() {
+        var r = Properties.startRenovation(propertyId);
+        showToast(r.message, r.success ? "success" : "error");
+        if (r.success) renderAll();
+      }}]);
+  }
+
+  function confirmReposition(propertyId) {
+    var prop = GameState.portfolio.find(function(p) { return p.id === propertyId; });
+    if (!prop) return;
+    var targets = Properties.getRepositionTargets(prop);
+    if (targets.length === 0) { showToast("No repositioning options available.", "error"); return; }
+    var cost = fmt(prop.currentValue * 0.15, 1);
+
+    var targetText = targets.map(function(t) {
+      var newCapRate = GameState.market.capRates[t][prop.location];
+      var newNOI = fmt(prop.currentValue * newCapRate / 100, 1);
+      return t + " (projected NOI: $" + newNOI + "M/yr @ " + newCapRate + "% cap rate)";
+    }).join("\n");
+
+    showModal("Reposition: " + prop.name,
+      "Current: " + prop.sector + " · " + prop.location + " | NOI: " + fmtM(prop.annualNOI) + "/yr\n\n" +
+      "Available targets:\n" + targetText + "\n\n" +
+      "Cost: $" + cost + "M (15% of value)\n" +
+      "Duration: 2 quarters offline\n" +
+      "Cash available: " + fmtM(GameState.balance.cash),
+      targets.map(function(t) {
+        return {
+          label: "Reposition to " + t.charAt(0).toUpperCase() + t.slice(1),
+          style: "btn-primary",
+          onClick: function() {
+            var r = Properties.startRepositioning(propertyId, t);
+            showToast(r.message, r.success ? "success" : "error");
+            if (r.success) renderAll();
+          }
+        };
+      })
+    );
+  }
+
   function leaseUp(propertyId) {
     var prop = GameState.portfolio.find(function(p) { return p.id === propertyId; });
     if (!prop) return;
@@ -1324,6 +1402,8 @@ window.UI = (function() {
     handleBuyback:       handleBuyback,
     handleSetDividend:   handleSetDividend,
     leaseUp:             leaseUp,
+    confirmRenovate:     confirmRenovate,
+    confirmReposition:   confirmReposition,
     makeDecision:        makeDecision,
     showBoardMeeting:    showBoardMeeting,
     boardResponse:       boardResponse,
