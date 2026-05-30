@@ -41,6 +41,9 @@ window.Financials = (() => {
     let noi                 = 0;
 
     GameState.portfolio.forEach(prop => {
+      // Properties under construction generate zero NOI
+      if (prop.underConstruction) return;
+
       // Quarterly GPR = annual NOI potential ÷ 4
       const propGPR      = fmt(prop.annualNOI / 4);
       const propVacancy  = fmt(propGPR * (1 - prop.occupancy));
@@ -753,6 +756,7 @@ window.Financials = (() => {
     const marketResult = Market.quarterlyUpdate();
     Properties.recalculatePropertyValues();
     Properties.quarterlyUpdate();
+    Properties.processConstructionProgress();
 
     // 3. Run P&L calculations
     const noComponents   = calcPortfolioNOI();
