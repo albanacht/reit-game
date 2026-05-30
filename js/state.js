@@ -154,29 +154,31 @@ window.GameState = {
   // BOARD
   // ----------------------------------------------------------
   board: {
+    // Legacy pressure display fields
     pressurePoints: 0,
     maxPressure:    8,
-    thresholds: {
-      dividendCoverage: 1.0,
-      debtToAssets:     0.60,
-      occupancy:        0.80,
-      ffoGrowth:        0,
-    },
-    pressureLog: [],
-    mood:        "neutral",
+    mood:           "neutral",
+    pressureLog:    [],
+    thresholds:     { dividendCoverage: 1.0, debtToAssets: 0.60, occupancy: 0.80, ffoGrowth: 0 },
+    year1Score:     { dividendMaintained: true, occupancyOk: true, leverageOk: true, cashOk: true, noiGrowth: true },
+    currentGoals:   [],
+    lastYearGoals:  [],
 
-    // Year 1 silent scoring
-    year1Score: {
-      dividendMaintained: true,
-      occupancyOk:        true,
-      leverageOk:         true,
-      cashOk:             true,
-      noiGrowth:          true,
-    },
+    // New director system
+    directors:            [],   // populated by Board.init()
+    politicalCapital:     2,
+    maxCapital:           5,
+    activeMandates:       [],
+    year1Safe:            true,
 
-    // Annual goals set by board each year
-    currentGoals: [],
-    lastYearGoals:[],
+    // Year tracking
+    acquisitionsThisYear: 0,
+    leaseUpsThisYear:     0,
+    noOverdraftBroken:    false,
+    noEquityBroken:       false,
+    startYearSharePrice:  0,
+    startYearFFO:         0,
+    startYearDividend:    0,
   },
 
   // ----------------------------------------------------------
@@ -187,6 +189,9 @@ window.GameState = {
 
   // Pending acquisition offer from events.js
   _pendingOffer: null,
+
+  // Pending board meeting after annual report
+  _pendingBoardMeeting: false,
 
   // Annual snapshots (one per year end)
   annualSnapshots: [],
