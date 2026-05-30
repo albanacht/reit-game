@@ -364,6 +364,12 @@ window.Financials = (() => {
     // Random market noise (±1%)
     priceMod += (Math.random() - 0.5) * 0.02;
 
+    // Suppress positive drift for 2 quarters after equity issuance
+    if (GameState.company.equitySuppressQuarters > 0) {
+      GameState.company.equitySuppressQuarters--;
+      priceMod = Math.min(priceMod, 0.99); // cap at tiny drop, no positive drift
+    }
+
     // P/FFO anchor — pull share price toward 15x annualised FFO per share
     var annualFFOPS = GameState.ratios.annualFFOPS || 0;
     if (annualFFOPS > 0) {
@@ -519,6 +525,14 @@ window.Financials = (() => {
       return { success: false, message: "Amount must be greater than zero." };
     }
 
+    // Debt can only be issued once every 2 quarters
+    var lastDebtQ    = GameState.company.debtIssuanceQuarter || 0;
+    var currentQ     = GameState.meta.totalQuarters;
+    var quartersSince = currentQ - lastDebtQ;
+    if (lastDebtQ > 0 && quartersSince < 2) {
+      return { success: false, message: "Debt markets need time to absorb issuances. You must wait " + (2 - quartersSince) + " more quarter(s) before issuing new debt." };
+    }
+
     // Cap per issuance at 20% of total assets
     var maxIssuance = fmt(GameState.balance.totalAssets * 0.20);
     if (amount > maxIssuance) {
@@ -542,6 +556,7 @@ window.Financials = (() => {
     });
 
     GameState.balance.cash = fmt(GameState.balance.cash + amount);
+    GameState.company.debtIssuanceQuarter = GameState.meta.totalQuarters;
 
     return {
       success: true,
@@ -587,11 +602,17 @@ window.Financials = (() => {
       return { success: false, message: "Maximum issuance is " + maxShares + "M shares (20% of float)." };
     }
 
-    // Price drop scales with issuance history and size
+    // Equity can only be issued ONCE per year
+    var lastEquityYear = GameState.company.equityIssuanceYear || 0;
+    if (lastEquityYear === GameState.meta.year) {
+      return { success: false, message: "Equity can only be issued once per year. Markets need time to absorb dilution. Wait until Year " + (GameState.meta.year + 1) + "." };
+    }
+
+    // Price drop scales with issuance history and size — larger drops to prevent abuse
     var count     = GameState.company.equityIssuanceCount || 0;
     var sizeRatio = shares / GameState.company.sharesOutstanding;
-    var baseDrop  = count === 0 ? 0.05 : count === 1 ? 0.08 : count === 2 ? 0.12 : 0.18;
-    var totalDrop = Math.min(0.35, baseDrop + sizeRatio * 0.10);
+    var baseDrop  = count === 0 ? 0.08 : count === 1 ? 0.15 : count === 2 ? 0.22 : 0.30;
+    var totalDrop = Math.min(0.40, baseDrop + sizeRatio * 0.15);
 
     var issuePrice = fmt(GameState.company.sharePrice * (1 - baseDrop));
     var proceeds   = fmt(shares * issuePrice);
@@ -600,6 +621,9 @@ window.Financials = (() => {
     GameState.balance.cash                = fmt(GameState.balance.cash + proceeds);
     GameState.company.sharePrice          = fmt(GameState.company.sharePrice * (1 - totalDrop));
     GameState.company.equityIssuanceCount = count + 1;
+    GameState.company.equityIssuanceYear  = GameState.meta.year;
+    // Suppress positive share price drift for 2 quarters
+    GameState.company.equitySuppressQuarters = 2;
 
     // Board pressure for repeated issuances
     if (count >= 1) {
