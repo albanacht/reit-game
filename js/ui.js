@@ -224,7 +224,10 @@ window.UI = (function() {
     if (!container) return;
 
     var capRates  = GameState.market.capRates;
-    var baselines = { office: 6.1, industrial: 5.0, multifamily: 5.5, retail: 6.6 };
+    // Use stored baseline or current rates as baseline if no history
+    var baselines = GameState.market.baselineCapRates || {
+      office: 6.1, industrial: 5.0, multifamily: 5.5, retail: 6.6
+    };
     var sectors   = ["office", "industrial", "multifamily", "retail"];
     var labels    = { office:"Office", industrial:"Industrial", multifamily:"Multifamily", retail:"Retail" };
 
@@ -1108,6 +1111,13 @@ window.UI = (function() {
     GameState._pendingOffer   = null;
 
     Market.init();
+    // Store baseline cap rates for market conditions indicator
+    GameState.market.baselineCapRates = {
+      office:      (GameState.market.capRates.office.tier1 + GameState.market.capRates.office.tier2 + GameState.market.capRates.office.suburban) / 3,
+      industrial:  (GameState.market.capRates.industrial.tier1 + GameState.market.capRates.industrial.tier2 + GameState.market.capRates.industrial.suburban) / 3,
+      multifamily: (GameState.market.capRates.multifamily.tier1 + GameState.market.capRates.multifamily.tier2 + GameState.market.capRates.multifamily.suburban) / 3,
+      retail:      (GameState.market.capRates.retail.tier1 + GameState.market.capRates.retail.tier2 + GameState.market.capRates.retail.suburban) / 3,
+    };
     Properties.init();
     Board.init();
     Events.init();
