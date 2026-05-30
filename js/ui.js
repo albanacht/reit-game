@@ -963,6 +963,55 @@ window.UI = (function() {
   }
 
   // ----------------------------------------------------------
+  // DECISION EVENT MODAL
+  // ----------------------------------------------------------
+  var _currentDecision = null;
+
+  function showDecisionEvent(evt) {
+    _currentDecision = evt;
+    var html = '<div class="decision-header">' + evt.headline + '</div>' +
+      '<div class="decision-body">' + evt.body.replace(/\n/g,"<br>") + '</div>' +
+      '<div class="decision-choices">';
+
+    evt.choices.forEach(function(c, i) {
+      var costBadge = c.costType === "capital"
+        ? '<span class="cost-badge cost-capital">💡 ' + (c.cost||1) + ' Capital</span>'
+        : c.costType === "cash"
+        ? '<span class="cost-badge cost-cash">💰 Cash</span>'
+        : '<span class="cost-badge cost-income">📉 Income</span>';
+
+      html += '<div class="decision-choice" onclick="UI.makeDecision(' + i + ')">' +
+        '<div class="choice-label">' + c.label + costBadge + '</div>' +
+        '<div class="choice-detail">' + c.detail.replace(/\n/g,"<br>") + '</div>' +
+        '</div>';
+    });
+
+    html += '</div>' +
+      '<div class="decision-capital">💡 Political Capital: ' +
+      (GameState.board.politicalCapital||0) + '/' + (GameState.board.maxCapital||5) + '</div>';
+
+    showModal(evt.headline, "", []);
+    var body = el("modal-body");
+    if (body) body.innerHTML = html;
+    var actions = el("modal-actions");
+    if (actions) actions.innerHTML = "";
+  }
+
+  function makeDecision(choiceIndex) {
+    if (!_currentDecision) return;
+    var result = Decisions.applyChoice(_currentDecision, choiceIndex);
+    _currentDecision = null;
+    closeModal();
+    if (!result.success) {
+      showToast(result.message, "error");
+      return;
+    }
+    showToast(result.message, "success");
+    // Now run the quarter
+    setTimeout(runQuarterAndReport, 400);
+  }
+
+  // ----------------------------------------------------------
   // MACRO EVENT POPUP — shows before earnings report for major events
   // ----------------------------------------------------------
   function showMacroEventPopup(firedEvents, callback) {
@@ -1003,6 +1052,20 @@ window.UI = (function() {
   }
 
   function doAdvance() {
+    // Check for decision event BEFORE quarter runs
+    var decisionEvt = Decisions.checkForEvent();
+    if (decisionEvt) {
+      showDecisionEvent(decisionEvt);
+      // Quarter will run after player closes modal via makeDecision
+      // Store pending advance
+      GameState._pendingAdvance = true;
+      return;
+    }
+    runQuarterAndReport();
+  }
+
+  function runQuarterAndReport() {
+    GameState._pendingAdvance = false;
     var qr = Financials.runQuarter();
     // Turn off tutorial BEFORE generating report
     if (GameState.meta.year === 2 && GameState.meta.quarter === 1) {
@@ -1098,6 +1161,7 @@ window.UI = (function() {
     GameState.board.noEquityBroken           = false;
     GameState.board.politicalCapital         = 2;
     GameState.board.activeMandates           = [];
+    Decisions.init();
     GameState.balance.cash                = 5;
 
     GameState.debtTranches = [
@@ -1221,6 +1285,7 @@ window.UI = (function() {
     handleBuyback:       handleBuyback,
     handleSetDividend:   handleSetDividend,
     leaseUp:             leaseUp,
+    makeDecision:        makeDecision,
     showBoardMeeting:    showBoardMeeting,
     boardResponse:       boardResponse,
     backroomDeal:        backroomDeal,
