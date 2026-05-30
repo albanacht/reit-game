@@ -30,9 +30,14 @@ window.Board = (() => {
       evaluate() {
         const d2a       = GameState.ratios.debtToAssets;
         const threshold = GameState.board.thresholds.debtToAssets;
-        if (d2a > 0.65) return { points: 3, reason: `Leverage dangerously high at ${fmt(d2a*100)}% debt/assets` };
-        if (d2a > threshold) return { points: 1, reason: `Leverage above threshold: ${fmt(d2a*100)}% vs ${fmt(threshold*100)}% limit` };
-        if (d2a < 0.35) return { relief: 1, reason: `Conservative leverage at ${fmt(d2a*100)}% debt/assets` };
+        // Too high
+        if (d2a > 0.65) return { points: 3, reason: "Leverage dangerously high at " + fmt(d2a*100) + "% debt/assets" };
+        if (d2a > threshold) return { points: 1, reason: "Leverage above threshold: " + fmt(d2a*100) + "% vs " + fmt(threshold*100) + "% limit" };
+        // Sweet spot 25-45%
+        if (d2a >= 0.25 && d2a <= 0.45) return { relief: 1, reason: "Efficient leverage at " + fmt(d2a*100) + "% — balance sheet well deployed" };
+        // Too low from Year 2+
+        if (d2a < 0.20 && GameState.meta.year >= 2) return { points: 2, reason: "Under-leveraged at " + fmt(d2a*100) + "% — board expects 25-45% debt/assets. Deploy the balance sheet." };
+        if (d2a < 0.25 && GameState.meta.year >= 2) return { points: 1, reason: "Under-leveraged at " + fmt(d2a*100) + "% — borrow and acquire to grow the portfolio" };
         return null;
       },
     },
@@ -44,6 +49,27 @@ window.Board = (() => {
         if (occ < 0.72) return { points: 3, reason: `Portfolio occupancy critically low at ${fmt(occ*100)}%` };
         if (occ < threshold) return { points: 1, reason: `Occupancy below threshold: ${fmt(occ*100)}% vs ${fmt(threshold*100)}%` };
         if (occ > 0.93) return { relief: 1, reason: `Excellent occupancy at ${fmt(occ*100)}%` };
+        return null;
+      },
+    },
+    {
+      id: "asset_growth", label: "Portfolio Growth",
+      evaluate() {
+        // Only from Year 2 onwards, only check at year end
+        if (GameState.meta.year < 2) return null;
+        if (GameState.meta.quarter !== 4) return null;
+
+        const history = GameState.history;
+        if (history.length < 4) return null;
+
+        // Compare portfolio size now vs 4 quarters ago
+        const currentAssets  = GameState.balance.totalAssets;
+        const priorAssets    = history[history.length - 4]?.totalAssets || currentAssets;
+        const growthRate     = priorAssets > 0 ? (currentAssets - priorAssets) / priorAssets : 0;
+
+        if (growthRate < 0)    return { points: 2, reason: "Portfolio SHRANK this year — Director Chen is furious. Borrow and acquire." };
+        if (growthRate < 0.10) return { points: 1, reason: "Portfolio grew only " + fmt(growthRate*100, 0) + "% — Director Chen expects minimum 15% annual growth" };
+        if (growthRate >= 0.20) return { relief: 1, reason: "Strong portfolio growth of " + fmt(growthRate*100, 0) + "% — Director Chen is impressed" };
         return null;
       },
     },
