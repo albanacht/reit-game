@@ -685,7 +685,7 @@ window.UI = (function() {
     GameState.company.dividendHistory     = [];
     GameState.company.dividendCutQuarters = 0;
     GameState.company.equityIssuanceCount  = 0;
-    GameState.balance.cash                = 50;
+    GameState.balance.cash                = 5;
 
     GameState.debtTranches = [
       { id: "d001", amount: 50, rate: 5.0, maturityQuarter: 2, maturityYear: 4, quartersUntilMaturity: 13, label: "5.0% Sr Notes due Y4Q2" },
@@ -717,19 +717,21 @@ window.UI = (function() {
         "Dear " + playerName + ",\n\n" +
         "The Board of Directors is pleased to appoint you as Chief Executive Officer of " + reitName + " REIT.\n\n" +
         "YEAR 1 — ORIENTATION PERIOD\n" +
-        "You cannot be fired this year. However the board is scoring you silently and any failures carry forward as pressure points into Year 2.\n\n" +
+        "You cannot be fired this year. However the board is scoring you silently. Failures carry forward as pressure into Year 2.\n\n" +
         "YOUR STARTING POSITION\n" +
-        "▸ Cash: $50M\n" +
+        "▸ Cash: $5M — almost nothing. Use it wisely.\n" +
         "▸ Four properties already owned\n" +
-        "▸ Debt: $50M across two tranches\n" +
+        "▸ Debt: $100M across two tranches\n" +
         "▸ Dividend: $0.10/share/quarter\n\n" +
-        "WHAT THE BOARD WATCHES\n" +
-        "▸ Dividend growth — raise it as earnings grow\n" +
-        "▸ Dividend coverage above 1.0x\n" +
-        "▸ Leverage below 60% debt/assets\n" +
-        "▸ Portfolio occupancy above 80%\n" +
-        "▸ FFO growing year over year\n\n" +
-        "Use Year 1 to acquire properties and grow your NOI base. Press F1 anytime for help.\n\n" +
+        "THE BOARD'S EXPECTATIONS\n" +
+        "▸ USE DEBT — a REIT that avoids leverage is a savings account\n" +
+        "▸ We expect debt/assets between 30-50% within two years\n" +
+        "▸ Grow the portfolio aggressively — acquire properties\n" +
+        "▸ Raise dividends as FFO grows — share the earnings\n" +
+        "▸ Keep occupancy above 80% across all properties\n\n" +
+        "You have a $1B credit facility available. Deploy it. Borrow, acquire, grow. " +
+        "The board does not reward caution — it rewards results.\n\n" +
+        "Press F1 anytime for help on ratios and mechanics.\n\n" +
         "— The Board of Directors",
         []
       );
