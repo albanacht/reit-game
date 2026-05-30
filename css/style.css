@@ -385,3 +385,17 @@ input::placeholder { color:var(--text-muted); }
 
 /* COPYRIGHT */
 .start-copyright { font-size:10px; color:var(--text-muted); opacity:0.5; letter-spacing:0.3px; }
+
+/* DECISION EVENTS */
+.decision-header { font-size:15px; font-weight:700; color:var(--text); margin-bottom:10px; }
+.decision-body { font-size:12px; color:var(--text-muted); line-height:1.6; margin-bottom:14px; }
+.decision-choices { display:flex; flex-direction:column; gap:8px; }
+.decision-choice { background:var(--surface2); border:1px solid var(--border); border-radius:var(--radius-sm); padding:10px 12px; cursor:pointer; transition:border-color .2s; }
+.decision-choice:hover { border-color:var(--blue); }
+.choice-label { font-size:13px; font-weight:600; color:var(--text); display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:4px; }
+.choice-detail { font-size:11px; color:var(--text-muted); line-height:1.6; }
+.cost-badge { font-size:10px; font-weight:700; padding:2px 6px; border-radius:10px; }
+.cost-cash    { background:rgba(239,68,68,.2);  color:#ef4444; }
+.cost-income  { background:rgba(245,158,11,.2); color:#f59e0b; }
+.cost-capital { background:rgba(99,102,241,.2); color:#818cf8; }
+.decision-capital { font-size:11px; color:var(--yellow); font-family:monospace; margin-top:10px; padding-top:8px; border-top:1px solid var(--border); }
