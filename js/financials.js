@@ -507,10 +507,12 @@ window.Financials = (() => {
 
   // Issue new debt tranche
   function getTermPremium(years) {
-    if (years <= 3)  return 0.00;
-    if (years <= 7)  return 0.25;
-    if (years <= 15) return 0.60;
-    return 1.00;
+    if (years <= 1)  return 0.00;  // 1yr: no premium
+    if (years <= 2)  return 0.15;  // 2yr: small premium
+    if (years <= 3)  return 0.30;  // 3yr: medium
+    if (years <= 5)  return 0.50;  // 5yr: standard
+    if (years <= 7)  return 0.75;  // 7yr: long term
+    return 1.00;                   // 10yr: maximum
   }
 
   function getCurrentBorrowingRateForTerm(years) {
@@ -672,6 +674,20 @@ window.Financials = (() => {
 
     if (newDividendPerShare < 0) {
       return { success: false, message: "Dividend cannot be negative." };
+    }
+
+    // DIVIDEND FLOOR MECHANIC
+    // Year 1: completely locked — cannot cut at all
+    if (GameState.meta.year <= 1 && change < -0.001) {
+      return { success: false, message: "Dividend is locked in Year 1. You cannot cut during the orientation year. Focus on growing NOI instead." };
+    }
+    // Year 2+: cannot cut below 50% of the year-start dividend
+    if (GameState.meta.year >= 2 && change < -0.001) {
+      var startDiv = GameState.board.startYearDividend || 0.10;
+      var minAllowed = fmt(startDiv * 0.50, 2);
+      if (newDividendPerShare < minAllowed) {
+        return { success: false, message: "Cannot cut dividend below $" + minAllowed + "/share (50% of year-start $" + fmt(startDiv,2) + "). This floor protects shareholder trust." };
+      }
     }
 
     // Cutting the dividend — punishment scales with size of cut
