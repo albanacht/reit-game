@@ -217,7 +217,7 @@
         <button id="btn-help" class="btn btn-secondary btn-sm">F1 Help</button>
       </div>
     </div>
-    <div class="board-pressure-wrap">
+    <div class="board-pressure-wrap" style="display:none">
       <span id="board-pressure-label">Board: NEUTRAL</span>
       <div class="pressure-track"><div id="board-pressure-bar" style="width:0%"></div></div>
     </div>
@@ -227,48 +227,6 @@
   <div id="main">
     <div id="sidebar">
       <button id="btn-advance-quarter">▶ Advance Quarter</button>
-
-      <!-- MARKET CONDITIONS PANEL -->
-      <div class="panel">
-        <div class="panel-header">
-          <span class="panel-title">📊 Market Conditions</span>
-        </div>
-        <div class="panel-body">
-          <div class="market-panel">
-            <img src="assets/board/jenkins.png" class="jenkins-portrait" alt="Jenkins">
-            <div class="market-conditions" id="market-conditions-list">
-              <p class="text-muted" style="font-size:11px">Loading market data...</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- BOARD ATTITUDES PANEL -->
-      <div class="panel">
-        <div class="panel-header">
-          <span class="panel-title">👥 Board Attitudes</span>
-          <span class="text-muted" style="font-size:10px">Next meeting: Q4</span>
-        </div>
-        <div class="panel-body">
-          <div class="board-attitudes" id="board-attitudes-list">
-            <p class="text-muted" style="font-size:11px">Start game to see board.</p>
-          </div>
-          <div class="ba-capital">
-            💡 Political Capital: <span id="ba-capital-display">—</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- BOARD GOALS PANEL -->
-      <div class="panel" id="goals-panel">
-        <div class="panel-header">
-          <span class="panel-title">🎯 Board Goals</span>
-          <span class="text-muted" style="font-size:11px" id="goals-year-label">Year 1</span>
-        </div>
-        <div class="panel-body" id="goals-list">
-          <p class="text-muted" style="font-size:12px">Goals set after Year 1.</p>
-        </div>
-      </div>
 
       <div class="panel">
         <div class="panel-header"><span class="panel-title">Income Statement</span><span class="text-muted" style="font-size:11px">Quarterly $M</span></div>
@@ -324,6 +282,48 @@
             <div class="ratio-row"><span class="ratio-label">P/AFFO</span><span class="ratio-value" id="ratio-paffo">—</span></div>
             <div class="ratio-row"><span class="ratio-label">Div Yield</span><span class="ratio-value" id="ratio-div-yield">—</span></div>
           </div>
+        </div>
+      </div>
+
+      <!-- MARKET CONDITIONS PANEL -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">📊 Market Conditions</span>
+        </div>
+        <div class="panel-body">
+          <div class="market-panel">
+            <img src="assets/board/jenkins.png" class="jenkins-portrait" alt="Jenkins">
+            <div class="market-conditions" id="market-conditions-list">
+              <p class="text-muted" style="font-size:11px">Loading market data...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- BOARD ATTITUDES PANEL -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">👥 Board Attitudes</span>
+          <span class="text-muted" style="font-size:10px">Next meeting: Q4</span>
+        </div>
+        <div class="panel-body">
+          <div class="board-attitudes" id="board-attitudes-list">
+            <p class="text-muted" style="font-size:11px">Start game to see board.</p>
+          </div>
+          <div class="ba-capital">
+            💡 Political Capital: <span id="ba-capital-display">—</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- BOARD GOALS PANEL -->
+      <div class="panel" id="goals-panel">
+        <div class="panel-header">
+          <span class="panel-title">🎯 Board Goals</span>
+          <span class="text-muted" style="font-size:11px" id="goals-year-label">Year 1</span>
+        </div>
+        <div class="panel-body" id="goals-list">
+          <p class="text-muted" style="font-size:12px">Goals set after Year 1.</p>
         </div>
       </div>
     </div>
