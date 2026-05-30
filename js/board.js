@@ -62,9 +62,9 @@ window.Board = (() => {
   // ----------------------------------------------------------
   const MANDATE_POOL = {
     williams: [
-      { id: "div_yield",    text: (t) => `Dividend yield must reach ${t}% by year end.`,          metric: "dividendYield",       target: (y) => 2.0 + y * 0.3,  higher: true  },
-      { id: "div_raise",    text: (t) => `Raise the dividend by at least ${t}% this year.`,       metric: "dividendGrowthPct",   target: (y) => 8 + y * 3,      higher: true  },
+      { id: "div_raise",    text: (t) => `Raise the quarterly dividend by at least ${t}% this year.`, metric: "dividendGrowthPct", target: (y) => 8 + y * 3,      higher: true  },
       { id: "div_coverage", text: (t) => `FFO coverage of dividend must exceed ${t}x.`,           metric: "dividendCoverage",    target: (y) => 1.1 + y * 0.05, higher: true  },
+      { id: "div_nocut",    text: () => `Do not cut the dividend at any point this year.`,         metric: "noDividendCut",       target: () => 1,               higher: true  },
     ],
     chen: [
       { id: "acquisitions", text: (t) => `Acquire at least ${t} properties this year.`,           metric: "acquisitionsThisYear",target: (y) => 1 + Math.floor(y/2), higher: true },
@@ -305,6 +305,7 @@ window.Board = (() => {
       minDebtToAssets:     r.debtToAssets,
       interestCoverage:    r.interestCoverage,
       noOverdraft:         b.noOverdraftBroken ? 0 : 1,
+      noDividendCut:       (GameState.company.dividendCutQuarters || 0) > 0 ? 0 : 1,
       sharePriceHeld:      co.sharePrice >= startYearSharePrice ? 1 : 0,
       noEquityIssued:      b.noEquityBroken ? 0 : 1,
       occupancyPortfolio:  r.occupancyPortfolio,
