@@ -307,3 +307,6 @@ input::placeholder { color:var(--text-muted); }
 .goal-icon { font-size:13px; min-width:18px; }
 .goal-metric { flex:1; color:var(--text-muted); }
 .goal-target { font-family:monospace; font-weight:700; font-size:11px; white-space:nowrap; }
+
+/* VERSION + CREDIT */
+.start-version { font-size:11px; color:var(--text-muted); letter-spacing:0.5px; margin-top:-12px; }
