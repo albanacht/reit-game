@@ -310,3 +310,6 @@ input::placeholder { color:var(--text-muted); }
 
 /* VERSION + CREDIT */
 .start-version { font-size:11px; color:var(--text-muted); letter-spacing:0.5px; margin-top:-12px; }
+
+/* PROPERTY INDICATORS */
+.prop-indicator { font-size:16px; margin-right:6px; cursor:help; }
