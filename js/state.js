@@ -45,7 +45,7 @@ window.GameState = {
   // BALANCE SHEET (rebalanced starting position)
   // ----------------------------------------------------------
   balance: {
-    cash:         50,     // modest cash reserve
+    cash:         5,      // minimal cash — forces debt deployment
     totalAssets:  0,      // calculated on init
     totalDebt:    100,    // two tranches of $50M each
     totalEquity:  0,      // calculated on init
