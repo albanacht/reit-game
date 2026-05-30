@@ -227,6 +227,37 @@
     <div id="sidebar">
       <button id="btn-advance-quarter">▶ Advance Quarter</button>
 
+      <!-- MARKET CONDITIONS PANEL -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">📊 Market Conditions</span>
+        </div>
+        <div class="panel-body">
+          <div class="market-panel">
+            <img src="assets/board/jenkins.png" class="jenkins-portrait" alt="Jenkins">
+            <div class="market-conditions" id="market-conditions-list">
+              <p class="text-muted" style="font-size:11px">Loading market data...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- BOARD ATTITUDES PANEL -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">👥 Board Attitudes</span>
+          <span class="text-muted" style="font-size:10px">Next meeting: Q4</span>
+        </div>
+        <div class="panel-body">
+          <div class="board-attitudes" id="board-attitudes-list">
+            <p class="text-muted" style="font-size:11px">Start game to see board.</p>
+          </div>
+          <div class="ba-capital">
+            💡 Political Capital: <span id="ba-capital-display">—</span>
+          </div>
+        </div>
+      </div>
+
       <!-- BOARD GOALS PANEL -->
       <div class="panel" id="goals-panel">
         <div class="panel-header">
