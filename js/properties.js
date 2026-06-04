@@ -41,6 +41,11 @@ window.Properties = (() => {
     },
   };
 
+  // Market properties are priced 1.5x the base profile (starting portfolio
+  // is NOT affected — it generates with the raw profile values). This makes
+  // each market purchase more meaningful: a debt raise buys 1-2 assets, not 4+.
+  const MARKET_PRICE_MULT = 1.5;
+
   // ----------------------------------------------------------
   // NAME BANKS — for generating realistic property names
   // ----------------------------------------------------------
@@ -102,7 +107,7 @@ window.Properties = (() => {
   // ----------------------------------------------------------
   // GENERATE a single property given sector and location
   // ----------------------------------------------------------
-  function generateProperty(sector, location, forSale = true) {
+  function generateProperty(sector, location, forSale = true, forMarket = false) {
     const profile = PROFILES[sector][location];
 
     // Pick a unique name
@@ -113,9 +118,12 @@ window.Properties = (() => {
       : `${profile.label} ${propIdCounter}`;
     usedNames.add(name);
 
+    // Market properties priced 1.5x base; starting portfolio uses raw base.
+    const priceMult = forMarket ? MARKET_PRICE_MULT : 1.0;
+
     // Price varies ±30% around midpoint
     const priceVariance = randBetween(0.70, 1.30);
-    const currentValue = Math.round(profile.basePriceMid * priceVariance * 10) / 10;
+    const currentValue = Math.round(profile.basePriceMid * priceMult * priceVariance * 10) / 10;
 
     // NOI yield varies slightly around profile
     const actualYield = profile.noiYield * randBetween(0.90, 1.10);
@@ -166,11 +174,11 @@ window.Properties = (() => {
     sectors.forEach(sector => {
       // Ensure at least one of each location per sector
       locations.forEach(location => {
-        pool.push(generateProperty(sector, location));
+        pool.push(generateProperty(sector, location, true, true));
       });
       // Add two more varied properties per sector
-      pool.push(generateProperty(sector, pick(locations)));
-      pool.push(generateProperty(sector, pick(locations)));
+      pool.push(generateProperty(sector, pick(locations), true, true));
+      pool.push(generateProperty(sector, pick(locations), true, true));
     });
 
     return pool;
@@ -293,7 +301,7 @@ window.Properties = (() => {
     while (GameState.propertyMarket.length < 20) {
       const sector = pick(sectors);
       const location = pick(locations);
-      GameState.propertyMarket.push(generateProperty(sector, location));
+      GameState.propertyMarket.push(generateProperty(sector, location, true, true));
     }
     // Acquisitions Lead unlocks rare off-market mega-properties
     maybeInjectMegaProperty();
