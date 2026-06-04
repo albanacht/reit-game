@@ -137,6 +137,29 @@ window.Staff = (function() {
     });
   }
 
+  // ----------------------------------------------------------
+  // PORTRAIT → NAME POOLS — names match each portrait's appearance
+  // (gender, and ethnicity where the face clearly suggests it) so we
+  // never get a bearded man called "Diana". port13 = A. Crow easter egg.
+  // ----------------------------------------------------------
+  var PORTRAIT_NAMES = {
+    "port1.png":  ["Diana Cho", "Susan Bell", "Charlotte Reed", "Margaret Liu", "Laura Simmons"],     // polished woman
+    "port2.png":  ["Tom Fletcher", "David Stern", "Peter Novak", "Greg Thornton", "Marcus Webb"],     // tired man
+    "port3.png":  ["Sam Patel", "George Adler", "Daniel Frost", "Kevin Ross", "Eric Lund"],            // young analyst man
+    "port4.png":  ["Richard Vance", "Charles Mercer", "William Hale", "Robert Knox", "Edward Grant"],  // stern silver man
+    "port5.png":  ["Jake Mullins", "Danny Pike", "Ross Calder", "Nate Brooks", "Leo Hart"],            // messy creative man
+    "port6.png":  ["Elena Vasquez", "Margaret Liu", "Patricia Wynn", "Helen Ashford", "Rosa Marin"],   // elegant older woman
+    "port7.png":  ["Gerald Combe", "Frank Olsen", "Bernie Katz", "Harold Boyd", "Stan Petrie"],        // heavyset jovial man
+    "port8.png":  ["Sebastian Cole", "Victor Lane", "Adrian Voss", "Marcus Webb", "Julian Reyes"],     // sharp ambitious man
+    "port9.png":  ["Norman Pratt", "Clive Easton", "Gordon Sykes", "Ray Dobbs", "Alan Pierce"],        // plain bald man
+    "port10.png": ["Nina Falk", "Mei Lin", "Priya Nair", "Zoe Hart", "Carmen Diaz"],                   // stylish young woman
+    "port11.png": ["Hank Brennan", "Bill Tucker", "Duane Foss", "Earl Maddox", "Roy Stubbs"],          // weathered moustache man
+    "port12.png": ["James Okoro", "Marcus Adebayo", "Daniel Mensah", "Andre Coleman", "Theo Banks"],   // Black businessman
+    "port13.png": ["A. Crow"],                                                                          // easter egg (you)
+    "port14.png": ["Mei Lin", "Aiko Tanaka", "Grace Yun", "Hana Sato", "Lily Chang"],                  // Asian woman
+    "port15.png": ["Hassan Ali", "Greg Mason", "Owen Brett", "Felix Roe", "Caleb Storm"],              // scruffy bearded man
+  };
+
   function rollTrait(roleId, tier) {
     var cfg = TIERS[tier];
     if (Math.random() > cfg.traitChance) return null;  // no trait
@@ -146,9 +169,10 @@ window.Staff = (function() {
     if (pool.length === 0) return null;
     return TRAITS[pick(pool)].id;
   }
-  function generateCandidate(roleId) {
+  function generateCandidate(roleId, usedPortraits) {
     var role = ROLES[roleId];
     if (!role) return null;
+    usedPortraits = usedPortraits || [];
 
     // Pick a tier (roughly even, slight lean to mid)
     var r = Math.random();
@@ -170,14 +194,23 @@ window.Staff = (function() {
     if (traitId === "expensive") cost *= 1.15;
     cost = fmt(Math.max(0.1, cost), 2);
 
-    // Portrait + easter-egg candidate (port13 = A. Crow)
-    var portrait = "port" + randInt(1, 15) + ".png";
+    // Portrait — pick one not already used in this refresh (best effort)
+    var portrait;
+    var attempts = 0;
+    do {
+      portrait = "port" + randInt(1, 15) + ".png";
+      attempts++;
+    } while (usedPortraits.indexOf(portrait) !== -1 && attempts < 20);
+    usedPortraits.push(portrait);
+
     var name, hint;
     if (portrait === "port13.png") {
       name = "A. Crow";
       hint = "Unusually confident. Won't say where he's from.";
     } else {
-      name = pick(role.candidateNames);
+      // Name matches the portrait's appearance, not the role
+      var namePool = PORTRAIT_NAMES[portrait] || role.candidateNames;
+      name = pick(namePool);
       hint = pick(role.hints);
     }
 
@@ -212,10 +245,11 @@ window.Staff = (function() {
   // ----------------------------------------------------------
   function refreshTalentMarket() {
     var market = [];
+    var usedPortraits = [];
     Object.keys(ROLES).forEach(function(roleId) {
       if (!isRoleFilled(roleId)) {
         for (var i = 0; i < 3; i++) {
-          market.push(generateCandidate(roleId));
+          market.push(generateCandidate(roleId, usedPortraits));
         }
       }
     });
