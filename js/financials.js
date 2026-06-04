@@ -380,29 +380,48 @@ window.Financials = (() => {
     // Random market noise (±1%)
     priceMod += (Math.random() - 0.5) * 0.02;
 
+    // ---- VALUATION ANCHORS (blend, with a real floor) ----
+    // 1. P/FFO fair value (earnings-based)
+    var annualFFOPS = GameState.ratios.annualFFOPS || 0;
+    var ffoFair = annualFFOPS > 0 ? annualFFOPS * 15 : 0;
+
+    // 2. NAV per share (asset-based) — the structural floor.
+    //    Even a troubled REIT owns real buildings; price shouldn't fall
+    //    far below its net asset value.
+    var navPS = GameState.ratios.navPerShare || 0;
+
+    // 3. Dividend-yield pull. When yield gets high, income buyers step in
+    //    and support the price (the missing upward force that caused the
+    //    collapse to $1).
+    var divYield = GameState.ratios.dividendYield || 0;
+    if (divYield > 12)      priceMod += 0.06;   // deeply oversold on yield
+    else if (divYield > 8)  priceMod += 0.04;
+    else if (divYield > 6)  priceMod += 0.02;
+    else if (divYield < 1.5) priceMod -= 0.02;  // expensive / unattractive income
+
+    // Blend fair value: weight NAV and FFO. NAV dominates so assets anchor price.
+    var fairValue = 0, weight = 0;
+    if (navPS > 0)   { fairValue += navPS * 0.6;  weight += 0.6; }
+    if (ffoFair > 0) { fairValue += ffoFair * 0.4; weight += 0.4; }
+    if (weight > 0)  { fairValue = fairValue / weight; }
+
+    // Mean-revert gently toward fair value (12% pull per quarter)
+    if (fairValue > 0 && GameState.company.sharePrice > 0) {
+      priceMod = priceMod * 0.88 + (fairValue / GameState.company.sharePrice) * 0.12;
+    }
+
     // Suppress positive drift for 2 quarters after equity issuance
     if (GameState.company.equitySuppressQuarters > 0) {
       GameState.company.equitySuppressQuarters--;
-      priceMod = Math.min(priceMod, 0.99); // cap at tiny drop, no positive drift
+      priceMod = Math.min(priceMod, 0.99);
     }
 
-    // P/FFO anchor — pull share price toward 15x annualised FFO per share
-    var annualFFOPS = GameState.ratios.annualFFOPS || 0;
-    if (annualFFOPS > 0) {
-      var fairValue = fmt(annualFFOPS * 15);
-      var currentPrice = GameState.company.sharePrice * priceMod;
-      // Gentle mean reversion toward fair value (10% pull per quarter)
-      priceMod = priceMod * 0.90 + (fairValue / GameState.company.sharePrice) * 0.10;
-    }
-
-    // Dividend yield anchor — low yield is a headwind
-    var divYield = GameState.ratios.dividendYield || 0;
-    if (divYield < 1.0) priceMod -= 0.03;
-    else if (divYield < 2.0) priceMod -= 0.01;
-
-    // Apply and floor at $1
+    // Structural floor: never fall below 55% of NAV per share (asset backing),
+    // and an absolute floor of $1 as a backstop.
+    var navFloor = navPS > 0 ? navPS * 0.55 : 1.0;
+    var floor = Math.max(1.0, navFloor);
     GameState.company.sharePrice = fmt(
-      Math.max(1.0, GameState.company.sharePrice * priceMod)
+      Math.max(floor, GameState.company.sharePrice * priceMod)
     );
   }
 
@@ -657,9 +676,20 @@ window.Financials = (() => {
     };
   }
 
-  // Buy back shares
+  // Buy back shares — capped at 5% of float per action, once per year
   function buybackShares(shares) {
     if (shares <= 0) return { success: false, message: "Shares must be greater than zero." };
+
+    // Frequency limit: once per year
+    if (GameState.company.lastBuybackYear === GameState.meta.year) {
+      return { success: false, message: "You can only conduct one buyback per year. Next available Year " + (GameState.meta.year + 1) + "." };
+    }
+
+    // Per-action cap: max 5% of shares outstanding
+    const maxShares = fmt(GameState.company.sharesOutstanding * 0.05);
+    if (shares > maxShares) {
+      return { success: false, message: "Buyback capped at 5% of float per year — maximum " + maxShares + "M shares ($" + fmt(maxShares * GameState.company.sharePrice) + "M)." };
+    }
 
     const cost = fmt(shares * GameState.company.sharePrice);
     if (GameState.balance.cash < cost) {
@@ -670,11 +700,17 @@ window.Financials = (() => {
       Math.max(1, GameState.company.sharesOutstanding - shares)
     );
     GameState.balance.cash = fmt(GameState.balance.cash - cost);
+    GameState.company.lastBuybackYear = GameState.meta.year;
 
     // Buyback slightly boosts share price
     GameState.company.sharePrice = fmt(
       GameState.company.sharePrice * 1.01
     );
+
+    // Newsfeed
+    if (typeof News !== "undefined" && News.add) {
+      News.add(GameState.company.name + " repurchased " + shares + "M shares for $" + cost + "M — earnings per share to improve.", "capital");
+    }
 
     return {
       success: true,
