@@ -208,14 +208,15 @@ window.Staff = (function() {
 
   // ----------------------------------------------------------
   // GENERATE THE TALENT MARKET — refreshed each year
-  // One candidate per unfilled role
+  // 3 candidates per unfilled role, so hiring is a real choice
   // ----------------------------------------------------------
   function refreshTalentMarket() {
     var market = [];
     Object.keys(ROLES).forEach(function(roleId) {
-      // Only offer candidates for roles not currently filled
       if (!isRoleFilled(roleId)) {
-        market.push(generateCandidate(roleId));
+        for (var i = 0; i < 3; i++) {
+          market.push(generateCandidate(roleId));
+        }
       }
     });
     GameState._talentMarket = market;
