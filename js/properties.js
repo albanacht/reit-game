@@ -353,6 +353,19 @@ window.Properties = (() => {
       megaTenant: m.tenant,
     };
     GameState.propertyMarket.unshift(prop);
+
+    // The Acquisitions Lead announces the find with his face/voice
+    var al = Staff.getStaff("acquisitions");
+    if (al) {
+      GameState._pendingMegaFind = {
+        alName:     al.name,
+        alPortrait: al.portrait,
+        propName:   prop.name,
+        tenant:     m.tenant,
+        price:      prop.askingPrice,
+        sector:     prop.sector,
+      };
+    }
   }
 
   // ----------------------------------------------------------
