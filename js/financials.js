@@ -446,39 +446,76 @@ window.Financials = (() => {
   }
 
   // ----------------------------------------------------------
-  // STEP 11 — HANDLE MATURED DEBT
-  // Auto-refinance if possible, else force cash repayment
+  // STEP 11 — HANDLE MATURED DEBT — escalation ladder:
+  // 1. Pay with cash if possible
+  // 2. Else refinance IF credit allows (distress rate) — needs tranche slot
+  // 3. Else forced asset sale at fire-sale discount to raise cash
+  // 4. Else fall into overdraft (cash goes negative)
+  // 5. Default fires elsewhere if overdraft breaches -$50M
   // ----------------------------------------------------------
   function handleMaturedDebt(maturedTranches) {
     const messages = [];
     maturedTranches.forEach(tranche => {
+
+      // ---- 1. Pay with cash ----
       if (GameState.balance.cash >= tranche.amount) {
-        // Pay off with cash
         GameState.balance.cash = fmt(GameState.balance.cash - tranche.amount);
-        GameState.debtTranches = GameState.debtTranches.filter(
-          t => t.id !== tranche.id
-        );
-        messages.push(
-          `${tranche.label} matured and was retired with $${tranche.amount}M cash.`
-        );
-      } else {
-        // Auto-refinance at current rate (punitive: 110% of amount)
-        const newRate = Market.getCurrentBorrowingRate();
-        const newAmount = fmt(tranche.amount * 1.02); // small penalty
-        const yearsToAdd = 5;
-        const newMaturityYear = GameState.meta.year + yearsToAdd;
-        const newMaturityQuarter = GameState.meta.quarter;
+        GameState.debtTranches = GameState.debtTranches.filter(t => t.id !== tranche.id);
+        messages.push(`${tranche.label} matured — retired with $${tranche.amount}M cash.`);
+        if (typeof News !== "undefined" && News.add) {
+          News.add(GameState.company.name + " repaid $" + tranche.amount + "M of maturing debt on schedule.", "debt");
+        }
+        return;
+      }
 
-        tranche.rate = newRate;
-        tranche.amount = newAmount;
-        tranche.maturityYear = newMaturityYear;
-        tranche.maturityQuarter = newMaturityQuarter;
-        tranche.quartersUntilMaturity = yearsToAdd * 4;
-        tranche.label = `${newRate}% Sr Notes due Y${newMaturityYear}Q${newMaturityQuarter}`;
+      // ---- 2. Refinance if credit allows ----
+      // Junk-rated (CCC) or already at max tranches => refinancing market is shut.
+      var ratingOrder = ["CCC","B","BB","BBB","A","AA","AAA"];
+      var canRefinance = ratingOrder.indexOf(GameState.credit.rating) >= ratingOrder.indexOf("B")
+                         && GameState.debtTranches.length <= 10;
 
-        messages.push(
-          `⚠️ ${tranche.label} matured but insufficient cash. Auto-refinanced at ${newRate}% for 5 years — $${newAmount}M outstanding.`
-        );
+      if (canRefinance) {
+        const distressRate = fmt(Market.getCurrentBorrowingRate() + 1.5); // distress premium
+        const newAmount    = fmt(tranche.amount * 1.03);                  // 3% rollover cost
+        tranche.rate                  = distressRate;
+        tranche.amount                = newAmount;
+        tranche.maturityYear          = GameState.meta.year + 3;          // shorter, punitive
+        tranche.maturityQuarter       = GameState.meta.quarter;
+        tranche.quartersUntilMaturity = 12;
+        tranche.label                 = `${distressRate}% Refinanced Notes due Y${tranche.maturityYear}Q${tranche.maturityQuarter}`;
+        messages.push(`⚠️ Could not repay ${tranche.amount}M maturing debt — refinanced at a distress rate of ${distressRate}% for 3 years ($${newAmount}M outstanding). This hurts coverage.`);
+        if (typeof News !== "undefined" && News.add) {
+          News.add(GameState.company.name + " forced to refinance maturing debt at a distressed " + distressRate + "% — analysts note rising funding stress.", "debt");
+        }
+        return;
+      }
+
+      // ---- 3. Forced asset sale (refinancing shut) ----
+      var raised = 0;
+      var sold   = [];
+      // Sell weakest assets (lowest occupancy first) at a 15% fire-sale discount
+      var sellable = GameState.portfolio.slice().sort(function(a, b) { return a.occupancy - b.occupancy; });
+      while (raised < tranche.amount && sellable.length > 0) {
+        var victim = sellable.shift();
+        var firePrice = fmt(victim.currentValue * 0.85);
+        raised += firePrice;
+        GameState.balance.cash = fmt(GameState.balance.cash + firePrice);
+        GameState.portfolio = GameState.portfolio.filter(function(p) { return p.id !== victim.id; });
+        sold.push(victim.name + " ($" + firePrice + "M)");
+      }
+
+      if (sold.length > 0) {
+        messages.push(`🔻 Refinancing markets shut. To cover $${tranche.amount}M maturing debt, assets were sold at fire-sale prices: ${sold.join(", ")}.`);
+        if (typeof News !== "undefined" && News.add) {
+          News.add(GameState.company.name + " dumped " + sold.length + " propert" + (sold.length === 1 ? "y" : "ies") + " at distressed prices to meet debt maturity.", "debt");
+        }
+      }
+
+      // ---- 4. Pay what we can; remainder hits cash (overdraft) ----
+      GameState.balance.cash = fmt(GameState.balance.cash - tranche.amount);
+      GameState.debtTranches = GameState.debtTranches.filter(t => t.id !== tranche.id);
+      if (GameState.balance.cash < 0) {
+        messages.push(`⚠️ ${tranche.label} cleared but cash is now negative ($${fmt(GameState.balance.cash)}M overdraft). Restore it before the -$50M default line.`);
       }
     });
     return messages;
