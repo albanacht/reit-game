@@ -432,3 +432,9 @@ input::placeholder { color:var(--text-muted); }
 /* MEGA PROPERTY */
 .prop-mega { border-color:#fbbf24; box-shadow:0 0 0 1px rgba(251,191,36,.3); }
 .mega-flag { font-size:11px; color:#fbbf24; margin:4px 0; font-weight:600; }
+
+.talent-role-header { font-size:12px; font-weight:700; color:var(--text); margin:14px 0 6px; padding-bottom:3px; border-bottom:1px solid var(--border); }
+.talent-role-header .text-muted { font-weight:400; font-size:11px; }
+
+.jenkins-warning { background:rgba(245,158,11,.12); border:1px solid rgba(245,158,11,.35); border-radius:var(--radius-sm); padding:8px 10px; font-size:11px; color:#fbbf24; line-height:1.5; margin-bottom:10px; }
+.jenkins-warning strong { color:#f59e0b; }
