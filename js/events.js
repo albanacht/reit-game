@@ -11,7 +11,7 @@
 // - Never touches debt or equity — financials.js does that
 // ============================================================
 
-const Events = (() => {
+window.Events = (() => {
 
   // ----------------------------------------------------------
   // EVENT CATALOGUE
@@ -98,7 +98,7 @@ const Events = (() => {
           `In a widely anticipated move, the Fed hiked rates ${hike*100}bps. Your floating-rate exposure is now a concern.`,
           `The Fed delivered a ${hike*100}bps hike, pushing the base rate to ${GameState.market.baseInterestRate}%. Refinancing costs are rising.`,
         ]);
-        return { headline: "🏦 Fed Hikes Rates", body: msg, impact: `-${hike*100}bps to base rate` };
+        return { isMacro: true, headline: "🏦 Fed Hikes Rates", body: msg, impact: `-${hike*100}bps to base rate` };
       },
     },
 
@@ -119,7 +119,7 @@ const Events = (() => {
           `A surprise ${cut*100}bps cut from the Fed. Your refinancing window just got more attractive.`,
           `Fed eases by ${cut*100}bps. Cap rates may follow over coming quarters.`,
         ]);
-        return { headline: "🏦 Fed Cuts Rates", body: msg, impact: `+${cut*100}bps relief to base rate` };
+        return { isMacro: true, headline: "🏦 Fed Cuts Rates", body: msg, impact: `+${cut*100}bps relief to base rate` };
       },
     },
 
@@ -144,7 +144,7 @@ const Events = (() => {
           "Credit markets have seized up following a banking sector scare. Lenders are pulling back and spreads have blown out. Your effective credit rating has been marked down one notch.",
           "A sudden risk-off move in credit markets has tightened lending standards. Your borrowing costs have increased and one tranche was repriced at a higher spread.",
         ]);
-        return { headline: "🔒 Credit Market Freeze", body: msg, impact: "Rating marked down 1 notch" };
+        return { isMacro: true, headline: "🔒 Credit Market Freeze", body: msg, impact: "Rating marked down 1 notch" };
       },
     },
 
@@ -168,7 +168,7 @@ const Events = (() => {
         addUnusualItem(-randBetween(5, 15));
 
         const msg = `A public health emergency has been declared. Retail properties are facing forced closures and your office tenants have vacated to work-from-home. Industrial assets are seeing a modest boost from accelerated e-commerce demand. Expect occupancy pain for 2–4 quarters.`;
-        return { headline: "🦠 Pandemic Shock", body: msg, impact: "Retail & Office occupancy -15–30%" };
+        return { isMacro: true, headline: "🦠 Pandemic Shock", body: msg, impact: "Retail & Office occupancy -15–30%" };
       },
     },
 
@@ -185,7 +185,7 @@ const Events = (() => {
           Math.min(12, GameState.market.baseInterestRate + shock)
         );
         const msg = `Inflation data came in dramatically above expectations, forcing an emergency rate response. The base rate jumped ${fmt(shock*100)}bps to ${GameState.market.baseInterestRate}%. Bond markets are repricing and cap rates are expected to follow.`;
-        return { headline: "⚡ Rate Shock", body: msg, impact: `+${fmt(shock*100)}bps emergency hike` };
+        return { isMacro: true, headline: "⚡ Rate Shock", body: msg, impact: `+${fmt(shock*100)}bps emergency hike` };
       },
     },
 
@@ -429,10 +429,18 @@ const Events = (() => {
       cycleBias: { expanding: 2.0, stable: 1.0, contracting: 0.5, recession: 0.2 },
       apply() {
         if (GameState.portfolio.length === 0) return null;
-        const prop = pick(GameState.portfolio);
-        const premium = randBetween(0.08, 0.20);
+        // Requires Acquisitions Lead — they source the buyers
+        if (typeof Staff === "undefined" || !Staff.hasRole("acquisitions")) return null;
+
+        // Prefer an underperforming property (the AL finds buyers for weak assets)
+        var underperformers = GameState.portfolio.filter(function(p) { return p.occupancy < 0.82 && !p.underConstruction; });
+        const prop = underperformers.length > 0 ? pick(underperformers) : pick(GameState.portfolio);
+        if (prop.underConstruction) return null;
+
+        // AL skill scales the premium offered (better AL = better buyers)
+        const skillBonus = Staff.skillFactor("acquisitions") * 0.12;
+        const premium = randBetween(0.10, 0.22) + skillBonus;
         const offerPrice = fmt(prop.currentValue * (1 + premium));
-        // Store the offer for UI to handle — player must decide next quarter
         GameState._pendingOffer = {
           propertyId: prop.id,
           propertyName: prop.name,
@@ -440,8 +448,9 @@ const Events = (() => {
           premium: fmt(premium * 100),
           expiresNextQuarter: true,
         };
-        const msg = `We have received an unsolicited offer of $${offerPrice}M for ${prop.name}, representing a ${fmt(premium*100)}% premium to current appraised value. The board is reviewing the offer. You may accept or decline next quarter.`;
-        return { headline: "💼 Acquisition Offer Received", body: msg, impact: `Offer: $${offerPrice}M for ${prop.name}` };
+        const al = Staff.getStaff("acquisitions");
+        const msg = al.name + " (Acquisitions): \"Boss, I found a buyer for " + prop.name + " at $" + offerPrice + "M — a " + fmt(premium*100) + "% premium to appraised value. " + (prop.occupancy < 0.82 ? "Good chance to offload an underperformer. " : "") + "We can accept or decline next quarter.\"";
+        return { headline: "💼 " + al.name + " Found a Buyer", body: msg, impact: "Offer: $" + offerPrice + "M for " + prop.name };
       },
     },
 
