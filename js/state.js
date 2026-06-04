@@ -187,6 +187,11 @@ window.GameState = {
   history:  [],
   eventLog: [],
 
+  // ----------------------------------------------------------
+  // STAFF — hired executives, each unlocks a function
+  // ----------------------------------------------------------
+  staff: [],   // array of hired staff objects, populated as you hire
+
   // Pending acquisition offer from events.js
   _pendingOffer: null,
 
