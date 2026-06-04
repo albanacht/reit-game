@@ -1271,8 +1271,11 @@ window.UI = (function() {
     if (GameState.meta.gameOver) { showGameOver(); return; }
     if (GameState._pendingOffer) {
       var offer = GameState._pendingOffer;
+      var portraitHTML = offer.alPortrait
+        ? '<div style="display:flex;gap:10px;align-items:center;margin-bottom:10px;"><img src="assets/staff/' + offer.alPortrait + '" style="width:52px;height:52px;border-radius:6px;image-rendering:pixelated;" alt="' + (offer.alName||"") + '"><div style="font-size:12px;color:var(--text-muted);font-style:italic;">' + (offer.alName||"Acquisitions") + ' sourced this buyer.</div></div>'
+        : '';
       showModal("Offer Expiring: " + offer.propertyName,
-        "Offer: " + fmtM(offer.offerPrice) + " (" + offer.premium + "% premium)\nExpires this quarter — accept or decline?",
+        portraitHTML + "Offer: " + fmtM(offer.offerPrice) + " (" + offer.premium + "% premium)\nExpires this quarter — accept or decline?",
         [
           { label: "Accept " + fmtM(offer.offerPrice), style: "btn-primary", onClick: function() {
             var r = Properties.sellProperty(offer.propertyId);
@@ -1342,6 +1345,29 @@ window.UI = (function() {
       if (qr.marketResult && qr.marketResult.cycleResult && qr.marketResult.cycleResult.cycleChanged) {
         var cy = qr.marketResult.cycleResult;
         setTimeout(function() { showToast("Market shift: " + cy.label, "warning"); }, 800);
+      }
+
+      // Acquisitions Lead mega-property find announcement
+      if (GameState._pendingMegaFind) {
+        var mf = GameState._pendingMegaFind;
+        GameState._pendingMegaFind = null;
+        var mfPortrait = mf.alPortrait
+          ? '<div style="display:flex;gap:10px;align-items:center;margin-bottom:10px;"><img src="assets/staff/' + mf.alPortrait + '" style="width:52px;height:52px;border-radius:6px;image-rendering:pixelated;" alt="' + (mf.alName||"") + '"><div style="font-size:12px;color:var(--text-muted);font-style:italic;">' + (mf.alName||"Acquisitions") + '</div></div>'
+          : '';
+        setTimeout(function() {
+          showModal("★ Off-Market Opportunity",
+            mfPortrait +
+            '"Boss, I\'ve sourced something off-market — ' + mf.propName + ', a ' + mf.sector +
+            ' asset with a ' + mf.tenant + ' on a long lease. These don\'t come up often. ' +
+            'It\'s in the Property Market now, asking ' + fmtM(mf.price) + '. Worth a look before someone else takes it."',
+            [{ label: "View the Market", style: "btn-primary", onClick: function() {
+              closeModal();
+              var btn = document.querySelector('.section-tab-btn[onclick*="tab-market"]');
+              if (btn) switchTab('tab-market', btn);
+            }},
+             { label: "Later", style: "btn-secondary", onClick: closeModal }]
+          );
+        }, 1000);
       }
     }
 
@@ -1413,6 +1439,9 @@ window.UI = (function() {
     GameState.eventLog        = [];
     GameState.annualSnapshots = [];
     GameState._pendingOffer   = null;
+    GameState._pendingMegaFind = null;
+    GameState._lastMegaRollYear = 0;
+    GameState._lastBuyerFindYear = 0;
 
     Market.init();
     // Store baseline cap rates for market conditions indicator
