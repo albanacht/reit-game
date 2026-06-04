@@ -108,7 +108,7 @@ window.Decisions = (function() {
     var sectors   = ["office","retail","industrial","multifamily"];
     var locations = ["tier1","tier2","suburban"];
     var s = pick(sectors), l = pick(locations);
-    var prop = Properties.generateProperty(s, l, false);
+    var prop = Properties.generateProperty(s, l, false, true);
     var price = fmt(prop.currentValue * 0.65, 1); // 35% discount
     prop.askingPrice = price;
     var interestCost = fmt(price * (GameState.market.baseInterestRate + GameState.credit.spread) / 100 / 4, 2);
@@ -436,7 +436,7 @@ window.Decisions = (function() {
     var props = [], totalValue = 0, totalNOI = 0;
 
     for (var i = 0; i < 3; i++) {
-      var p = Properties.generateProperty(sectors[i], locations[i], false);
+      var p = Properties.generateProperty(sectors[i], locations[i], false, true);
       p.occupancy     = fmt(0.60 + Math.random()*0.15, 3);
       p.currentValue  = fmt(p.currentValue * 0.65);
       p.purchasePrice = p.currentValue;
