@@ -295,6 +295,56 @@ window.Properties = (() => {
       const location = pick(locations);
       GameState.propertyMarket.push(generateProperty(sector, location));
     }
+    // Acquisitions Lead unlocks rare off-market mega-properties
+    maybeInjectMegaProperty();
+  }
+
+  // ----------------------------------------------------------
+  // MEGA-PROPERTY — large single-tenant assets only accessible
+  // with an Acquisitions Lead hired. Rare, expensive, reliable.
+  // ----------------------------------------------------------
+  function maybeInjectMegaProperty() {
+    if (typeof Staff === "undefined" || !Staff.hasRole("acquisitions")) return;
+    // Only one mega-property on the market at a time
+    if (GameState.propertyMarket.some(function(p) { return p.isMega; })) return;
+    // Only roll once per year
+    if (GameState._lastMegaRollYear === GameState.meta.year) return;
+    GameState._lastMegaRollYear = GameState.meta.year;
+    // 40% base chance per year, 60% with a Rainmaker
+    var megaOdds = (Staff.hasTrait && Staff.hasTrait("acquisitions", "rainmaker")) ? 0.60 : 0.40;
+    if (Math.random() > megaOdds) return;
+
+    var megaTypes = [
+      { sector: "industrial", label: "Mega Distribution Centre", baseValue: 180, noiYield: 0.072, tenant: "national logistics operator" },
+      { sector: "industrial", label: "Machinery Manufacturing Plant", baseValue: 220, noiYield: 0.078, tenant: "blue-chip manufacturer" },
+      { sector: "office",     label: "Corporate HQ Campus", baseValue: 240, noiYield: 0.068, tenant: "Fortune 500 anchor" },
+      { sector: "retail",     label: "Regional Shopping Megamall", baseValue: 260, noiYield: 0.080, tenant: "diversified retail consortium" },
+    ];
+    var m = pick(megaTypes);
+    var value = Math.round(m.baseValue * randBetween(0.9, 1.15) * 10) / 10;
+    var noi   = Math.round(value * m.noiYield * 10) / 10;
+
+    var prop = {
+      id: nextPropId(),
+      name: "★ " + m.label,
+      sector: m.sector,
+      location: "tier1",
+      label: m.label,
+      purchasePrice: null,
+      currentValue: value,
+      askingPrice: Math.round(value * 1.02 * 10) / 10,
+      annualNOI: noi,
+      occupancy: 0.97,            // single reliable tenant, near-full
+      age: randInt(1, 8),
+      capexReserve: Math.round(value * 0.008 * 10) / 10,
+      quarterOwned: 0,
+      encumbered: false,
+      daysOnMarket: 0,
+      isMega: true,
+      isSingleTenant: true,
+      megaTenant: m.tenant,
+    };
+    GameState.propertyMarket.unshift(prop);
   }
 
   // ----------------------------------------------------------
@@ -344,6 +394,7 @@ window.Properties = (() => {
   // Check if renovation is available for a property
   function canRenovate(prop) {
     if (!prop) return { ok: false, reason: "Property not found." };
+    if (typeof Staff !== "undefined" && !Staff.hasRole("asset")) return { ok: false, reason: "Requires an Asset Manager. Hire one in the Staff tab." };
     if (prop.location === "tier1") return { ok: false, reason: "Tier 1 properties are already premium — renovation not applicable." };
     if (prop.renovated) return { ok: false, reason: "Already renovated." };
     if (prop.underConstruction) return { ok: false, reason: "Already under construction." };
@@ -355,6 +406,7 @@ window.Properties = (() => {
 
   function canReposition(prop) {
     if (!prop) return { ok: false, reason: "Property not found." };
+    if (typeof Staff !== "undefined" && !Staff.hasRole("asset")) return { ok: false, reason: "Requires an Asset Manager. Hire one in the Staff tab." };
     if (prop.location === "tier1") return { ok: false, reason: "Tier 1 properties cannot be repositioned." };
     if (prop.repositioned) return { ok: false, reason: "Already repositioned." };
     if (prop.underConstruction) return { ok: false, reason: "Already under construction." };
@@ -502,6 +554,7 @@ window.Properties = (() => {
     recalculatePropertyValues,
     quarterlyUpdate,
     refreshMarket,
+    maybeInjectMegaProperty,
     generateProperty,
     canRenovate,
     canReposition,
