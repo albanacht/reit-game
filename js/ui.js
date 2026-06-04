@@ -183,6 +183,87 @@ window.UI = (function() {
   }
 
   // BOARD ATTITUDES PANEL
+  // STAFF ROSTER + TALENT MARKET
+  function renderStaff() {
+    var roster = el("staff-roster");
+    var market = el("talent-market");
+    if (!roster || !market) return;
+
+    // Roster of hired staff — court-style cards with portrait
+    if (GameState.staff.length === 0) {
+      roster.innerHTML = '<p class="text-muted" style="font-size:12px">No staff hired yet. Browse the talent market below.</p>';
+    } else {
+      var rh = "";
+      GameState.staff.forEach(function(s) {
+        var traitClass = Staff.traitColor(s);
+        var traitTxt   = Staff.traitLabel(s);
+        var traitDesc  = Staff.traitDesc(s);
+        rh += '<div class="staff-row">' +
+          '<img class="staff-portrait" src="assets/staff/' + (s.portrait || "port1.png") + '" alt="' + s.name + '">' +
+          '<div class="staff-info">' +
+            '<div class="staff-name-row"><span class="staff-name">' + s.name + '</span><span class="staff-stars">' + (s.stars || "") + '</span></div>' +
+            '<div class="staff-title">' + s.title + '</div>' +
+            '<div class="staff-trait ' + traitClass + '">' + traitTxt + (traitDesc ? ' — <span class="text-muted">' + traitDesc + '</span>' : '') + '</div>' +
+          '</div>' +
+          '<div class="staff-right">' +
+            '<div class="staff-cost">$' + fmt(s.salary, 2) + 'M/q</div>' +
+            '<button class="btn btn-sm btn-danger" onclick="UI.fireStaff(\'' + s.roleId + '\')">Fire</button>' +
+          '</div>' +
+          '</div>';
+      });
+      roster.innerHTML = rh;
+    }
+
+    // Talent market — candidate cards with portrait + stars
+    var tm = GameState._talentMarket || [];
+    if (tm.length === 0) {
+      market.innerHTML = '<p class="text-muted" style="font-size:12px">All roles filled. Fire someone to see new candidates next year.</p>';
+      return;
+    }
+    var mh = "";
+    tm.forEach(function(c, i) {
+      var role = Staff.ROLES[c.roleId];
+      mh += '<div class="candidate-card">' +
+        '<img class="candidate-portrait" src="assets/staff/' + (c.portrait || "port1.png") + '" alt="' + c.name + '">' +
+        '<div class="candidate-body">' +
+          '<div class="candidate-head">' +
+            '<span class="candidate-title">' + c.title + ' <span class="staff-stars">' + (c.stars || "") + '</span></span>' +
+            '<span class="candidate-salary">$' + fmt(c.salary, 2) + 'M/q</span>' +
+          '</div>' +
+          '<div class="candidate-name">' + c.name + '</div>' +
+          '<div class="candidate-unlock">🔓 ' + role.unlocks + '</div>' +
+          '<div class="candidate-hint">"' + c.hint + '"</div>' +
+          '<button class="btn btn-sm btn-primary" onclick="UI.hireStaff(' + i + ')">Hire — $' + fmt(c.salary,2) + 'M/q</button>' +
+        '</div>' +
+        '</div>';
+    });
+    market.innerHTML = mh;
+  }
+
+  function hireStaff(marketIndex) {
+    var tm = GameState._talentMarket || [];
+    var candidate = tm[marketIndex];
+    if (!candidate) return;
+    var r = Staff.hire(candidate);
+    showToast(r.message, r.success ? "success" : "error");
+    if (r.success) renderAll();
+  }
+
+  function fireStaff(roleId) {
+    var s = Staff.getStaff(roleId);
+    if (!s) return;
+    showModal("Dismiss " + s.name + "?",
+      "Role: " + s.title + "\n" +
+      "Severance: $" + fmt(s.salary, 2) + "M (one quarter)\n\n" +
+      "WARNING: Firing removes all functions this role unlocks. " +
+      "Any in-progress benefits will stop.",
+      [{ label: "Confirm Dismissal", style: "btn-danger", onClick: function() {
+        var r = Staff.fire(roleId);
+        showToast(r.message, r.success ? "success" : "error");
+        if (r.success) renderAll();
+      }}]);
+  }
+
   function renderBoardAttitudes() {
     var container = el("board-attitudes-list");
     var capEl     = el("ba-capital-display");
@@ -318,9 +399,9 @@ window.UI = (function() {
       var oc = p.occupancy >= 0.90 ? "text-green" : p.occupancy >= 0.80 ? "text-yellow" : "text-red";
       var gl = p.purchasePrice ? fmt(p.currentValue - p.purchasePrice, 1) : 0;
       var gc = gl >= 0 ? "text-green" : "text-red";
-      // Lease Up button — grey/disabled if already used this year
+      // Lease Up button — requires Asset Manager, grey/disabled if used this year
       var leaseUpBtn = "";
-      if (p.occupancy < 0.90 && !p.underConstruction) {
+      if (p.occupancy < 0.90 && !p.underConstruction && Staff.hasRole("asset")) {
         var usedThisYear = p.leaseUpYear === GameState.meta.year;
         leaseUpBtn = usedThisYear
           ? '<button class="btn btn-sm btn-secondary" disabled style="opacity:0.4;cursor:not-allowed" title="Already leased up this year — available Year ' + (GameState.meta.year + 1) + '">✓ Leased Up</button>'
@@ -375,9 +456,13 @@ window.UI = (function() {
     GameState.propertyMarket.forEach(function(p) {
       var cr = GameState.market.capRates[p.sector][p.location];
       var ca = GameState.balance.cash >= p.askingPrice;
-      html += '<div class="property-card ' + (ca ? "" : "prop-unaffordable") + '">' +
+      var megaTag = p.isMega
+        ? '<div class="mega-flag">★ Off-market mega-asset · single tenant: ' + (p.megaTenant || "anchor") + '</div>'
+        : '';
+      html += '<div class="property-card ' + (ca ? "" : "prop-unaffordable") + (p.isMega ? " prop-mega" : "") + '">' +
         '<div class="prop-header"><span class="prop-name">' + p.name + '</span>' +
         '<span class="prop-tag tag-' + p.sector + '">' + p.sector + ' · ' + p.location + '</span></div>' +
+        megaTag +
         '<div class="prop-stats">' +
         '<span>Ask: <strong>' + fmtM(p.askingPrice) + '</strong></span>' +
         '<span>NOI: <strong>' + fmtM(p.annualNOI) + '/yr</strong></span>' +
@@ -472,6 +557,7 @@ window.UI = (function() {
     renderGoalsPanel();
     renderBoardAttitudes();
     renderMarketConditions();
+    renderStaff();
     renderPortfolio();
     renderPropertyMarket();
     renderCapitalActions();
@@ -1059,6 +1145,8 @@ window.UI = (function() {
     } else {
       // Reset year tracking for new year
       Board.resetYearTracking();
+      // Refresh the talent market with new candidates for unfilled roles
+      Staff.refreshTalentMarket();
     }
   }
 
@@ -1301,6 +1389,7 @@ window.UI = (function() {
     };
     Properties.init();
     Board.init();
+    Staff.init();
     Events.init();
     Financials.init();
     Charts.init();
@@ -1404,6 +1493,8 @@ window.UI = (function() {
     leaseUp:             leaseUp,
     confirmRenovate:     confirmRenovate,
     confirmReposition:   confirmReposition,
+    hireStaff:           hireStaff,
+    fireStaff:           fireStaff,
     makeDecision:        makeDecision,
     showBoardMeeting:    showBoardMeeting,
     boardResponse:       boardResponse,
