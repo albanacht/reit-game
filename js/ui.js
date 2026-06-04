@@ -828,9 +828,14 @@ window.UI = (function() {
     var sharesEl = el("input-buyback-shares");
     var shares = sharesEl ? parseFloat(sharesEl.value) : NaN;
     if (isNaN(shares) || shares <= 0) { showToast("Enter valid shares", "error"); return; }
+    var maxShares = fmt(GameState.company.sharesOutstanding * 0.05, 2);
     var cost = shares * GameState.company.sharePrice;
+    var alreadyDone = GameState.company.lastBuybackYear === GameState.meta.year;
     showModal("Share Buyback",
-      "Shares: " + fmt(shares, 1) + "M  |  Cost: " + fmtM(cost) + "\nCash after: " + fmtM(GameState.balance.cash - cost),
+      "Shares: " + fmt(shares, 1) + "M  |  Cost: " + fmtM(cost) + "\n" +
+      "Cash after: " + fmtM(GameState.balance.cash - cost) + "\n\n" +
+      "Limit: max 5% of float per year (" + maxShares + "M shares).\n" +
+      (alreadyDone ? "⚠ Already used this year — next available Year " + (GameState.meta.year + 1) + "." : "Available this year."),
       [{ label: "Buy Back", style: "btn-primary", onClick: function() {
         var r = Financials.buybackShares(shares);
         showToast(r.message, r.success ? "success" : "error");
