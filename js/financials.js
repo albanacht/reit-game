@@ -75,7 +75,20 @@ window.Financials = (() => {
     const portfolioValue = GameState.portfolio.reduce(
       (sum, p) => sum + p.currentValue, 0
     );
-    return fmt(GA_BASE + portfolioValue * GA_PORTFOLIO_PCT);
+    let ga = GA_BASE + portfolioValue * GA_PORTFOLIO_PCT;
+
+    // Operations head reduces base G&A by up to 20% (scaled by skill)
+    if (typeof Staff !== "undefined" && Staff.hasRole("operations")) {
+      const reduction = 0.10 + Staff.skillFactor("operations") * 0.10; // 10-20%
+      ga = ga * (1 - reduction);
+    }
+
+    // Add staff salaries (shown as subline inside G&A)
+    if (typeof Staff !== "undefined") {
+      ga += Staff.totalSalary();
+    }
+
+    return fmt(ga);
   }
 
   // ----------------------------------------------------------
@@ -744,6 +757,7 @@ window.Financials = (() => {
       GameState.meta.quarter = 1;
       GameState.meta.year   += 1;
       Market.applyYearlyEscalation();
+      if (typeof Staff !== "undefined" && Staff.processYearEnd) Staff.processYearEnd();
     }
 
     // Reset unusual items (events.js will populate this before we run)
@@ -757,6 +771,7 @@ window.Financials = (() => {
     Properties.recalculatePropertyValues();
     Properties.quarterlyUpdate();
     Properties.processConstructionProgress();
+    if (typeof Staff !== "undefined") Staff.processQuarter();
 
     // 3. Run P&L calculations
     const noComponents   = calcPortfolioNOI();
