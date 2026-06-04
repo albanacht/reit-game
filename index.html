@@ -13,7 +13,7 @@
   <div id="start-overlay" class="hidden">
     <div class="start-inner">
       <div class="start-logo">REIT SIM</div>
-      <div class="start-version">v0.9 · Designed by Alexander Voronin · Built with Claude AI</div>
+      <div class="start-version">v0.8 · Designed by Alexander Voronin · Built with Claude AI</div>
       <p class="start-subtitle">Run a publicly traded Real Estate Investment Trust. Survive the board. Grow shareholder value.</p>
 
       <div class="start-setup">
@@ -340,9 +340,20 @@
           <button class="section-tab-btn" onclick="switchTab('tab-market', this)">Property Market</button>
           <button class="section-tab-btn" onclick="switchTab('tab-debt', this)">Debt</button>
           <button class="section-tab-btn" onclick="switchTab('tab-capital', this)">Capital Actions</button>
+          <button class="section-tab-btn" onclick="switchTab('tab-staff', this)">Staff</button>
         </div>
         <div id="tab-portfolio" class="section-tab-content active">
           <div class="scroll-list" id="portfolio-list"><p class="text-muted">Start a game to see your portfolio.</p></div>
+        </div>
+        <div id="tab-staff" class="section-tab-content">
+          <div style="margin-bottom:12px;">
+            <span class="panel-title">Your Team</span>
+            <p class="text-muted" style="font-size:11px;margin-top:4px;">Each hire unlocks a function. Salaries are paid inside G&amp;A every quarter. Skill is revealed after 2-4 quarters. Firing a hire removes their unlock.</p>
+          </div>
+          <div class="scroll-list" id="staff-roster" style="margin-bottom:16px;"></div>
+          <div class="panel-title" style="margin-bottom:8px;">Talent Market</div>
+          <p class="text-muted" style="font-size:11px;margin-bottom:8px;">Available candidates this year. Higher salary often — but not always — signals higher skill.</p>
+          <div class="scroll-list" id="talent-market"></div>
         </div>
         <div id="tab-market" class="section-tab-content">
           <div class="scroll-list" id="market-list"><p class="text-muted">Start a game to see the market.</p></div>
@@ -453,6 +464,7 @@
 <script src="js/market.js"></script>
 <script src="js/events.js"></script>
 <script src="js/board.js"></script>
+<script src="js/staff.js"></script>
 <script src="js/decisions.js"></script>
 <script src="js/financials.js"></script>
 <script src="js/charts.js"></script>
