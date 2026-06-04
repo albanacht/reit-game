@@ -407,3 +407,28 @@ input::placeholder { color:var(--text-muted); }
 .btn-upgrade-repo:hover { background:rgba(245,158,11,.25); }
 .upgrade-badge    { font-size:10px; color:var(--text-muted); font-style:italic; padding:2px 6px; background:var(--surface2); border-radius:10px; }
 .upgrade-done     { color:#22c55e; }
+
+/* STAFF SYSTEM */
+.staff-row { display:flex; align-items:center; gap:10px; background:var(--surface2); border:1px solid var(--border); border-radius:var(--radius-sm); padding:8px 10px; margin-bottom:8px; }
+.staff-portrait { width:48px; height:48px; border-radius:6px; object-fit:cover; flex-shrink:0; image-rendering:pixelated; }
+.staff-info { flex:1; min-width:0; }
+.staff-name-row { display:flex; align-items:center; gap:6px; }
+.staff-name { font-size:13px; font-weight:700; color:var(--text); }
+.staff-stars { font-size:12px; color:#fbbf24; letter-spacing:1px; }
+.staff-title { font-size:11px; color:var(--text-muted); }
+.staff-trait { font-size:11px; margin-top:2px; }
+.staff-right { display:flex; flex-direction:column; align-items:flex-end; gap:4px; }
+.staff-cost { font-size:12px; font-family:monospace; color:var(--yellow); }
+.candidate-card { display:flex; gap:10px; background:var(--surface2); border:1px solid var(--border); border-radius:var(--radius-sm); padding:10px 12px; margin-bottom:8px; }
+.candidate-portrait { width:64px; height:64px; border-radius:6px; object-fit:cover; flex-shrink:0; image-rendering:pixelated; }
+.candidate-body { flex:1; min-width:0; }
+.candidate-head { display:flex; justify-content:space-between; align-items:center; }
+.candidate-title { font-size:13px; font-weight:700; color:var(--text); }
+.candidate-salary { font-size:12px; font-family:monospace; color:var(--yellow); }
+.candidate-name { font-size:12px; color:var(--text); margin:2px 0; }
+.candidate-unlock { font-size:11px; color:#818cf8; margin:4px 0; }
+.candidate-hint { font-size:11px; color:var(--text-muted); font-style:italic; margin-bottom:8px; }
+
+/* MEGA PROPERTY */
+.prop-mega { border-color:#fbbf24; box-shadow:0 0 0 1px rgba(251,191,36,.3); }
+.mega-flag { font-size:11px; color:#fbbf24; margin:4px 0; font-weight:600; }
