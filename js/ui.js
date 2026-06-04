@@ -214,28 +214,35 @@ window.UI = (function() {
       roster.innerHTML = rh;
     }
 
-    // Talent market — candidate cards with portrait + stars
+    // Talent market — grouped by role, 3 candidates each
     var tm = GameState._talentMarket || [];
     if (tm.length === 0) {
       market.innerHTML = '<p class="text-muted" style="font-size:12px">All roles filled. Fire someone to see new candidates next year.</p>';
       return;
     }
-    var mh = "";
+    // Group candidates by role, preserving global index for hire()
+    var byRole = {};
     tm.forEach(function(c, i) {
-      var role = Staff.ROLES[c.roleId];
-      mh += '<div class="candidate-card">' +
-        '<img class="candidate-portrait" src="assets/staff/' + (c.portrait || "port1.png") + '" alt="' + c.name + '">' +
-        '<div class="candidate-body">' +
-          '<div class="candidate-head">' +
-            '<span class="candidate-title">' + c.title + ' <span class="staff-stars">' + (c.stars || "") + '</span></span>' +
-            '<span class="candidate-salary">$' + fmt(c.salary, 2) + 'M/q</span>' +
+      (byRole[c.roleId] = byRole[c.roleId] || []).push({ c: c, i: i });
+    });
+    var mh = "";
+    Object.keys(byRole).forEach(function(roleId) {
+      var role = Staff.ROLES[roleId];
+      mh += '<div class="talent-role-header">' + role.title + ' <span class="text-muted">— ' + role.unlocks + '</span></div>';
+      byRole[roleId].forEach(function(entry) {
+        var c = entry.c, i = entry.i;
+        mh += '<div class="candidate-card">' +
+          '<img class="candidate-portrait" src="assets/staff/' + (c.portrait || "port1.png") + '" alt="' + c.name + '">' +
+          '<div class="candidate-body">' +
+            '<div class="candidate-head">' +
+              '<span class="candidate-title">' + c.name + ' <span class="staff-stars">' + (c.stars || "") + '</span></span>' +
+              '<span class="candidate-salary">$' + fmt(c.salary, 2) + 'M/q</span>' +
+            '</div>' +
+            '<div class="candidate-hint">"' + c.hint + '"</div>' +
+            '<button class="btn btn-sm btn-primary" onclick="UI.hireStaff(' + i + ')">Hire — $' + fmt(c.salary,2) + 'M/q</button>' +
           '</div>' +
-          '<div class="candidate-name">' + c.name + '</div>' +
-          '<div class="candidate-unlock">🔓 ' + role.unlocks + '</div>' +
-          '<div class="candidate-hint">"' + c.hint + '"</div>' +
-          '<button class="btn btn-sm btn-primary" onclick="UI.hireStaff(' + i + ')">Hire — $' + fmt(c.salary,2) + 'M/q</button>' +
-        '</div>' +
-        '</div>';
+          '</div>';
+      });
     });
     market.innerHTML = mh;
   }
@@ -299,6 +306,22 @@ window.UI = (function() {
     }
   }
 
+  // Jenkins maturity warning: fires when a tranche matures within 2 quarters
+  // and current cash can't cover it.
+  function getJenkinsMaturityWarning() {
+    if (!GameState.debtTranches || GameState.debtTranches.length === 0) return null;
+    var soon = GameState.debtTranches.filter(function(t) {
+      return t.quartersUntilMaturity > 0 && t.quartersUntilMaturity <= 2;
+    });
+    if (soon.length === 0) return null;
+    var totalDue = soon.reduce(function(sum, t) { return sum + t.amount; }, 0);
+    if (GameState.balance.cash >= totalDue) return null;
+    var shortfall = fmt(totalDue - GameState.balance.cash);
+    var q = soon[0].quartersUntilMaturity;
+    return "$" + fmt(totalDue) + "M of debt matures within " + q + " quarter" + (q === 1 ? "" : "s") +
+           " and we're $" + shortfall + "M short. Issue debt now while our rating holds, or sell an asset before we're forced to at fire-sale prices.";
+  }
+
   // MARKET CONDITIONS PANEL
   function renderMarketConditions() {
     var container = el("market-conditions-list");
@@ -313,6 +336,13 @@ window.UI = (function() {
     var labels    = { office:"Office", industrial:"Industrial", multifamily:"Multifamily", retail:"Retail" };
 
     var html = "";
+
+    // Jenkins advisory — maturity shortfall warning (1-2 quarters out)
+    var jenkinsWarning = getJenkinsMaturityWarning();
+    if (jenkinsWarning) {
+      html += '<div class="jenkins-warning">⚠ <strong>Jenkins:</strong> ' + jenkinsWarning + '</div>';
+    }
+
     sectors.forEach(function(s) {
       // Average cap rate across locations for this sector
       var avg = (capRates[s].tier1 + capRates[s].tier2 + capRates[s].suburban) / 3;
