@@ -41,6 +41,7 @@ window.GameState = {
     equityIssuanceCount:  0,   // tracks number of equity issuances
     equityIssuanceYear:   0,   // year of last equity issuance
     debtIssuanceQuarter:  0,   // total quarter number of last debt issuance
+    lastBuybackYear:      0,   // year of last share buyback (once per year)
   },
 
   // ----------------------------------------------------------
