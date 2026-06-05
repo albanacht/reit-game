@@ -171,11 +171,47 @@ window.Market = (() => {
     // Tick down remaining quarters in this cycle
     market.cycleQuartersRemaining -= 1;
 
-    // Apply rate drift (with small noise)
-    const rateDelta = cycleDef.baseRateDelta + randBetween(-0.05, 0.05);
-    market.baseInterestRate = Math.round(
-      clamp(market.baseInterestRate + rateDelta, 2.0, 12.0) * 100
-    ) / 100;
+    // ---- INTEREST RATE MODEL ----
+    // The Fed moves in discrete 0.25% steps, not every quarter (every 2-3
+    // quarters typically), upward-biased to make long games progressively
+    // harder — with rare surprise shocks and occasional relief cuts.
+    if (market.rateHoldQuarters === undefined) market.rateHoldQuarters = 2;
+    market.rateHoldQuarters -= 1;
+
+    var rateMsg = null;
+    if (market.rateHoldQuarters <= 0) {
+      var roll = Math.random();
+      var delta = 0;
+      if (roll < 0.06) {
+        // Surprise inflation shock: +0.75 to +1.00
+        delta = Math.random() < 0.5 ? 0.75 : 1.00;
+        rateMsg = "shock_up";
+      } else if (roll < 0.66) {
+        // Typical hike: +0.25 (sometimes +0.50)
+        delta = Math.random() < 0.75 ? 0.25 : 0.50;
+        rateMsg = "hike";
+      } else if (roll < 0.84) {
+        // Hold — no change
+        delta = 0;
+      } else {
+        // Relief cut: -0.25 (a breather)
+        delta = -0.25;
+        rateMsg = "cut";
+      }
+      market.baseInterestRate = Math.round(
+        clamp(market.baseInterestRate + delta, 0.5, 9.0) * 100
+      ) / 100;
+      market.lastRateMove = rateMsg;
+      // Next change in 2-3 quarters (rarely back-to-back)
+      market.rateHoldQuarters = Math.random() < 0.25 ? 1 : (Math.random() < 0.6 ? 2 : 3);
+
+      // News headline for rate moves
+      if (rateMsg && typeof News !== "undefined" && News.add) {
+        if (rateMsg === "shock_up") News.add("Inflation surprise: the Fed hikes rates sharply to " + market.baseInterestRate.toFixed(2) + "% — REIT valuations under pressure.", "rating");
+        else if (rateMsg === "hike") News.add("Fed raises its benchmark rate to " + market.baseInterestRate.toFixed(2) + "%.", "rating");
+        else if (rateMsg === "cut") News.add("Fed trims rates to " + market.baseInterestRate.toFixed(2) + "% — modest relief for property owners.", "rating");
+      }
+    }
     market.rateDirection = cycleDef.rateDirection;
 
     // Apply cap rate drift to all sector/location combos
@@ -285,7 +321,7 @@ window.Market = (() => {
   // INITIALISE — call once at game start
   // ----------------------------------------------------------
   function init() {
-    GameState.market.baseInterestRate = 3.5;
+    GameState.market.baseInterestRate = 2.5;
     GameState.market.cycle = "stable";
     GameState.market.cycleQuartersRemaining = randInt(4, 8);
     GameState.market.rateDirection = "flat";
