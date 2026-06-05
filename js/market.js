@@ -134,9 +134,14 @@ window.Market = (() => {
     // Negative watch: if moving worse two quarters in a row
     const watchNegative = targetIdx > newIdx;
 
+    var oldRating = GameState.credit.rating;
     GameState.credit.rating = newRating.rating;
     GameState.credit.spread = newRating.spread;
     GameState.credit.watchNegative = watchNegative;
+
+    if (oldRating !== newRating.rating && typeof News !== "undefined" && News.ratingChanged) {
+      News.ratingChanged(oldRating, newRating.rating, newIdx > currentIdx);
+    }
 
     return {
       rating: newRating.rating,
