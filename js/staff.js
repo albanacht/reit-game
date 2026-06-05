@@ -306,6 +306,10 @@ window.Staff = (function() {
       });
     }
 
+    if (typeof News !== "undefined" && News.staffHired) {
+      News.staffHired(candidate.name, candidate.title);
+    }
+
     return { success: true, message: candidate.name + " hired as " + candidate.title + " at $" + candidate.salary + "M/quarter." };
   }
 
@@ -319,6 +323,10 @@ window.Staff = (function() {
     var severance = fmt(s.salary, 2);  // one quarter severance
     GameState.balance.cash = fmt(GameState.balance.cash - severance);
     GameState.staff = GameState.staff.filter(function(x) { return x.roleId !== roleId; });
+
+    if (typeof News !== "undefined" && News.staffFired) {
+      News.staffFired(s.name, s.title);
+    }
 
     return { success: true, message: s.name + " dismissed. Severance $" + severance + "M paid. " + ROLES[roleId].title + " functions are now locked." };
   }
