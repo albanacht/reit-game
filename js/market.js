@@ -233,7 +233,7 @@ window.Market = (() => {
         const locNoise = randBetween(-0.03, 0.03);
         const delta = (capDelta * sensitivity) + locNoise;
         market.capRates[sector][location] = Math.round(
-          clamp(market.capRates[sector][location] + delta, 3.0, 12.0) * 100
+          clamp(market.capRates[sector][location] + delta, 4.5, 13.0) * 100
         ) / 100;
       });
     });
@@ -325,13 +325,14 @@ window.Market = (() => {
     GameState.market.cycle = "stable";
     GameState.market.cycleQuartersRemaining = randInt(4, 8);
     GameState.market.rateDirection = "flat";
+    GameState.market.rateHoldQuarters = 3;   // no rate move for the first few quarters
 
-    // Reset cap rates to defaults
+    // Reset cap rates to defaults (raised for positive carry vs borrowing costs)
     GameState.market.capRates = {
-      office:      { tier1: 6.1, tier2: 7.2, suburban: 8.3 },
-      industrial:  { tier1: 5.0, tier2: 6.1, suburban: 7.2 },
-      multifamily: { tier1: 5.5, tier2: 6.6, suburban: 7.7 },
-      retail:      { tier1: 6.6, tier2: 7.7, suburban: 9.4 },
+      office:      { tier1: 6.2, tier2: 7.2, suburban: 8.2 },
+      industrial:  { tier1: 5.2, tier2: 6.2, suburban: 7.2 },
+      multifamily: { tier1: 5.7, tier2: 6.7, suburban: 7.7 },
+      retail:      { tier1: 6.7, tier2: 7.7, suburban: 9.2 },
     };
 
     GameState.credit.rating = "BBB";
