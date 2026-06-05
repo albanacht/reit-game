@@ -457,3 +457,8 @@ input::placeholder { color:var(--text-muted); }
 .news-property { color:#2dd4bf; }
 .news-staff    { color:#818cf8; }
 .news-ambient  { color:#64748b; }
+
+/* TUTORIAL TOGGLE */
+.tutorial-toggle-row { margin-top:4px; }
+.tutorial-toggle { display:flex; align-items:center; gap:8px; font-size:12px; color:var(--text-muted); cursor:pointer; }
+.tutorial-toggle input { width:16px; height:16px; cursor:pointer; }
