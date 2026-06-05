@@ -367,6 +367,13 @@ window.UI = (function() {
     }
 
     var names = { williams:"Williams", chen:"Chen", okafor:"Okafor", petrova:"Petrova", hassan:"Hassan" };
+    var focus = {
+      williams:"Dividends",
+      chen:"Growth & FFO",
+      okafor:"Leverage & Risk",
+      petrova:"Share Price",
+      hassan:"Occupancy"
+    };
     var html = "";
     directors.forEach(function(d) {
       var att      = Math.round(d.attitude * 10) / 10;
@@ -374,7 +381,9 @@ window.UI = (function() {
       var color    = d.attitude < 3 ? "#ef4444" : d.attitude >= 7 ? "#22c55e" : "#f59e0b";
       var hostile  = d.attitude < 3 ? " 🔴" : "";
       html += '<div class="ba-row">' +
-        '<span class="ba-name">' + (names[d.id] || d.id) + hostile + '</span>' +
+        '<span class="ba-name">' + (names[d.id] || d.id) + hostile +
+          '<span class="ba-focus">' + (focus[d.id] || "") + '</span>' +
+        '</span>' +
         '<div class="ba-bar"><div class="ba-bar-fill" style="width:' + pct + '%;background:' + color + '"></div></div>' +
         '<span class="ba-score" style="color:' + color + '">' + fmt(att, 1) + '</span>' +
         '</div>';
@@ -1041,6 +1050,7 @@ window.UI = (function() {
         })() +
         '</div>' +
         '<div class="bm-dir-name">' + d.name.split(" ")[1] + '</div>' +
+        '<div class="bm-dir-focus">' + ({williams:"Dividends",chen:"Growth",okafor:"Leverage",petrova:"Share Price",hassan:"Occupancy"}[d.id] || "") + '</div>' +
         '<div class="bm-dir-stars ' + (att < 3 ? "text-red" : att >= 7 ? "text-green" : "text-yellow") + '">' + fmt(att, 1) + '/10</div>' +
         '</div>';
     }).join("");
