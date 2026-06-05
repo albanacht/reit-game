@@ -341,88 +341,88 @@ window.Financials = (() => {
   // Driven by: FFO growth, dividend changes, board mood,
   // market cycle, leverage signals
   // ----------------------------------------------------------
+  // ----------------------------------------------------------
+  // SHARE PRICE — BOND-PROXY MODEL
+  // A REIT is priced off its dividend yield. price = annualDividend / targetYield.
+  // Target yield sits in a band: healthy REITs command a low yield (premium
+  // price), distressed ones are pushed to a high yield (cheap price). The whole
+  // band shifts UP with interest rates — when bonds pay more, REITs must too.
+  // NAV provides a sanity backstop. Operational quality moves you within the band.
+  // ----------------------------------------------------------
   function updateSharePrice(pnl) {
-    const prev = GameState.history.length > 0
-      ? GameState.history[GameState.history.length - 1]
-      : null;
+    var annualDiv = GameState.company.dividendPerShare * 4;
+    var navPS     = GameState.ratios.navPerShare || 0;
+    var rate      = GameState.market.baseInterestRate || 2.5;
 
-    let priceMod = 1.0;
+    // Base band shifts with rates: the healthy (low) end tracks risk-free + a
+    // REIT risk premium. At 2.5% rates, healthy ~5%; at 6% rates, healthy ~8.5%.
+    var healthyYield   = rate + 2.5;   // premium end of the band
+    var distressYield  = rate + 7.0;   // distressed end of the band
 
-    // FFO per share vs last quarter
-    if (prev) {
-      const ffoGrowth = prev.ffoPerShare > 0
-        ? (GameState.ratios.ffoPerShare - prev.ffoPerShare) / prev.ffoPerShare
-        : 0;
-      priceMod += ffoGrowth * 0.5; // share price partially reflects FFO growth
+    // Position within the band (0 = healthy/premium, 1 = distressed) driven by
+    // operational quality: AFFO, dividend coverage, leverage, credit rating.
+    var stress = 0;
+
+    // AFFO health — the dominant driver
+    var affo = pnl ? pnl.affo : 0;
+    if (affo < 0)        stress += 0.45;        // bleeding cash → distressed
+    else if (affo < GameState.company.dividendPerShare * GameState.company.sharesOutstanding) stress += 0.20; // not covering dividend
+
+    // Dividend coverage
+    var cov = GameState.ratios.dividendCoverage || 0;
+    if (cov < 0.8)       stress += 0.20;
+    else if (cov < 1.1)  stress += 0.10;
+    else if (cov > 1.8)  stress -= 0.05;
+
+    // Leverage
+    var d2a = GameState.ratios.debtToAssets || 0;
+    if (d2a > 0.60)      stress += 0.15;
+    else if (d2a > 0.50) stress += 0.07;
+
+    // Credit rating
+    var ratingStress = { AAA:-0.10, AA:-0.07, A:-0.04, BBB:0, BB:0.10, B:0.20, CCC:0.35 };
+    stress += (ratingStress[GameState.credit.rating] || 0);
+
+    // Market cycle mood
+    var cycle = GameState.market.cycle;
+    if (cycle === "recession")   stress += 0.10;
+    else if (cycle === "contracting") stress += 0.05;
+    else if (cycle === "expanding")   stress -= 0.05;
+
+    stress = Math.max(0, Math.min(1, stress));
+
+    // Target yield within the band
+    var targetYield = healthyYield + (distressYield - healthyYield) * stress;
+
+    // Fair price from the dividend (bond proxy). If no dividend, fall back to
+    // a steep discount to NAV (a REIT that pays nothing is worth little as income).
+    var fairPrice;
+    if (annualDiv > 0.001) {
+      fairPrice = annualDiv / (targetYield / 100);
+    } else {
+      fairPrice = navPS * 0.35;
     }
 
-    // Dividend coverage signal
-    const coverage = GameState.ratios.dividendCoverage;
-    if (coverage < 0.90)       priceMod -= 0.04;
-    else if (coverage < 1.00)  priceMod -= 0.02;
-    else if (coverage > 1.50)  priceMod += 0.01;
-
-    // Leverage signal
-    const d2a = GameState.ratios.debtToAssets;
-    if (d2a > 0.58)      priceMod -= 0.03;
-    else if (d2a > 0.52) priceMod -= 0.01;
-    else if (d2a < 0.35) priceMod += 0.01;
-
-    // Market cycle signal
-    const cycle = GameState.market.cycle;
-    if (cycle === "expanding")   priceMod += 0.01;
-    if (cycle === "contracting") priceMod -= 0.01;
-    if (cycle === "recession")   priceMod -= 0.02;
-
-    // Credit watch negative
-    if (GameState.credit.watchNegative) priceMod -= 0.02;
-
-    // Random market noise (±1%)
-    priceMod += (Math.random() - 0.5) * 0.02;
-
-    // ---- VALUATION ANCHORS (blend, with a real floor) ----
-    // 1. P/FFO fair value (earnings-based)
-    var annualFFOPS = GameState.ratios.annualFFOPS || 0;
-    var ffoFair = annualFFOPS > 0 ? annualFFOPS * 15 : 0;
-
-    // 2. NAV per share (asset-based) — the structural floor.
-    //    Even a troubled REIT owns real buildings; price shouldn't fall
-    //    far below its net asset value.
-    var navPS = GameState.ratios.navPerShare || 0;
-
-    // 3. Dividend-yield pull. When yield gets high, income buyers step in
-    //    and support the price (the missing upward force that caused the
-    //    collapse to $1).
-    var divYield = GameState.ratios.dividendYield || 0;
-    if (divYield > 12)      priceMod += 0.06;   // deeply oversold on yield
-    else if (divYield > 8)  priceMod += 0.04;
-    else if (divYield > 6)  priceMod += 0.02;
-    else if (divYield < 1.5) priceMod -= 0.02;  // expensive / unattractive income
-
-    // Blend fair value: weight NAV and FFO. NAV dominates so assets anchor price.
-    var fairValue = 0, weight = 0;
-    if (navPS > 0)   { fairValue += navPS * 0.6;  weight += 0.6; }
-    if (ffoFair > 0) { fairValue += ffoFair * 0.4; weight += 0.4; }
-    if (weight > 0)  { fairValue = fairValue / weight; }
-
-    // Mean-revert gently toward fair value (12% pull per quarter)
-    if (fairValue > 0 && GameState.company.sharePrice > 0) {
-      priceMod = priceMod * 0.88 + (fairValue / GameState.company.sharePrice) * 0.12;
+    // NAV sanity backstop: price shouldn't stray absurdly far from asset value.
+    if (navPS > 0) {
+      var ceiling = navPS * 1.6;   // rarely trade far above NAV
+      var floorNAV = navPS * 0.30; // or far below it
+      fairPrice = Math.max(floorNAV, Math.min(ceiling, fairPrice));
     }
 
-    // Suppress positive drift for 2 quarters after equity issuance
+    // Equity-issuance suppression: dampen for 2 quarters after dilution
     if (GameState.company.equitySuppressQuarters > 0) {
       GameState.company.equitySuppressQuarters--;
-      priceMod = Math.min(priceMod, 0.99);
+      fairPrice *= 0.97;
     }
 
-    // Structural floor: never fall below 55% of NAV per share (asset backing),
-    // and an absolute floor of $1 as a backstop.
-    var navFloor = navPS > 0 ? navPS * 0.55 : 1.0;
-    var floor = Math.max(1.0, navFloor);
-    GameState.company.sharePrice = fmt(
-      Math.max(floor, GameState.company.sharePrice * priceMod)
-    );
+    // Mean-revert toward fair price (35%/quarter) plus small noise, so moves
+    // feel gradual rather than instant snaps.
+    var cur = GameState.company.sharePrice || fairPrice;
+    var noise = 1 + (Math.random() - 0.5) * 0.02;
+    var newPrice = (cur * 0.65 + fairPrice * 0.35) * noise;
+
+    GameState.company.sharePrice = fmt(Math.max(0.5, newPrice));
   }
 
   // ----------------------------------------------------------
@@ -842,6 +842,7 @@ window.Financials = (() => {
       GameState.meta.quarter = 1;
       GameState.meta.year   += 1;
       Market.applyYearlyEscalation();
+      Properties.applyAnnualDecay();
       if (typeof Staff !== "undefined" && Staff.processYearEnd) Staff.processYearEnd();
     }
 
