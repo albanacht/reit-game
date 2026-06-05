@@ -13,7 +13,7 @@
   <div id="start-overlay" class="hidden">
     <div class="start-inner">
       <div class="start-logo">REIT SIM</div>
-      <div class="start-version">v0.9 · Designed by Alexander Voronin · Built with Claude AI</div>
+      <div class="start-version">v0.8 · Designed by Alexander Voronin · Built with Claude AI</div>
       <p class="start-subtitle">Run a publicly traded Real Estate Investment Trust. Survive the board. Grow shareholder value.</p>
 
       <div class="start-setup">
@@ -334,6 +334,16 @@
         <div class="panel-body"><p class="text-muted">Press <strong>Advance Quarter</strong> to begin.</p></div>
       </div>
 
+      <div id="news-terminal" class="panel">
+        <div class="panel-header">
+          <span class="panel-title">📟 Market Wire</span>
+          <span class="news-live">● LIVE</span>
+        </div>
+        <div class="panel-body">
+          <div id="news-feed" class="news-feed"><p class="text-muted" style="font-size:11px">Awaiting market open…</p></div>
+        </div>
+      </div>
+
       <div class="section-tabs">
         <div class="section-tab-bar">
           <button class="section-tab-btn active" onclick="switchTab('tab-portfolio', this)">Portfolio</button>
@@ -469,6 +479,7 @@
 <script src="js/financials.js"></script>
 <script src="js/charts.js"></script>
 <script src="js/leaderboard.js"></script>
+<script src="js/news.js"></script>
 <script src="js/ui.js"></script>
 <script>
   function switchTab(tabId, btn) {
