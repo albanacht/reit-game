@@ -91,7 +91,7 @@ window.GameState = {
   // MARKET CONDITIONS
   // ----------------------------------------------------------
   market: {
-    baseInterestRate: 3.5,
+    baseInterestRate: 2.5,
     capRates: {
       office:      { tier1: 5.5, tier2: 6.5, suburban: 7.5 },
       industrial:  { tier1: 4.5, tier2: 5.5, suburban: 6.5 },
