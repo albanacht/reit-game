@@ -254,6 +254,10 @@ window.Properties = (() => {
     // Refresh market with a new property to keep pool near 20
     refreshMarket();
 
+    if (typeof News !== "undefined" && News.propertyBought) {
+      News.propertyBought(prop.name, prop.purchasePrice);
+    }
+
     return {
       success: true,
       message: `Acquired ${prop.name} for $${prop.purchasePrice}M.`
@@ -282,6 +286,10 @@ window.Properties = (() => {
 
     GameState.balance.cash += salePrice;
     GameState.portfolio.splice(idx, 1);
+
+    if (typeof News !== "undefined" && News.propertySold) {
+      News.propertySold(prop.name, salePrice, gain);
+    }
 
     return {
       success: true,
