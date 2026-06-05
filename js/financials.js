@@ -44,12 +44,23 @@ window.Financials = (() => {
       // Properties under construction generate zero NOI
       if (prop.underConstruction) return;
 
-      // Quarterly GPR = annual NOI potential ÷ 4
-      const propGPR      = fmt(prop.annualNOI / 4);
-      const propVacancy  = fmt(propGPR * (1 - prop.occupancy));
-      const propRevenue  = fmt(propGPR - propVacancy);
-      const propOpex     = fmt(propGPR * OPEX_RATIO);
-      const propNOI      = fmt(propRevenue - propOpex);
+      // prop.annualNOI is ALREADY net operating income (clean profit, after
+      // operating expenses). We must NOT subtract opex again. Instead we work
+      // BACKWARDS from NOI to show a realistic Gross Rent → Vacancy → Opex
+      // breakdown that sums correctly and matches the property list.
+      //
+      // Quarterly clean NOI at full occupancy:
+      const fullNOIq = prop.annualNOI / 4;
+
+      // Gross it up for display: if opex is OPEX_RATIO of gross rent, then
+      // NOI (at full occ) = grossRent * (1 - OPEX_RATIO). So gross rent is:
+      const propGPR     = fmt(fullNOIq / (1 - OPEX_RATIO));
+      const propOpex    = fmt(propGPR * OPEX_RATIO);
+      // Vacancy is the only real haircut applied to NOI (occupancy):
+      const propVacancy = fmt(propGPR * (1 - prop.occupancy));
+      const propRevenue = fmt(propGPR - propVacancy);
+      // Final NOI = gross - vacancy - opex  (lands at fullNOIq * occupancy)
+      const propNOI     = fmt(propRevenue - propOpex);
 
       grossPotentialRent += propGPR;
       vacancyLoss        += propVacancy;
