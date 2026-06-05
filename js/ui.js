@@ -183,6 +183,32 @@ window.UI = (function() {
   }
 
   // BOARD ATTITUDES PANEL
+  // NEWS TERMINAL
+  function renderNews() {
+    var feed = el("news-feed");
+    if (!feed) return;
+    var items = (typeof News !== "undefined" && News.getFeed) ? News.getFeed() : [];
+    if (items.length === 0) {
+      feed.innerHTML = '<p class="text-muted" style="font-size:11px">No headlines yet.</p>';
+      return;
+    }
+    var catColor = {
+      capital:"news-capital", debt:"news-debt", dividend:"news-dividend",
+      rating:"news-rating", market:"news-market", board:"news-board",
+      property:"news-property", staff:"news-staff", ambient:"news-ambient"
+    };
+    var html = "";
+    items.slice(0, 30).forEach(function(it) {
+      var cls = catColor[it.category] || "news-market";
+      html += '<div class="news-item">' +
+        '<span class="news-period">Y' + it.year + 'Q' + it.quarter + '</span>' +
+        '<span class="news-dot ' + cls + '">●</span>' +
+        '<span class="news-text">' + it.text + '</span>' +
+        '</div>';
+    });
+    feed.innerHTML = html;
+  }
+
   // STAFF ROSTER + TALENT MARKET
   function renderStaff() {
     var roster = el("staff-roster");
@@ -588,6 +614,7 @@ window.UI = (function() {
     renderBoardAttitudes();
     renderMarketConditions();
     renderStaff();
+    renderNews();
     renderPortfolio();
     renderPropertyMarket();
     renderCapitalActions();
@@ -1454,6 +1481,7 @@ window.UI = (function() {
     Properties.init();
     Board.init();
     Staff.init();
+    if (typeof News !== "undefined") News.init();
     Events.init();
     Financials.init();
     Charts.init();
