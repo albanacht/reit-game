@@ -204,23 +204,61 @@ window.Properties = (() => {
   // RECALCULATE property market value from current cap rates
   // Called every quarter as cap rates shift
   // ----------------------------------------------------------
+  // ----------------------------------------------------------
+  // RECALCULATE PROPERTY VALUES
+  // Value is NOT driven by operational lease-up (filling the bus earns
+  // more fares, it doesn't make the bus worth more). Instead value =
+  // a depreciating base, re-rated by market cap-rate swings (cycle + rates).
+  // Operational gains show up as NOI, never as value.
+  // ----------------------------------------------------------
   function recalculatePropertyValues() {
     const capRates = GameState.market.capRates;
 
     GameState.portfolio.forEach(prop => {
-      const capRate = capRates[prop.sector][prop.location] / 100;
-      const effectiveNOI = prop.annualNOI * prop.occupancy;
-      prop.currentValue = Math.round((effectiveNOI / capRate) * 10) / 10;
+      // Establish a baseline cap rate the first time we see this property
+      if (prop.baseCapRate === undefined) {
+        prop.baseCapRate = capRates[prop.sector][prop.location];
+      }
+      if (prop.baseValue === undefined) {
+        prop.baseValue = prop.currentValue;
+      }
+      // Market re-rating: how today's cap rate compares to the property's
+      // baseline. Lower cap rate than baseline => market marks it UP; higher
+      // => marks it DOWN. This is the cycle/interest-rate swing, both ways.
+      const curCap = capRates[prop.sector][prop.location];
+      const marketFactor = prop.baseCapRate / curCap;
+      prop.currentValue = Math.round(prop.baseValue * marketFactor * 10) / 10;
     });
 
     GameState.propertyMarket.forEach(prop => {
       const capRate = capRates[prop.sector][prop.location] / 100;
       const effectiveNOI = prop.annualNOI * prop.occupancy;
       prop.currentValue = Math.round((effectiveNOI / capRate) * 10) / 10;
-      // Asking price adjusts slowly (sellers are sticky)
       prop.askingPrice = Math.round(
-        prop.askingPrice * 0.85 + prop.currentValue * 1.02 * 0.15
-      * 10) / 10;
+        (prop.askingPrice * 0.85 + prop.currentValue * 1.02 * 0.15) * 10
+      ) / 10;
+    });
+  }
+
+  // ----------------------------------------------------------
+  // ANNUAL DEPRECIATION & NOI DECAY (called once per year)
+  // Buildings wear out: base value depreciates ~1.75%/yr and NOI drifts
+  // down ~1.25%/yr unless renovated. Renovation resets the decay clock.
+  // ----------------------------------------------------------
+  function applyAnnualDecay() {
+    GameState.portfolio.forEach(prop => {
+      if (prop.underConstruction) return;
+      if (prop.baseValue === undefined) prop.baseValue = prop.currentValue;
+
+      // Physical depreciation on the asset's base value (~1.75%/yr)
+      prop.baseValue = Math.round(prop.baseValue * 0.9825 * 10) / 10;
+
+      // NOI decay (~1.25%/yr) — gentle, offset partly by escalation clauses.
+      // A renovated property resists decay for a few years.
+      var decayResist = (prop.renovated && prop.renovatedYear && (GameState.meta.year - prop.renovatedYear) < 4) ? 0.5 : 1.0;
+      prop.annualNOI = Math.round(prop.annualNOI * (1 - 0.0125 * decayResist) * 10) / 10;
+
+      prop.age = (prop.age || 0) + 1;
     });
   }
 
@@ -534,8 +572,11 @@ window.Properties = (() => {
         if (prop.constructionType === "renovation") {
           prop.renovating  = false;
           prop.renovated   = true;
-          // Apply renovation benefits: NOI +15%, value recalculates automatically
+          prop.renovatedYear = GameState.meta.year;
+          // Renovation lifts NOI 15% and restores the asset's base value
           prop.annualNOI   = Math.round(prop.annualNOI * 1.15 * 100) / 100;
+          prop.baseValue   = Math.round((prop.baseValue || prop.currentValue) * 1.12 * 10) / 10;
+          prop.baseCapRate = GameState.market.capRates[prop.sector][prop.location];
           prop.occupancy   = Math.min(0.97, Math.round((prop.preConstructionOccupancy + 0.08) * 1000) / 1000);
           prop.constructionType = null;
           GameState.eventLog.push({
@@ -581,6 +622,7 @@ window.Properties = (() => {
     buyProperty,
     sellProperty,
     recalculatePropertyValues,
+    applyAnnualDecay,
     quarterlyUpdate,
     refreshMarket,
     maybeInjectMegaProperty,
