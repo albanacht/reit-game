@@ -480,6 +480,12 @@ window.Properties = (() => {
     if (prop.renovating) return { ok: false, reason: "Renovation in progress." };
     if ((prop.quarterOwned || 0) < 2) return { ok: false, reason: "Must own for at least 2 quarters." };
 
+    // Repositioning is a last resort for genuinely distressed assets only —
+    // a major, expensive structural change, not a routine optimisation.
+    if (prop.occupancy >= 0.70) {
+      return { ok: false, reason: "Repositioning is only for distressed properties (occupancy below 70%). This asset is performing too well to justify it." };
+    }
+
     // Must have a valid target sector
     var targets = getRepositionTargets(prop);
     if (targets.length === 0) return { ok: false, reason: "No valid repositioning targets for this property type." };
