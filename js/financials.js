@@ -632,6 +632,10 @@ window.Financials = (() => {
     GameState.balance.cash = fmt(GameState.balance.cash + amount);
     GameState.company.debtIssuanceQuarter = GameState.meta.totalQuarters;
 
+    if (typeof News !== "undefined" && News.debtIssued) {
+      News.debtIssued(amount, rate, years);
+    }
+
     return {
       success: true,
       message: `Issued $${amount}M of ${rate}% notes due Y${matYear}Q${matQ}. Cash increased by $${amount}M.`,
@@ -705,6 +709,10 @@ window.Financials = (() => {
         GameState.board.maxPressure,
         GameState.board.pressurePoints + 1
       );
+    }
+
+    if (typeof News !== "undefined" && News.equityIssued) {
+      News.equityIssued(fmt(sizeRatio * 100), fmt(totalDrop * 100));
     }
 
     return {
@@ -807,6 +815,10 @@ window.Financials = (() => {
       );
     }
 
+    if (typeof News !== "undefined" && News.dividendChanged) {
+      News.dividendChanged(old, fmt(newDividendPerShare));
+    }
+
     GameState.company.dividendPerShare = fmt(newDividendPerShare);
 
     const direction = change > 0.001 ? "raised" : change < -0.001 ? "cut" : "maintained";
@@ -845,6 +857,7 @@ window.Financials = (() => {
     Properties.quarterlyUpdate();
     Properties.processConstructionProgress();
     if (typeof Staff !== "undefined") Staff.processQuarter();
+    if (typeof News !== "undefined" && News.rollAmbient) News.rollAmbient();
 
     // 3. Run P&L calculations
     const noComponents   = calcPortfolioNOI();
