@@ -93,10 +93,10 @@ window.GameState = {
   market: {
     baseInterestRate: 2.5,
     capRates: {
-      office:      { tier1: 5.5, tier2: 6.5, suburban: 7.5 },
-      industrial:  { tier1: 4.5, tier2: 5.5, suburban: 6.5 },
-      multifamily: { tier1: 5.0, tier2: 6.0, suburban: 7.0 },
-      retail:      { tier1: 6.0, tier2: 7.0, suburban: 8.5 },
+      office:      { tier1: 6.2, tier2: 7.2, suburban: 8.2 },
+      industrial:  { tier1: 5.2, tier2: 6.2, suburban: 7.2 },
+      multifamily: { tier1: 5.7, tier2: 6.7, suburban: 7.7 },
+      retail:      { tier1: 6.7, tier2: 7.7, suburban: 9.2 },
     },
     cycle:                  "stable",
     cycleQuartersRemaining: 8,
