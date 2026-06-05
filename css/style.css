@@ -438,3 +438,22 @@ input::placeholder { color:var(--text-muted); }
 
 .jenkins-warning { background:rgba(245,158,11,.12); border:1px solid rgba(245,158,11,.35); border-radius:var(--radius-sm); padding:8px 10px; font-size:11px; color:#fbbf24; line-height:1.5; margin-bottom:10px; }
 .jenkins-warning strong { color:#f59e0b; }
+
+/* NEWS TERMINAL */
+#news-terminal .panel-header { display:flex; justify-content:space-between; align-items:center; }
+.news-live { font-size:10px; color:#22c55e; font-family:monospace; letter-spacing:1px; animation:newsblink 2s infinite; }
+@keyframes newsblink { 0%,100%{opacity:1;} 50%{opacity:0.4;} }
+.news-feed { max-height:220px; overflow-y:auto; font-family:'SF Mono',Menlo,monospace; }
+.news-item { display:flex; gap:8px; align-items:baseline; padding:5px 0; border-bottom:1px solid rgba(51,65,85,.25); font-size:11.5px; line-height:1.4; }
+.news-period { color:var(--text-muted); font-size:10px; flex-shrink:0; min-width:38px; }
+.news-dot { font-size:9px; flex-shrink:0; }
+.news-text { color:var(--text); }
+.news-capital  { color:#f59e0b; }
+.news-debt     { color:#ef4444; }
+.news-dividend { color:#22c55e; }
+.news-rating   { color:#a78bfa; }
+.news-market   { color:#38bdf8; }
+.news-board    { color:#fbbf24; }
+.news-property { color:#2dd4bf; }
+.news-staff    { color:#818cf8; }
+.news-ambient  { color:#64748b; }
