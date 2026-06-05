@@ -20,31 +20,30 @@ window.Properties = (() => {
   // ----------------------------------------------------------
   const PROFILES = {
     office: {
-      tier1:    { basePriceMid: 120, noiYield: 0.055, occupancyMid: 0.90, volatility: 0.08, label: "CBD Office Tower" },
-      tier2:    { basePriceMid: 65,  noiYield: 0.065, occupancyMid: 0.85, volatility: 0.10, label: "City Office Park" },
-      suburban: { basePriceMid: 35,  noiYield: 0.075, occupancyMid: 0.80, volatility: 0.13, label: "Suburban Office Campus" },
+      tier1:    { basePriceMid: 105, noiYield: 0.062, occupancyMid: 0.90, volatility: 0.08, label: "CBD Office Tower" },
+      tier2:    { basePriceMid: 48,  noiYield: 0.072, occupancyMid: 0.85, volatility: 0.10, label: "City Office Park" },
+      suburban: { basePriceMid: 18,  noiYield: 0.082, occupancyMid: 0.80, volatility: 0.13, label: "Suburban Office Campus" },
     },
     industrial: {
-      tier1:    { basePriceMid: 95,  noiYield: 0.045, occupancyMid: 0.95, volatility: 0.04, label: "Urban Logistics Hub" },
-      tier2:    { basePriceMid: 55,  noiYield: 0.055, occupancyMid: 0.93, volatility: 0.05, label: "Regional Distribution Center" },
-      suburban: { basePriceMid: 30,  noiYield: 0.065, occupancyMid: 0.90, volatility: 0.06, label: "Suburban Warehouse Park" },
+      tier1:    { basePriceMid: 90,  noiYield: 0.052, occupancyMid: 0.95, volatility: 0.04, label: "Urban Logistics Hub" },
+      tier2:    { basePriceMid: 42,  noiYield: 0.062, occupancyMid: 0.93, volatility: 0.05, label: "Regional Distribution Center" },
+      suburban: { basePriceMid: 15,  noiYield: 0.072, occupancyMid: 0.90, volatility: 0.06, label: "Suburban Warehouse Park" },
     },
     multifamily: {
-      tier1:    { basePriceMid: 110, noiYield: 0.050, occupancyMid: 0.93, volatility: 0.05, label: "Urban Apartment Tower" },
-      tier2:    { basePriceMid: 60,  noiYield: 0.060, occupancyMid: 0.90, volatility: 0.07, label: "Mid-City Apartment Complex" },
-      suburban: { basePriceMid: 32,  noiYield: 0.070, occupancyMid: 0.87, volatility: 0.10, label: "Suburban Apartment Community" },
+      tier1:    { basePriceMid: 100, noiYield: 0.057, occupancyMid: 0.93, volatility: 0.05, label: "Urban Apartment Tower" },
+      tier2:    { basePriceMid: 45,  noiYield: 0.067, occupancyMid: 0.90, volatility: 0.07, label: "Mid-City Apartment Complex" },
+      suburban: { basePriceMid: 16,  noiYield: 0.077, occupancyMid: 0.87, volatility: 0.10, label: "Suburban Apartment Community" },
     },
     retail: {
-      tier1:    { basePriceMid: 100, noiYield: 0.060, occupancyMid: 0.88, volatility: 0.10, label: "High Street Retail Center" },
-      tier2:    { basePriceMid: 50,  noiYield: 0.070, occupancyMid: 0.83, volatility: 0.13, label: "Community Shopping Center" },
-      suburban: { basePriceMid: 28,  noiYield: 0.085, occupancyMid: 0.78, volatility: 0.16, label: "Suburban Strip Mall" },
+      tier1:    { basePriceMid: 95,  noiYield: 0.067, occupancyMid: 0.88, volatility: 0.10, label: "High Street Retail Center" },
+      tier2:    { basePriceMid: 40,  noiYield: 0.077, occupancyMid: 0.83, volatility: 0.13, label: "Community Shopping Center" },
+      suburban: { basePriceMid: 13,  noiYield: 0.092, occupancyMid: 0.78, volatility: 0.16, label: "Suburban Strip Mall" },
     },
   };
 
-  // Market properties are priced 1.5x the base profile (starting portfolio
-  // is NOT affected — it generates with the raw profile values). This makes
-  // each market purchase more meaningful: a debt raise buys 1-2 assets, not 4+.
-  const MARKET_PRICE_MULT = 1.5;
+  // Market and starting portfolio now use the same base prices (no multiplier).
+  // Range emerges naturally: ~10M suburban up to ~120M prime tier-1.
+  const MARKET_PRICE_MULT = 1.0;
 
   // ----------------------------------------------------------
   // NAME BANKS — for generating realistic property names
@@ -369,14 +368,22 @@ window.Properties = (() => {
     if (Math.random() > megaOdds) return;
 
     var megaTypes = [
-      { sector: "industrial", label: "Mega Distribution Centre", baseValue: 180, noiYield: 0.072, tenant: "national logistics operator" },
-      { sector: "industrial", label: "Machinery Manufacturing Plant", baseValue: 220, noiYield: 0.078, tenant: "blue-chip manufacturer" },
-      { sector: "office",     label: "Corporate HQ Campus", baseValue: 240, noiYield: 0.068, tenant: "Fortune 500 anchor" },
-      { sector: "retail",     label: "Regional Shopping Megamall", baseValue: 260, noiYield: 0.080, tenant: "diversified retail consortium" },
+      { sector: "industrial", label: "Mega Distribution Centre", price: [80, 140], tenant: "national logistics operator" },
+      { sector: "industrial", label: "Machinery Manufacturing Plant", price: [90, 160], tenant: "blue-chip manufacturer" },
+      { sector: "office",     label: "Corporate HQ Campus", price: [100, 160], tenant: "Fortune 500 anchor" },
+      { sector: "retail",     label: "Regional Distribution Hub", price: [85, 150], tenant: "diversified retail consortium" },
     ];
     var m = pick(megaTypes);
-    var value = Math.round(m.baseValue * randBetween(0.9, 1.15) * 10) / 10;
-    var noi   = Math.round(value * m.noiYield * 10) / 10;
+
+    // The acquisitions officer's skill sets how good a deal he digs up:
+    // a poor AL finds ~7.5% cap, a great one ~9.5% cap. Higher cap = cheaper
+    // for the income = a genuine life-saving bargain.
+    var skill = Staff.skillFactor("acquisitions"); // 0..1
+    var capRate = 7.5 + skill * 2.0;               // 7.5% (poor) → 9.5% (great)
+    capRate = Math.round(capRate * 10) / 10;
+
+    var value = Math.round(randBetween(m.price[0], m.price[1]) * 10) / 10;
+    var noi   = Math.round(value * (capRate / 100) * 10) / 10;
 
     var prop = {
       id: nextPropId(),
@@ -386,7 +393,9 @@ window.Properties = (() => {
       label: m.label,
       purchasePrice: null,
       currentValue: value,
-      askingPrice: Math.round(value * 1.02 * 10) / 10,
+      baseValue: value,
+      baseCapRate: capRate,
+      askingPrice: value,         // sold at fair value — the deal is the high cap
       annualNOI: noi,
       occupancy: 0.97,            // single reliable tenant, near-full
       age: randInt(1, 8),
@@ -396,6 +405,7 @@ window.Properties = (() => {
       daysOnMarket: 0,
       isMega: true,
       isSingleTenant: true,
+      megaCapRate: capRate,
       megaTenant: m.tenant,
     };
     GameState.propertyMarket.unshift(prop);
