@@ -47,6 +47,64 @@ window.UI = (function() {
   }
 
   // ----------------------------------------------------------
+  // JENKINS TUTORIAL — Year 1 quarterly guidance (optional)
+  // ----------------------------------------------------------
+  var TUTORIAL_SCRIPT = {
+    "1-1": {
+      title: "Jenkins — Getting Started",
+      body: "Welcome aboard, boss. Keep your eye on <strong>AFFO</strong> — that's our true free cash flow, the bottom line that keeps us alive. " +
+            "Cash is tight early on, so use <strong>debt</strong> to buy high-yielding properties, hire an <strong>Asset Manager</strong> to lease them up, and squeeze every dollar of income out of them. Keep AFFO climbing or we go belly up."
+    },
+    "1-2": {
+      title: "Jenkins — Reading the Market",
+      body: "See the <strong>cap rates</strong> in the market panel? A higher cap rate means cheaper property for the income it throws off. " +
+            "But mind this — the juiciest yields are often the riskiest: more exposed to nasty events and falling occupancy. Balance the high-yield bargains against safer, steadier buildings."
+    },
+    "1-3": {
+      title: "Jenkins — Mind the Debt Wall",
+      body: "Our debt matures on fixed dates. Don't bunch it all into one year — <strong>ladder it</strong> across time so we're never hit by a wall we can't refinance. " +
+            "I'll give you a shout when one's coming up."
+    },
+    "1-4": {
+      title: "Jenkins — The Board Awaits",
+      body: "Year-end approaches. From next year the <strong>board votes</strong> on your future. <strong>Chairman Williams</strong> leads them — keep him content above all, and he cares most about a <strong>rising dividend</strong>. " +
+            "You've a few political-capital points to smooth things over, but don't lean on them — do the real work of keeping the board on side yourself."
+    },
+  };
+
+  function maybeShowTutorial() {
+    if (!GameState._tutorialEnabled) return false;
+    if (GameState.meta.year !== 1) return false;
+    var key = GameState.meta.year + "-" + GameState.meta.quarter;
+    var entry = TUTORIAL_SCRIPT[key];
+    if (!entry) return false;
+    if (GameState._tutorialShown && GameState._tutorialShown[key]) return false;
+    GameState._tutorialShown = GameState._tutorialShown || {};
+    GameState._tutorialShown[key] = true;
+    showJenkinsPopup(entry.title, entry.body);
+    return true;
+  }
+
+  // Jenkins portrait popup (tutorial + advisories)
+  function showJenkinsPopup(title, body) {
+    var overlay = el("modal-overlay");
+    if (!overlay) return;
+    el("modal-title").textContent = title;
+    el("modal-body").innerHTML =
+      '<div style="display:flex;gap:12px;align-items:flex-start;">' +
+        '<img src="assets/board/jenkins.png" style="width:64px;height:64px;border-radius:8px;flex-shrink:0;image-rendering:pixelated;" alt="Jenkins">' +
+        '<div style="font-size:13px;line-height:1.6;">' + body + '</div>' +
+      '</div>';
+    el("modal-actions").innerHTML = "";
+    var btn = document.createElement("button");
+    btn.textContent = "Got it";
+    btn.className = "btn btn-primary";
+    btn.onclick = closeModal;
+    el("modal-actions").appendChild(btn);
+    overlay.classList.remove("hidden");
+  }
+
+  // ----------------------------------------------------------
   // TOAST
   // ----------------------------------------------------------
   function showToast(message, type) {
@@ -1396,9 +1454,54 @@ window.UI = (function() {
           );
         }, 1000);
       }
+
+      // Jenkins Year-1 tutorial (queued after other popups)
+      setTimeout(function() {
+        if (el("modal-overlay") && !el("modal-overlay").classList.contains("hidden")) return; // don't stack
+        if (maybeShowTutorial()) return;
+        // Q4 board warning (max once/year): if a director is angry before the vote
+        maybeShowBoardWarning();
+      }, 1200);
     }
 
     showMacroEventPopup(qr.firedEvents, continueAfterEvents);
+  }
+
+  // Jenkins warns before the annual meeting if a director is turning hostile.
+  // Max once per year, only in Q4 (the meeting is imminent).
+  function maybeShowBoardWarning() {
+    if (GameState.meta.quarter !== 4) return;
+    if (GameState.meta.year < 2) return; // no vote after Year 1
+    if (GameState._boardWarnYear === GameState.meta.year) return;
+
+    var directors = GameState.board.directors; // array of {id, attitude}
+    if (!directors || !directors.length) return;
+
+    // Find the angriest director below the danger threshold
+    var worst = null;
+    directors.forEach(function(d) {
+      if (d.attitude < 3.8 && (!worst || d.attitude < worst.attitude)) worst = d;
+    });
+    if (!worst) return;
+
+    GameState._boardWarnYear = GameState.meta.year;
+
+    // Look up display info from the static directory
+    var info = (Board.DIRECTORS || []).find(function(x) { return x.id === worst.id; }) || {};
+    var dirName = info.name || "A director";
+
+    var body;
+    if (worst.id === "williams") {
+      var startDiv = GameState.board.startYearDividend || GameState.company.dividendPerShare;
+      var target = fmt(startDiv * 1.10, 2);
+      body = "Boss, <strong>Chairman Williams</strong> is unhappy heading into the vote. He expects the dividend to keep rising — " +
+             "consider lifting it toward <strong>$" + target + "/share</strong> before the meeting, or he may turn on us. " +
+             "Raise it this quarter and his mood will improve before they vote.";
+    } else {
+      body = "Boss, <strong>" + dirName + "</strong> is unhappy heading into the annual vote (watching " + (info.watches || "performance") + "). " +
+             "We've this quarter to improve things — address their concern, or spend political capital to smooth it over before the meeting.";
+    }
+    showJenkinsPopup("Jenkins — Board Warning", body);
   }
 
   // ----------------------------------------------------------
@@ -1422,12 +1525,17 @@ window.UI = (function() {
   function newGame() {
     var ni = el("input-player-name");
     var ri = el("input-reit-name");
+    var tut = el("input-tutorial");
     var playerName = (ni && ni.value.trim()) ? ni.value.trim() : "CEO";
     var reitName   = (ri && ri.value.trim()) ? ri.value.trim() : "My";
 
     GameState.player.name     = playerName;
     GameState.player.reitName = reitName;
     GameState.company.name    = reitName + " REIT";
+
+    // Tutorial mode — Jenkins Year-1 guidance (default on)
+    GameState._tutorialEnabled = tut ? tut.checked : true;
+    GameState._tutorialShown   = {};
 
     GameState.meta.quarter        = 1;
     GameState.meta.year           = 1;
@@ -1515,7 +1623,10 @@ window.UI = (function() {
         "The board does not reward caution — it rewards results.\n\n" +
         "Press F1 anytime for help on ratios and mechanics.\n\n" +
         "— The Board of Directors",
-        []
+        [{ label: "Begin", style: "btn-primary", onClick: function() {
+          // After the welcome letter, Jenkins gives the first tutorial beat
+          setTimeout(maybeShowTutorial, 350);
+        }}]
       );
     }, 400);
   }
