@@ -63,8 +63,9 @@ window.Board = (() => {
   const MANDATE_POOL = {
     williams: [
       { id: "div_raise",    text: (t) => `Raise the quarterly dividend by at least ${t}% this year.`, metric: "dividendGrowthPct", target: (y) => 8 + y * 3,      higher: true  },
-      { id: "div_coverage", text: (t) => `FFO coverage of dividend must exceed ${t}x.`,           metric: "dividendCoverage",    target: (y) => 1.1 + y * 0.05, higher: true  },
+      { id: "div_raise2",   text: (t) => `Deliver dividend growth of ${t}% — shareholders expect rising income.`, metric: "dividendGrowthPct", target: (y) => 8 + y * 3, higher: true  },
       { id: "div_nocut",    text: () => `Do not cut the dividend at any point this year.`,         metric: "noDividendCut",       target: () => 1,               higher: true  },
+      { id: "div_coverage", text: (t) => `Keep FFO coverage of the dividend above a healthy ${t}x.`, metric: "dividendCoverage",  target: (y) => 0.9 + y * 0.03, higher: true  },
     ],
     chen: [
       { id: "acquisitions", text: (t) => `Acquire at least ${t} properties this year.`,           metric: "acquisitionsThisYear",target: (y) => 1 + Math.floor(y/2), higher: true },
@@ -157,14 +158,25 @@ window.Board = (() => {
     var b  = GameState.balance;
     var h  = GameState.history;
 
-    // Williams — dividends
+    // Williams — DIVIDENDS. Dividend GROWTH is his overwhelming concern.
+    // Coverage is near-cosmetic: it barely nudges him, and only bites if
+    // truly catastrophic — so the early-game solvency struggle doesn't
+    // unfairly enrage him. The real pressure is to keep raising the payout.
     var w = getDirectorState("williams");
     if (w) {
-      if (co.dividendPerShare > (GameState.board.startYearDividend || co.dividendPerShare))
-        w.attitude = clamp(w.attitude + 0.5, 0, 10);
-      if (r.dividendCoverage < 1.0)  w.attitude = clamp(w.attitude - 0.5, 0, 10);
-      if (r.dividendCoverage > 1.5)  w.attitude = clamp(w.attitude + 0.3, 0, 10);
-      if (p.retainedCash < 0)        w.attitude = clamp(w.attitude - 0.5, 0, 10);
+      var startDiv = GameState.board.startYearDividend || co.dividendPerShare;
+      // Primary driver: is the dividend rising vs the year-start level?
+      if (co.dividendPerShare > startDiv * 1.02) {
+        w.attitude = clamp(w.attitude + 0.6, 0, 10);   // raised — he's pleased
+      } else if (co.dividendPerShare < startDiv - 0.001) {
+        w.attitude = clamp(w.attitude - 0.8, 0, 10);   // cut — he's angry
+      } else {
+        w.attitude = clamp(w.attitude - 0.25, 0, 10);  // stagnant — mild displeasure (anti-snowball)
+      }
+      // Coverage: near-cosmetic. Tiny reward when healthy; small bite ONLY
+      // if catastrophically low (well below 1.0). Never a major driver.
+      if (r.dividendCoverage > 1.8)      w.attitude = clamp(w.attitude + 0.1, 0, 10);
+      else if (r.dividendCoverage < 0.5) w.attitude = clamp(w.attitude - 0.15, 0, 10);
     }
 
     // Chen — growth
