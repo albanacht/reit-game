@@ -101,7 +101,7 @@ window.Decisions = (function() {
   function checkDistressedProperty() {
     var cycle = GameState.market.cycle;
     if (cycle !== "contracting" && cycle !== "recession") return null;
-    return Math.random() < 0.10 ? true : null;
+    return Math.random() < 0.16 ? true : null;
   }
 
   function generateDistressedProperty() {
@@ -198,7 +198,7 @@ window.Decisions = (function() {
   function checkZoning() {
     var sub = GameState.portfolio.filter(function(p) { return p.location==="suburban"; });
     if (sub.length === 0) return null;
-    return Math.random() < 0.08 ? pick(sub) : null;
+    return Math.random() < 0.22 ? pick(sub) : null;
   }
 
   function generateZoning(prop) {
@@ -277,7 +277,7 @@ window.Decisions = (function() {
     var candidates = GameState.portfolio.filter(function(p) {
       return p.occupancy >= 0.85 && p.occupancy < 0.97;
     });
-    return candidates.length > 0 && Math.random() < 0.12 ? pick(candidates) : null;
+    return candidates.length > 0 && Math.random() < 0.30 ? pick(candidates) : null;
   }
 
   function generateExpansion(prop) {
@@ -564,6 +564,13 @@ window.Decisions = (function() {
       { check: checkActivist,          gen: generateActivist          },
       { check: checkMicroReit,         gen: generateMicroReit         },
     ];
+
+    // Shuffle so no single event type gets first-check priority each quarter
+    // (Fisher-Yates). Without this, tenant distress always won the tie.
+    for (var s = checks.length - 1; s > 0; s--) {
+      var j = Math.floor(Math.random() * (s + 1));
+      var tmp = checks[s]; checks[s] = checks[j]; checks[j] = tmp;
+    }
 
     for (var i = 0; i < checks.length; i++) {
       var result = checks[i].check();
