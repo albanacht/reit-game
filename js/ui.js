@@ -300,10 +300,16 @@ window.UI = (function() {
 
     // Talent market — grouped by role, 3 candidates each
     var tm = GameState._talentMarket || [];
+    var header = el("talent-market-header");
     if (tm.length === 0) {
-      market.innerHTML = '<p class="text-muted" style="font-size:12px">All roles filled. Fire someone to see new candidates next year.</p>';
+      if (header) header.style.display = "none";
+      var allFilled = Object.keys(Staff.ROLES).every(function(r) { return Staff.isRoleFilled(r); });
+      market.innerHTML = allFilled
+        ? '<p class="text-muted" style="font-size:12px">✓ Your executive team is complete — every role is filled. Fire someone to open a search, or new candidates appear next year for any vacancy.</p>'
+        : '<p class="text-muted" style="font-size:12px">No candidates available. New ones appear next year.</p>';
       return;
     }
+    if (header) header.style.display = "";
     // Group candidates by role, preserving global index for hire()
     var byRole = {};
     tm.forEach(function(c, i) {
@@ -1334,12 +1340,14 @@ window.UI = (function() {
   function makeDecision(choiceIndex) {
     if (!_currentDecision) return;
     var result = Decisions.applyChoice(_currentDecision, choiceIndex);
-    _currentDecision = null;
-    closeModal();
     if (!result.success) {
+      // Invalid choice (e.g. not enough capital) — keep the modal open,
+      // the player must choose a valid option. No free escape.
       showToast(result.message, "error");
       return;
     }
+    _currentDecision = null;
+    closeModal();
     showToast(result.message, "success");
     // Now run the quarter
     setTimeout(runQuarterAndReport, 400);
