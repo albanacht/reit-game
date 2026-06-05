@@ -1046,6 +1046,8 @@ window.UI = (function() {
           var scale = containerH / dim.h;
           var scaledW = Math.round(dim.w * scale);
           var xPos = expr === "neutral" ? "0%" : expr === "happy" ? "33.33%" : expr === "angry" ? "66.66%" : "100%";
+          // If this director is the current speaker, force the speaking frame (4th)
+          if (isCurrent) xPos = "100%";
           return '<div class="bm-portrait" id="bm-sprite-' + d.id + '" style="background-image:url(\'' + d.image + '\');background-size:' + scaledW + 'px ' + containerH + 'px;background-position:' + xPos + ' 0%;background-repeat:no-repeat;"></div>';
         })() +
         '</div>' +
@@ -1079,15 +1081,13 @@ window.UI = (function() {
     setText("bm-mandate-counter", "Mandate " + (idx + 1) + " of " + mandates.length);
     setText("bm-capital-display", "Political Capital: " + GameState.board.politicalCapital + "/" + GameState.board.maxCapital);
 
+    // Clear previous state BEFORE typing the new speech
+    var voteBox = document.querySelector(".bm-vote-box");
+    if (voteBox) voteBox.remove();
+
     // Generate and type speech
     var speech = Board.generateSpeech(mandate.directorId, mandate, attitude);
     typeText("bm-speech-text", speech);
-
-    // Clear previous state
-    var speechEl2 = el("bm-speech-text");
-    if (speechEl2) speechEl2.textContent = "";
-    var voteBox = document.querySelector(".bm-vote-box");
-    if (voteBox) voteBox.remove();
 
     // Update buttons
     var btnArea = el("bm-response-buttons");
