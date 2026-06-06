@@ -35,7 +35,7 @@ window.GameState = {
     sharePrice:           10.00,
     sharesOutstanding:    10,          // millions
     marketCap:            100,         // $ millions
-    dividendPerShare:     0.10,        // $ per share per quarter (rebalanced)
+    dividendPerShare:     0.05,        // $ per share per quarter (sustainable start ~55% payout)
     dividendHistory:      [],
     dividendCutQuarters:  0,
     equityIssuanceCount:  0,   // tracks number of equity issuances
