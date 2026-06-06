@@ -430,6 +430,47 @@ window.Decisions = (function() {
     return Math.random() < 0.04 ? true : null;
   }
 
+  // CFO preferred-stock lifeline — once per game, only when the CFO is hired
+  // and the company is genuinely stressed (negative AFFO or low cash).
+  function checkPreferredOffer() {
+    if (typeof Staff === "undefined" || !Staff.hasRole("financial")) return null;
+    if (GameState.preferred && GameState.preferred.issued) return null;
+    if (GameState._preferredOffered) return null;
+    var stressed = (GameState.pnl && GameState.pnl.affo < 0) || GameState.balance.cash < 10;
+    if (!stressed) return null;
+    return Math.random() < 0.5 ? true : null;
+  }
+
+  function generatePreferredOffer() {
+    GameState._preferredOffered = true;
+    var cfo = Staff.getStaff("financial");
+    var cfoName = cfo ? cfo.name : "Your CFO";
+    var shares = 2, par = 25, rate = 0.05;
+    var proceeds = shares * par;
+    var qtrCost = fmt(proceeds * rate / 4);
+    return {
+      id: "preferred_offer",
+      title: "💼 " + cfoName + " — Preferred Stock Opportunity",
+      isMacro: false,
+      body: cfoName + " (CFO): \"Boss, I've worked my connections at the banks and pension funds. We can issue " + shares + "M preferred shares at $" + par + " par — $" + proceeds + "M, fully spoken for by Halverson Bank and the Westgate County pension fund. The rate's just " + (rate*100) + "% annually ($" + qtrCost + "M/quarter), paid before common dividends. It's not debt, so it won't touch our leverage or credit rating — pure breathing room. Shall I close it?\"",
+      choices: [
+        {
+          label: "Issue $" + proceeds + "M preferred (5%)",
+          costType: "none",
+          apply: function() {
+            var r = Financials.issuePreferred(shares, par, rate);
+            return r.message;
+          }
+        },
+        {
+          label: "Decline — keep the cap table clean",
+          costType: "none",
+          apply: function() { return "You declined the preferred stock issuance."; }
+        }
+      ]
+    };
+  }
+
   function generateMicroReit() {
     var sectors   = ["office","retail","industrial"];
     var locations = ["tier2","tier2","suburban"];
@@ -557,6 +598,7 @@ window.Decisions = (function() {
         GameState.meta.totalQuarters - GameState._lastDecisionQuarter < 2) return null;
 
     var checks = [
+      { check: checkPreferredOffer,    gen: generatePreferredOffer    },
       { check: checkTenantDistress,    gen: generateTenantDistress    },
       { check: checkDistressedProperty,gen: generateDistressedProperty},
       { check: checkZoning,            gen: generateZoning            },
@@ -564,6 +606,14 @@ window.Decisions = (function() {
       { check: checkActivist,          gen: generateActivist          },
       { check: checkMicroReit,         gen: generateMicroReit         },
     ];
+
+    // The preferred lifeline is checked FIRST (not shuffled) so a stressed
+    // company reliably sees its rescue option.
+    var lifeline = checks.shift();
+    if (lifeline.check()) {
+      var levt = lifeline.gen();
+      if (levt) { GameState._lastDecisionQuarter = GameState.meta.totalQuarters; return levt; }
+    }
 
     // Shuffle so no single event type gets first-check priority each quarter
     // (Fisher-Yates). Without this, tenant distress always won the tie.
