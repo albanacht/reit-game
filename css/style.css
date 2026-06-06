@@ -309,7 +309,7 @@ input::placeholder { color:var(--text-muted); }
 .goal-target { font-family:monospace; font-weight:700; font-size:11px; white-space:nowrap; }
 
 /* VERSION + CREDIT */
-.start-version { font-size:11px; color:var(--text-muted); letter-spacing:0.5px; margin-top:-12px; }
+.start-version { font-size:12px; color:#94a3b8; letter-spacing:0.5px; margin-top:0; font-weight:600; }
 
 /* PROPERTY INDICATORS */
 .prop-indicator { font-size:16px; margin-right:6px; cursor:help; }
