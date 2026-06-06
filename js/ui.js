@@ -1634,8 +1634,8 @@ window.UI = (function() {
     GameState.balance.cash                = 5;
 
     GameState.debtTranches = [
-      { id: "d001", amount: 50, rate: 5.0, maturityQuarter: 2, maturityYear: 4, quartersUntilMaturity: 13, label: "5.0% Sr Notes due Y4Q2" },
-      { id: "d002", amount: 50, rate: 5.5, maturityQuarter: 4, maturityYear: 6, quartersUntilMaturity: 23, label: "5.5% Sr Notes due Y6Q4" },
+      { id: "d001", amount: 35, rate: 5.0, maturityQuarter: 2, maturityYear: 4, quartersUntilMaturity: 13, label: "5.0% Sr Notes due Y4Q2" },
+      { id: "d002", amount: 35, rate: 5.5, maturityQuarter: 4, maturityYear: 6, quartersUntilMaturity: 23, label: "5.5% Sr Notes due Y6Q4" },
     ];
 
     GameState.history         = [];
