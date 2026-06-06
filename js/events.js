@@ -425,30 +425,42 @@ window.Events = (() => {
       name: "Unsolicited Acquisition Offer",
       type: "property",
       target: null,
-      baseProbability: 0.07,
-      cycleBias: { expanding: 2.0, stable: 1.0, contracting: 0.5, recession: 0.2 },
+      baseProbability: 1.0,   // gating handled inside apply() (once/year, skill-scaled)
+      cycleBias: { expanding: 1.0, stable: 1.0, contracting: 1.0, recession: 1.0 },
       apply() {
         if (GameState.portfolio.length === 0) return null;
         // Requires Acquisitions Lead — they source the buyers
         if (typeof Staff === "undefined" || !Staff.hasRole("acquisitions")) return null;
+
+        // Once per year only
+        if (GameState._lastBuyerFindYear === GameState.meta.year) return null;
+        GameState._lastBuyerFindYear = GameState.meta.year;
+
+        // Chance of FINDING a buyer scales with skill: ~50% (low) to ~90% (high)
+        var findChance = 0.50 + Staff.skillFactor("acquisitions") * 0.40;
+        if (Math.random() > findChance) {
+          // He looked but found nothing this year — quiet, no popup
+          return null;
+        }
 
         // Prefer an underperforming property (the AL finds buyers for weak assets)
         var underperformers = GameState.portfolio.filter(function(p) { return p.occupancy < 0.82 && !p.underConstruction; });
         const prop = underperformers.length > 0 ? pick(underperformers) : pick(GameState.portfolio);
         if (prop.underConstruction) return null;
 
-        // AL skill scales the premium offered (better AL = better buyers)
-        const skillBonus = Staff.skillFactor("acquisitions") * 0.12;
-        const premium = randBetween(0.10, 0.22) + skillBonus;
+        // Premium scales with skill: ~10% (low) to ~25% (high)
+        const premium = 0.10 + Staff.skillFactor("acquisitions") * 0.15;
         const offerPrice = fmt(prop.currentValue * (1 + premium));
+        const al = Staff.getStaff("acquisitions");
         GameState._pendingOffer = {
           propertyId: prop.id,
           propertyName: prop.name,
           offerPrice,
           premium: fmt(premium * 100),
           expiresNextQuarter: true,
+          alName: al.name,
+          alPortrait: al.portrait,
         };
-        const al = Staff.getStaff("acquisitions");
         const msg = al.name + " (Acquisitions): \"Boss, I found a buyer for " + prop.name + " at $" + offerPrice + "M — a " + fmt(premium*100) + "% premium to appraised value. " + (prop.occupancy < 0.82 ? "Good chance to offload an underperformer. " : "") + "We can accept or decline next quarter.\"";
         return { headline: "💼 " + al.name + " Found a Buyer", body: msg, impact: "Offer: $" + offerPrice + "M for " + prop.name };
       },
@@ -468,29 +480,51 @@ window.Events = (() => {
     // Base number of event slots per quarter (increases with years)
     const eventSlots = Math.min(3, 1 + Math.floor(year / 3));
 
+    // Events that inflict damage (cost / occupancy loss) — throttled by cooldown
+    var HARMFUL_IDS = {
+      credit_crunch:true, pandemic_shock:true, interest_rate_shock:true,
+      retail_oversupply:true, office_wfh:true, multifamily_oversupply:true,
+      major_tenant_bankruptcy:true, major_repair:true, natural_disaster:true,
+    };
+
     // Build probability-adjusted list
     const candidates = EVENT_CATALOGUE.map(evt => {
       const bias = evt.cycleBias[cycle] || 1.0;
       // Probability scales up slightly with years (world gets more volatile)
       const yearMod = 1 + (year - 1) * 0.05;
+      evt.harmful = !!HARMFUL_IDS[evt.id];
       return {
         evt,
         probability: Math.min(0.60, evt.baseProbability * bias * yearMod),
       };
     });
 
-    // Roll each event independently
+    // Roll each event independently, but throttle NEGATIVE shocks with a
+    // global cooldown so the player isn't hit with a bad event every quarter.
     const firedIds = new Set();
+    var negativeCooldown = GameState._negEventCooldown || 0;
+    var firedNegativeThisQuarter = false;
+
     candidates.forEach(({ evt, probability }) => {
       if (firedIds.has(evt.id)) return;
+      // Year 1 is an orientation year — suppress harmful macro shocks entirely.
+      if (year <= 1 && evt.harmful) return;
+      // If a negative event is on cooldown, skip harmful events this quarter.
+      if (evt.harmful && (negativeCooldown > 0 || firedNegativeThisQuarter)) return;
       if (Math.random() < probability) {
         const result = evt.apply();
         if (result) {
           firedIds.add(evt.id);
           firedEvents.push(result);
+          if (evt.harmful) {
+            firedNegativeThisQuarter = true;
+            // After a negative shock, 2-3 quarter breather before the next one.
+            GameState._negEventCooldown = 2 + Math.floor(Math.random() * 2);
+          }
         }
       }
     });
+    if (negativeCooldown > 0) GameState._negEventCooldown = negativeCooldown - 1;
 
     // Cap at eventSlots to avoid chaos
     return firedEvents.slice(0, eventSlots);
