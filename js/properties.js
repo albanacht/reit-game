@@ -198,15 +198,15 @@ window.Properties = (() => {
       return prop;
     });
 
-    // A small, high-yield, fully-leased suburban anchor — provides steady
-    // income from turn one (no lease-up J-curve) and a yield cushion to help
-    // cover fixed costs while you build. ~$10M at a ~9.5% cap rate.
+    // A small, high-yield suburban anchor — provides useful income to help
+    // cover fixed costs while you build, at a realistic suburban occupancy
+    // (~86%) so there's room to lease it up as an early goal. ~$10M, ~9.5% cap.
     var anchor = generateProperty("retail", "suburban", false);
     anchor.currentValue   = 10;
     anchor.baseValue      = 10;
-    anchor.annualNOI      = 0.95;        // ~9.5% cap on $10M
+    anchor.annualNOI      = 0.95;        // ~9.5% cap on $10M (at full occupancy)
     anchor.baseCapRate    = 9.5;
-    anchor.occupancy      = 0.96;        // fully leased, steady tenant
+    anchor.occupancy      = 0.86;        // realistic suburban — room to lease up
     anchor.purchasePrice  = 10;
     anchor.quarterOwned   = 1;
     anchor.askingPrice    = null;
