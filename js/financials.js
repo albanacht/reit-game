@@ -621,24 +621,32 @@ window.Financials = (() => {
       return { success: false, message: "Amount must be greater than zero." };
     }
 
-    // Debt can only be issued once every 2 quarters
-    var lastDebtQ    = GameState.company.debtIssuanceQuarter || 0;
-    var currentQ     = GameState.meta.totalQuarters;
-    var quartersSince = currentQ - lastDebtQ;
-    if (lastDebtQ > 0 && quartersSince < 2) {
-      return { success: false, message: "Debt markets need time to absorb issuances. You must wait " + (2 - quartersSince) + " more quarter(s) before issuing new debt." };
-    }
+    // Borrowing capacity = 80% LTV against PORTFOLIO VALUE (real-estate lending
+    // is based on loan-to-value, not total assets — so cash doesn't inflate the
+    // limit, and capacity grows as you acquire more property).
+    var portfolioValue = GameState.portfolio.reduce(function(s, p) { return s + p.currentValue; }, 0);
+    var currentDebt    = GameState.debtTranches.reduce(function(s, t) { return s + t.amount; }, 0);
+    var maxTotalDebt   = fmt(portfolioValue * 0.80);
+    var headroom       = fmt(maxTotalDebt - currentDebt);
 
-    // Leverage cap: total debt may not exceed 70% of total assets.
-    // (Real REITs lever to 60-70%.) Capacity = headroom under that ceiling.
-    var currentDebt = GameState.debtTranches.reduce(function(s, t) { return s + t.amount; }, 0);
-    var maxTotalDebt = fmt(GameState.balance.totalAssets * 0.70);
-    var headroom = fmt(maxTotalDebt - currentDebt);
     if (headroom <= 0) {
-      return { success: false, message: "You're at the 70% leverage ceiling (debt vs assets). Acquire more assets or retire debt before borrowing more." };
+      return { success: false, message: "You're at the 80% loan-to-value ceiling against your property portfolio. Acquire more property or retire debt before borrowing more." };
     }
     if (amount > headroom) {
-      return { success: false, message: "That would breach the 70% leverage ceiling. Your remaining borrowing capacity is $" + headroom + "M." };
+      return { success: false, message: "That would breach the 80% LTV ceiling. Your remaining borrowing capacity is $" + headroom + "M (against a $" + fmt(portfolioValue) + "M portfolio)." };
+    }
+
+    // Frequency: lenders are happy to fund you while you're modestly levered
+    // (borrow freely below 50% LTV), but make you wait once you're highly
+    // levered (a 2-quarter cooldown kicks in above 50% LTV).
+    var currentLTV = portfolioValue > 0 ? (currentDebt / portfolioValue) : 1;
+    if (currentLTV >= 0.50) {
+      var lastDebtQ     = GameState.company.debtIssuanceQuarter || 0;
+      var currentQ      = GameState.meta.totalQuarters;
+      var quartersSince = currentQ - lastDebtQ;
+      if (lastDebtQ > 0 && quartersSince < 2) {
+        return { success: false, message: "You're above 50% leverage — lenders need time between issuances. Wait " + (2 - quartersSince) + " more quarter(s), or pay down debt to borrow freely again." };
+      }
     }
 
     var rate    = getCurrentBorrowingRateForTerm(years);
