@@ -16,9 +16,9 @@ window.Financials = (() => {
   // ----------------------------------------------------------
   // CONSTANTS
   // ----------------------------------------------------------
-  const OPEX_RATIO        = 0.35;  // Operating expenses as % of GPR (property level)
+  const OPEX_RATIO        = 0.31;  // Operating expenses as % of GPR (trimmed for breathing room)
   const DEPRECIATION_RATE = 0.025; // Annual depreciation as % of asset value
-  const GA_BASE           = 0.5;   // Fixed G&A per quarter $M
+  const GA_BASE           = 0.0;   // Fixed G&A per quarter $M (trimmed)
   const GA_PORTFOLIO_PCT  = 0.003; // Additional G&A per $M of portfolio value
   const CAPEX_RESERVE_PCT = 0.005; // Annual normalized capex reserve as % of asset value
 
@@ -158,14 +158,21 @@ window.Financials = (() => {
     // AFFO = FFO - Normalized Capex Reserve
     const affo = fmt(ffo - capex);
 
-    // Dividends
+    // Preferred dividend — a fixed charge paid BEFORE common dividends.
+    const preferredDiv = fmt(
+      (GameState.preferred ? GameState.preferred.outstanding : 0) *
+      (GameState.preferred ? GameState.preferred.dividendRate : 0) / 4
+    );
+
+    // Common dividends
     const dividendsPaid = fmt(
       GameState.company.dividendPerShare *
       GameState.company.sharesOutstanding
     );
 
-    // Retained cash (can be negative — danger signal)
-    const retainedCash = fmt(affo - dividendsPaid);
+    // Retained cash (can be negative — danger signal). Preferred dividend
+    // comes out of cash flow too.
+    const retainedCash = fmt(affo - preferredDiv - dividendsPaid);
 
     return {
       grossPotentialRent:  noComponents.grossPotentialRent,
@@ -181,6 +188,7 @@ window.Financials = (() => {
       ffo:                 ffo,
       affo:                affo,
       capexReserve:        capex,
+      preferredDiv:        preferredDiv,
       dividendsPaid:       dividendsPaid,
       retainedCash:        retainedCash,
     };
@@ -204,6 +212,7 @@ window.Financials = (() => {
       - pnl.gAndA
       - pnl.interestExpense
       + pnl.unusualItems
+      - (pnl.preferredDiv || 0)
       - pnl.dividendsPaid
       - overdraftInterest
     );
@@ -233,10 +242,11 @@ window.Financials = (() => {
       GameState.debtTranches.reduce((sum, t) => sum + t.amount, 0)
     );
 
-    // Total equity (residual)
-    GameState.balance.totalEquity = fmt(
-      GameState.balance.totalAssets - GameState.balance.totalDebt
-    );
+    // Total equity (residual = assets − debt). This includes preferred.
+    var totalEq = fmt(GameState.balance.totalAssets - GameState.balance.totalDebt);
+    GameState.balance.preferredEquity = GameState.preferred ? GameState.preferred.outstanding : 0;
+    // Common equity is what's left after preferred's claim.
+    GameState.balance.totalEquity = fmt(totalEq - GameState.balance.preferredEquity);
 
     // Market cap
     GameState.company.marketCap = fmt(
@@ -264,24 +274,25 @@ window.Financials = (() => {
     const annualAFFO   = fmt(pnl.affo * 4);
     const annualFFOPS  = fmt(ffoPerShare * 4);
 
-    // Dividend coverage (FFO / dividends) — board threshold
+    // Dividend coverage (FFO / dividends) — board threshold. null when no div.
     const dividendCoverage = pnl.dividendsPaid > 0
       ? fmt(pnl.ffo / pnl.dividendsPaid)
-      : 99;
+      : null;
 
-    // Payout ratio (dividends / AFFO) — >1.0 is danger
+    // Payout ratio (dividends / AFFO) — >1.0 is danger. null when AFFO ≤ 0
+    // (a payout ratio against negative AFFO is meaningless, not "9900%").
     const payoutRatio = pnl.affo > 0
       ? fmt(pnl.dividendsPaid / pnl.affo)
-      : 99;
+      : null;
 
     // Leverage ratios
-    const debtToAssets  = assets > 0  ? fmt(debt / assets)  : 0;
-    const debtToEquity  = equity > 0  ? fmt(debt / equity)  : 99;
+    const debtToAssets  = assets > 0  ? fmt(debt / assets)  : null;
+    const debtToEquity  = equity > 0  ? fmt(debt / equity)  : null;
 
     // EBITDA approx = NOI - G&A (no tax for REITs)
     const ebitda        = fmt(pnl.noi - pnl.gAndA);
     const annualEbitda  = fmt(ebitda * 4);
-    const debtToEbitda  = annualEbitda > 0 ? fmt(debt / annualEbitda) : 99;
+    const debtToEbitda  = annualEbitda > 0 ? fmt(debt / annualEbitda) : null;
 
     // Interest coverage = NOI / Interest (quarterly)
     const interestCoverage = pnl.interestExpense > 0
@@ -311,12 +322,12 @@ window.Financials = (() => {
     // NAV per share
     const navPerShare = shares > 0 ? fmt(equity / shares) : 0;
 
-    // P/FFO (annualized)
-    const pToFFO = annualFFOPS > 0 ? fmt(price / annualFFOPS) : 99;
+    // P/FFO (annualized) — N/A when FFO is non-positive (negative multiple is meaningless)
+    const pToFFO = annualFFOPS > 0 ? fmt(price / annualFFOPS) : null;
 
     // P/AFFO (annualized)
     const annualAFFOPS = fmt(affoPerShare * 4);
-    const pToAFFO = annualAFFOPS > 0 ? fmt(price / annualAFFOPS) : 99;
+    const pToAFFO = annualAFFOPS > 0 ? fmt(price / annualAFFOPS) : null;
 
     // Dividend yield
     const annualDividend = fmt(GameState.company.dividendPerShare * 4);
@@ -618,10 +629,16 @@ window.Financials = (() => {
       return { success: false, message: "Debt markets need time to absorb issuances. You must wait " + (2 - quartersSince) + " more quarter(s) before issuing new debt." };
     }
 
-    // Cap per issuance at 20% of total assets
-    var maxIssuance = fmt(GameState.balance.totalAssets * 0.20);
-    if (amount > maxIssuance) {
-      return { success: false, message: "Maximum single issuance is $" + maxIssuance + "M (20% of total assets). Your current capacity: $" + maxIssuance + "M." };
+    // Leverage cap: total debt may not exceed 70% of total assets.
+    // (Real REITs lever to 60-70%.) Capacity = headroom under that ceiling.
+    var currentDebt = GameState.debtTranches.reduce(function(s, t) { return s + t.amount; }, 0);
+    var maxTotalDebt = fmt(GameState.balance.totalAssets * 0.70);
+    var headroom = fmt(maxTotalDebt - currentDebt);
+    if (headroom <= 0) {
+      return { success: false, message: "You're at the 70% leverage ceiling (debt vs assets). Acquire more assets or retire debt before borrowing more." };
+    }
+    if (amount > headroom) {
+      return { success: false, message: "That would breach the 70% leverage ceiling. Your remaining borrowing capacity is $" + headroom + "M." };
     }
 
     var rate    = getCurrentBorrowingRateForTerm(years);
@@ -655,29 +672,95 @@ window.Financials = (() => {
   }
 
   // Retire debt tranche early
+  // Call premium: 2.5% of principal per the bond indenture (issuer's early
+  // redemption right). Flat rate for simplicity.
+  const CALL_PREMIUM_PCT = 0.025;
+
+  function getCallInfo(trancheId) {
+    const tranche = GameState.debtTranches.find(t => t.id === trancheId);
+    if (!tranche) return null;
+    const premium = fmt(tranche.amount * CALL_PREMIUM_PCT);
+    return {
+      principal: fmt(tranche.amount),
+      premium:   premium,
+      total:     fmt(tranche.amount + premium),
+      label:     tranche.label,
+    };
+  }
+
   function retireDebt(trancheId) {
     const tranche = GameState.debtTranches.find(t => t.id === trancheId);
     if (!tranche) return { success: false, message: "Tranche not found." };
 
-    // Early repayment penalty if > 4 quarters remaining
-    const penalty = tranche.quartersUntilMaturity > 4
-      ? fmt(tranche.amount * 0.01)
-      : 0;
-    const totalCost = fmt(tranche.amount + penalty);
+    // Call premium per indenture: 2.5% of principal
+    const premium   = fmt(tranche.amount * CALL_PREMIUM_PCT);
+    const totalCost = fmt(tranche.amount + premium);
 
     if (GameState.balance.cash < totalCost) {
       return {
         success: false,
-        message: `Insufficient cash. Need $${totalCost}M (including $${penalty}M prepayment penalty).`,
+        message: `Insufficient cash to call this bond. Need $${totalCost}M (principal $${tranche.amount}M + $${premium}M call premium).`,
       };
     }
 
     GameState.balance.cash = fmt(GameState.balance.cash - totalCost);
     GameState.debtTranches = GameState.debtTranches.filter(t => t.id !== trancheId);
 
+    if (typeof News !== "undefined" && News.add) {
+      News.add(GameState.company.name + " called $" + tranche.amount + "M of notes early, paying a " + (CALL_PREMIUM_PCT*100) + "% premium.", "debt");
+    }
+
     return {
       success: true,
-      message: `Retired ${tranche.label}. Cash decreased by $${totalCost}M${penalty > 0 ? ` (incl. $${penalty}M penalty)` : ""}.`,
+      message: `Called ${tranche.label}. Paid $${totalCost}M (principal + $${premium}M call premium).`,
+    };
+  }
+
+  // ----------------------------------------------------------
+  // PREFERRED STOCK — a redeemable lifeline (issued via the CFO).
+  // Raises cash as mezzanine equity (NOT debt, so leverage stays clean),
+  // but carries a fixed preferred dividend paid before common.
+  // ----------------------------------------------------------
+  function issuePreferred(shares, parValue, annualRate) {
+    if (GameState.preferred.issued) {
+      return { success: false, message: "Preferred stock has already been issued. Redeem the existing series first." };
+    }
+    var proceeds = fmt(shares * parValue);
+    GameState.preferred.outstanding  = proceeds;
+    GameState.preferred.shares       = shares;
+    GameState.preferred.parValue     = parValue;
+    GameState.preferred.dividendRate = annualRate;
+    GameState.preferred.issued       = true;
+    GameState.balance.cash = fmt(GameState.balance.cash + proceeds);
+
+    if (typeof News !== "undefined" && News.add) {
+      News.add(GameState.company.name + " issues $" + proceeds + "M of " + (annualRate*100) + "% preferred stock to institutional buyers — balance-sheet relief without new debt.", "capital");
+    }
+    return {
+      success: true,
+      message: "Issued " + shares + "M preferred shares at $" + parValue + " par. Raised $" + proceeds + "M. A " + (annualRate*100) + "% preferred dividend ($" + fmt(proceeds*annualRate/4) + "M/quarter) now applies before common dividends.",
+    };
+  }
+
+  function redeemPreferred() {
+    if (!GameState.preferred.issued || GameState.preferred.outstanding <= 0) {
+      return { success: false, message: "No preferred stock outstanding to redeem." };
+    }
+    var cost = fmt(GameState.preferred.outstanding);
+    if (GameState.balance.cash < cost) {
+      return { success: false, message: "Insufficient cash to redeem. Need $" + cost + "M to buy back the preferred at par." };
+    }
+    GameState.balance.cash = fmt(GameState.balance.cash - cost);
+    GameState.preferred.outstanding  = 0;
+    GameState.preferred.shares       = 0;
+    GameState.preferred.issued       = false;
+
+    if (typeof News !== "undefined" && News.add) {
+      News.add(GameState.company.name + " redeems its preferred stock at par for $" + cost + "M — the fixed dividend burden is lifted.", "capital");
+    }
+    return {
+      success: true,
+      message: "Redeemed all preferred stock for $" + cost + "M at par. The preferred dividend obligation is gone.",
     };
   }
 
@@ -949,6 +1032,9 @@ window.Financials = (() => {
     runQuarter,
     issueDebt,
     retireDebt,
+    getCallInfo,
+    issuePreferred,
+    redeemPreferred,
     issueEquity,
     buybackShares,
     setDividend,
