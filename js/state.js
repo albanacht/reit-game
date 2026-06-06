@@ -48,7 +48,7 @@ window.GameState = {
   // BALANCE SHEET (rebalanced starting position)
   // ----------------------------------------------------------
   balance: {
-    cash:         5,      // minimal cash — forces debt deployment
+    cash:         25,     // dry powder for an early move, while still incentivizing debt
     totalAssets:  0,      // calculated on init
     totalDebt:    70,     // two tranches of $35M each (lower starting leverage)
     totalEquity:  0,      // calculated on init (common equity)
