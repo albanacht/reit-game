@@ -973,21 +973,23 @@ window.Financials = (() => {
     // Write P&L to GameState
     GameState.pnl = { ...GameState.pnl, ...pnl };
 
-    // 4. Update balance sheet
-    updateBalanceSheet(pnl);
-
-    // 5. Calculate ratios
-    const ratios = calcRatios(pnl);
-
-    // 6. Update credit rating (uses freshly computed ratios)
-    const creditResult = Market.computeCreditRating();
-
-    // 7. Update share price
-    updateSharePrice(pnl);
-
-    // 8. Handle debt maturities
+    // 4. Handle debt maturities FIRST — this deducts cash, retires/refinances
+    //    tranches, and may force asset sales. Must happen before the balance
+    //    sheet and ratios so they reflect the post-maturity reality.
     const matured      = tickDebtMaturities();
     const maturityMsgs = handleMaturedDebt(matured);
+
+    // 5. Update balance sheet (now reflects matured-debt cash & tranche changes)
+    updateBalanceSheet(pnl);
+
+    // 6. Calculate ratios
+    const ratios = calcRatios(pnl);
+
+    // 7. Update credit rating (uses freshly computed ratios)
+    const creditResult = Market.computeCreditRating();
+
+    // 8. Update share price
+    updateSharePrice(pnl);
 
     // 9. Save quarter to history
     saveToHistory(pnl);
