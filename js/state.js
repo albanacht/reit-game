@@ -50,7 +50,7 @@ window.GameState = {
   balance: {
     cash:         5,      // minimal cash — forces debt deployment
     totalAssets:  0,      // calculated on init
-    totalDebt:    100,    // two tranches of $50M each
+    totalDebt:    70,     // two tranches of $35M each (lower starting leverage)
     totalEquity:  0,      // calculated on init (common equity)
     preferredEquity: 0,   // preferred stock outstanding (mezzanine)
   },
@@ -70,7 +70,7 @@ window.GameState = {
   debtTranches: [
     {
       id:                   "d001",
-      amount:               50,
+      amount:               35,
       rate:                 5.0,
       maturityQuarter:      2,
       maturityYear:         4,
@@ -79,7 +79,7 @@ window.GameState = {
     },
     {
       id:                   "d002",
-      amount:               50,
+      amount:               35,
       rate:                 5.5,
       maturityQuarter:      4,
       maturityYear:         6,
