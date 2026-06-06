@@ -668,6 +668,12 @@ window.UI = (function() {
       "7yr: " + getRateStr(7) + "% | " +
       "10yr: " + getRateStr(10) + "%"
     );
+    // Live borrowing capacity (80% LTV against portfolio)
+    var pv = GameState.portfolio.reduce(function(s, p) { return s + p.currentValue; }, 0);
+    var cd = GameState.debtTranches.reduce(function(s, t) { return s + t.amount; }, 0);
+    var cap = Math.max(0, Math.round((pv * 0.80 - cd) * 10) / 10);
+    var capEl = el("action-borrow-capacity");
+    if (capEl) setText("action-borrow-capacity", "Capacity: " + fmtM(cap) + " (80% LTV · current " + (pv > 0 ? Math.round(cd/pv*100) : 0) + "%)");
     // Update dropdown to show rates next to each option
     var sel = el("input-debt-years");
     if (sel) {
@@ -953,11 +959,14 @@ window.UI = (function() {
     if (isNaN(years) || years < 1 || years > 10) { showToast("Select a valid term.", "error"); return; }
     // NEW: term-adjusted rate
     var rate = Financials.getCurrentBorrowingRateForTerm ? Financials.getCurrentBorrowingRateForTerm(years) : Market.getCurrentBorrowingRate();
-    var maxIssuance = Math.round(GameState.balance.totalAssets * 0.20 * 10) / 10;
+    var portfolioValue = GameState.portfolio.reduce(function(s, p) { return s + p.currentValue; }, 0);
+    var currentDebt    = GameState.debtTranches.reduce(function(s, t) { return s + t.amount; }, 0);
+    var capacity       = Math.round((portfolioValue * 0.80 - currentDebt) * 10) / 10;
+    var ltv            = portfolioValue > 0 ? Math.round(currentDebt / portfolioValue * 100) : 0;
     showModal("Issue New Debt",
       "Amount: " + fmtM(amount) + "  |  Term: " + years + " yrs  |  Rate: " + fmt(rate, 2) + "%\n" +
       "Annual interest: " + fmtM(amount * rate / 100) + "  |  Tranches: " + GameState.debtTranches.length + "/10\n" +
-      "Max single issuance: " + fmtM(maxIssuance) + " (20% of assets)",
+      "Current LTV: " + ltv + "%  |  Borrowing capacity: " + fmtM(Math.max(0, capacity)) + " (80% LTV ceiling)",
       [{ label: "Issue at " + fmt(rate, 2) + "%", style: "btn-primary", onClick: function() {
         var r = Financials.issueDebt(amount, years);
         showToast(r.message, r.success ? "success" : "error");
