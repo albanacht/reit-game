@@ -94,59 +94,81 @@ window.Market = (() => {
   }
 
   // ----------------------------------------------------------
-  // COMPUTE CREDIT RATING
-  // Based on debt/assets and interest coverage
-  // Rating is sticky: can only move one notch per quarter
+  // COMPUTE CREDIT RATING — BLENDED SCORE
+  // Leverage and coverage each contribute to a 0-100 score, so a strong
+  // balance sheet cushions weak coverage (and vice versa). No more crashing
+  // to CCC just because early FFO is thin. Downgrades are slow (a notch every
+  // 2-3 quarters); upgrades can move a notch per quarter.
   // ----------------------------------------------------------
   function computeCreditRating() {
-    const debtToAssets = GameState.ratios.debtToAssets;
-    const coverage = GameState.ratios.interestCoverage;
+    var debtToAssets = GameState.ratios.debtToAssets;   // 0..1+
+    var coverage     = GameState.ratios.interestCoverage; // x
 
-    // Find the best rating the company qualifies for
-    let qualifiedRating = "CCC";
-    let qualifiedSpread = 6.00;
+    // --- Leverage sub-score (0-50): lower leverage = more points ---
+    // 25% D/A → ~50pts (excellent); 70%+ → ~0pts (stretched)
+    var levScore = clamp((0.75 - debtToAssets) / (0.75 - 0.25), 0, 1) * 50;
 
-    for (const tier of CREDIT_RATINGS) {
-      if (debtToAssets <= tier.maxDebtToAssets && coverage >= tier.minCoverage) {
-        qualifiedRating = tier.rating;
-        qualifiedSpread = tier.spread;
-        break; // CREDIT_RATINGS is ordered best to worst
-      }
-    }
+    // --- Coverage sub-score (0-50): higher coverage = more points ---
+    // 5x+ → 50pts; 1x → ~12pts; below 1x tapers toward 0 but never instantly junk
+    var covScore;
+    if (coverage >= 5)      covScore = 50;
+    else if (coverage >= 1) covScore = 12 + (coverage - 1) / (5 - 1) * 38;
+    else                    covScore = clamp(coverage, 0, 1) * 12; // 0..12 for sub-1x
+    covScore = clamp(covScore, 0, 50);
 
-    // Stickiness: only move one notch per quarter
-    const ratingOrder = CREDIT_RATINGS.map(r => r.rating);
-    const currentIdx = ratingOrder.indexOf(GameState.credit.rating);
-    const targetIdx = ratingOrder.indexOf(qualifiedRating);
+    var score = levScore + covScore; // 0-100
 
-    let newIdx;
+    // Map blended score to rating band
+    var qualifiedRating, qualifiedSpread;
+    if      (score >= 90) { qualifiedRating = "AAA"; qualifiedSpread = 0.50; }
+    else if (score >= 80) { qualifiedRating = "AA";  qualifiedSpread = 0.80; }
+    else if (score >= 68) { qualifiedRating = "A";   qualifiedSpread = 1.20; }
+    else if (score >= 54) { qualifiedRating = "BBB"; qualifiedSpread = 1.80; }
+    else if (score >= 38) { qualifiedRating = "BB";  qualifiedSpread = 3.00; }
+    else if (score >= 22) { qualifiedRating = "B";   qualifiedSpread = 4.50; }
+    else                  { qualifiedRating = "CCC"; qualifiedSpread = 7.00; }
+
+    var ratingOrder = ["AAA","AA","A","BBB","BB","B","CCC"];
+    var spreads     = { AAA:0.50, AA:0.80, A:1.20, BBB:1.80, BB:3.00, B:4.50, CCC:7.00 };
+    var currentIdx  = ratingOrder.indexOf(GameState.credit.rating);
+    if (currentIdx < 0) currentIdx = 3; // default BBB
+    var targetIdx   = ratingOrder.indexOf(qualifiedRating);
+
+    // Downgrade stickiness: only allow a downgrade every 2-3 quarters, so a
+    // bad patch can't cascade to CCC in three turns.
+    if (GameState.credit.downgradeCooldown === undefined) GameState.credit.downgradeCooldown = 0;
+
+    var newIdx = currentIdx;
     if (targetIdx > currentIdx) {
-      newIdx = currentIdx + 1; // deteriorating: move one notch worse
+      // deteriorating
+      if (GameState.credit.downgradeCooldown <= 0) {
+        newIdx = currentIdx + 1;                 // one notch worse
+        GameState.credit.downgradeCooldown = 2;  // wait 2 quarters before next downgrade
+      }
     } else if (targetIdx < currentIdx) {
-      newIdx = currentIdx - 1; // improving: move one notch better
-    } else {
-      newIdx = currentIdx;     // no change
+      newIdx = currentIdx - 1;                    // improving: one notch better
     }
+    if (GameState.credit.downgradeCooldown > 0) GameState.credit.downgradeCooldown -= 1;
 
-    newIdx = clamp(newIdx, 0, CREDIT_RATINGS.length - 1);
-    const newRating = CREDIT_RATINGS[newIdx];
+    newIdx = clamp(newIdx, 0, ratingOrder.length - 1);
+    var newRatingName = ratingOrder[newIdx];
 
-    // Negative watch: if moving worse two quarters in a row
-    const watchNegative = targetIdx > newIdx;
+    var watchNegative = targetIdx > newIdx;
 
     var oldRating = GameState.credit.rating;
-    GameState.credit.rating = newRating.rating;
-    GameState.credit.spread = newRating.spread;
+    GameState.credit.rating = newRatingName;
+    GameState.credit.spread = spreads[newRatingName];
     GameState.credit.watchNegative = watchNegative;
+    GameState.credit.score = Math.round(score);
 
-    if (oldRating !== newRating.rating && typeof News !== "undefined" && News.ratingChanged) {
-      News.ratingChanged(oldRating, newRating.rating, newIdx > currentIdx);
+    if (oldRating !== newRatingName && typeof News !== "undefined" && News.ratingChanged) {
+      News.ratingChanged(oldRating, newRatingName, newIdx < currentIdx);
     }
 
     return {
-      rating: newRating.rating,
-      spread: newRating.spread,
-      watchNegative,
+      rating: newRatingName,
+      spread: spreads[newRatingName],
+      watchNegative: watchNegative,
     };
   }
 
@@ -329,10 +351,10 @@ window.Market = (() => {
 
     // Reset cap rates to defaults (raised for positive carry vs borrowing costs)
     GameState.market.capRates = {
-      office:      { tier1: 6.2, tier2: 7.2, suburban: 8.2 },
-      industrial:  { tier1: 5.2, tier2: 6.2, suburban: 7.2 },
-      multifamily: { tier1: 5.7, tier2: 6.7, suburban: 7.7 },
-      retail:      { tier1: 6.7, tier2: 7.7, suburban: 9.2 },
+      office:      { tier1: 6.8, tier2: 7.9, suburban: 9.0 },
+      industrial:  { tier1: 5.7, tier2: 6.8, suburban: 7.9 },
+      multifamily: { tier1: 6.3, tier2: 7.4, suburban: 8.5 },
+      retail:      { tier1: 7.4, tier2: 8.5, suburban: 10.1 },
     };
 
     GameState.credit.rating = "BBB";
