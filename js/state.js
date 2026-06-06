@@ -48,7 +48,7 @@ window.GameState = {
   // BALANCE SHEET (rebalanced starting position)
   // ----------------------------------------------------------
   balance: {
-    cash:         25,     // dry powder for an early move, while still incentivizing debt
+    cash:         30,     // dry powder for early moves, while still incentivizing debt
     totalAssets:  0,      // calculated on init
     totalDebt:    70,     // two tranches of $35M each (lower starting leverage)
     totalEquity:  0,      // calculated on init (common equity)
@@ -103,10 +103,10 @@ window.GameState = {
   market: {
     baseInterestRate: 2.5,
     capRates: {
-      office:      { tier1: 6.8, tier2: 7.9, suburban: 9.0 },
-      industrial:  { tier1: 5.7, tier2: 6.8, suburban: 7.9 },
-      multifamily: { tier1: 6.3, tier2: 7.4, suburban: 8.5 },
-      retail:      { tier1: 7.4, tier2: 8.5, suburban: 10.1 },
+      office:      { tier1: 7.8, tier2: 8.4, suburban: 9.25 },
+      industrial:  { tier1: 6.7, tier2: 7.3, suburban: 8.15 },
+      multifamily: { tier1: 7.3, tier2: 7.9, suburban: 8.75 },
+      retail:      { tier1: 8.4, tier2: 9.0, suburban: 10.35 },
     },
     cycle:                  "stable",
     cycleQuartersRemaining: 8,
