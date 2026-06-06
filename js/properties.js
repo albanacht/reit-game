@@ -189,7 +189,7 @@ window.Properties = (() => {
   // ----------------------------------------------------------
   function generateStartingPortfolio() {
     const sectors = ["industrial", "multifamily", "office", "retail"];
-    return sectors.map(function(sector) {
+    var portfolio = sectors.map(function(sector) {
       const prop = generateProperty(sector, "tier2", false);
       prop.purchasePrice = prop.currentValue;
       prop.quarterOwned  = 1;
@@ -197,6 +197,24 @@ window.Properties = (() => {
       prop.daysOnMarket  = null;
       return prop;
     });
+
+    // A small, high-yield, fully-leased suburban anchor — provides steady
+    // income from turn one (no lease-up J-curve) and a yield cushion to help
+    // cover fixed costs while you build. ~$10M at a ~9.5% cap rate.
+    var anchor = generateProperty("retail", "suburban", false);
+    anchor.currentValue   = 10;
+    anchor.baseValue      = 10;
+    anchor.annualNOI      = 0.95;        // ~9.5% cap on $10M
+    anchor.baseCapRate    = 9.5;
+    anchor.occupancy      = 0.96;        // fully leased, steady tenant
+    anchor.purchasePrice  = 10;
+    anchor.quarterOwned   = 1;
+    anchor.askingPrice    = null;
+    anchor.daysOnMarket   = null;
+    anchor.name           = "Cornerstone Strip Center";
+    portfolio.push(anchor);
+
+    return portfolio;
   }
 
   // ----------------------------------------------------------
@@ -249,8 +267,8 @@ window.Properties = (() => {
       if (prop.underConstruction) return;
       if (prop.baseValue === undefined) prop.baseValue = prop.currentValue;
 
-      // Physical depreciation on the asset's base value (~1.75%/yr)
-      prop.baseValue = Math.round(prop.baseValue * 0.9825 * 10) / 10;
+      // Physical depreciation on the asset's base value (2.0%/yr)
+      prop.baseValue = Math.round(prop.baseValue * 0.98 * 10) / 10;
 
       // NOI decay (~1.25%/yr) — gentle, offset partly by escalation clauses.
       // A renovated property resists decay for a few years.
