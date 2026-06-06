@@ -1631,7 +1631,7 @@ window.UI = (function() {
     GameState.board.activeMandates           = [];
     Decisions.init();
     GameState._lastTenantDistressYear = 0;
-    GameState.balance.cash                = 5;
+    GameState.balance.cash                = 25;
 
     GameState.debtTranches = [
       { id: "d001", amount: 35, rate: 5.0, maturityQuarter: 2, maturityYear: 4, quartersUntilMaturity: 13, label: "5.0% Sr Notes due Y4Q2" },
@@ -1648,6 +1648,7 @@ window.UI = (function() {
     GameState.preferred = { outstanding:0, shares:0, parValue:25, dividendRate:0.05, issued:false };
     GameState.balance.preferredEquity = 0;
     GameState._preferredOffered = false;
+    GameState._negEventCooldown = 0;
 
     Market.init();
     // Store baseline cap rates for market conditions indicator
