@@ -18,16 +18,18 @@ window.Decisions = (function() {
   // ----------------------------------------------------------
   function checkTenantDistress() {
     if (GameState.portfolio.length === 0) return null;
-    // Max once every 4 quarters (once per year)
+    // Never in Year 1 (orientation), and at most once per year.
+    if (GameState.meta.year <= 1) return null;
     var lastFired = GameState._lastTenantDistressYear || 0;
     if (GameState.meta.year <= lastFired) return null;
 
     var cycle = GameState.market.cycle;
-    var mult  = cycle==="recession"?2 : cycle==="contracting"?1.5 : cycle==="stable"?1 : 0.3;
-    // Much lower base probabilities — roughly 2% per quarter per property in stable
-    var risk  = { retail:0.025, office:0.015, multifamily:0.008, industrial:0.005 };
+    var mult  = cycle==="recession"?2 : cycle==="contracting"?1.3 : cycle==="stable"?1 : 0.3;
+    // Lower base odds, and capped against portfolio size so big portfolios
+    // don't get hit constantly. Roughly 1% per property per quarter in stable.
+    var risk  = { retail:0.013, office:0.008, multifamily:0.005, industrial:0.003 };
     var hits  = GameState.portfolio.filter(function(p) {
-      return Math.random() < (risk[p.sector]||0.01) * mult;
+      return Math.random() < (risk[p.sector]||0.006) * mult;
     });
     if (hits.length === 0) return null;
     GameState._lastTenantDistressYear = GameState.meta.year;
