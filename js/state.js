@@ -51,7 +51,17 @@ window.GameState = {
     cash:         5,      // minimal cash — forces debt deployment
     totalAssets:  0,      // calculated on init
     totalDebt:    100,    // two tranches of $50M each
-    totalEquity:  0,      // calculated on init
+    totalEquity:  0,      // calculated on init (common equity)
+    preferredEquity: 0,   // preferred stock outstanding (mezzanine)
+  },
+
+  // Preferred stock — a redeemable lifeline (issued via CFO). Not debt.
+  preferred: {
+    outstanding: 0,       // $M par value outstanding
+    shares:      0,       // millions of preferred shares
+    parValue:    25,      // $ per preferred share
+    dividendRate: 0.05,   // annual rate on par
+    issued:      false,   // once-per-game offer guard
   },
 
   // ----------------------------------------------------------
@@ -93,10 +103,10 @@ window.GameState = {
   market: {
     baseInterestRate: 2.5,
     capRates: {
-      office:      { tier1: 6.2, tier2: 7.2, suburban: 8.2 },
-      industrial:  { tier1: 5.2, tier2: 6.2, suburban: 7.2 },
-      multifamily: { tier1: 5.7, tier2: 6.7, suburban: 7.7 },
-      retail:      { tier1: 6.7, tier2: 7.7, suburban: 9.2 },
+      office:      { tier1: 6.8, tier2: 7.9, suburban: 9.0 },
+      industrial:  { tier1: 5.7, tier2: 6.8, suburban: 7.9 },
+      multifamily: { tier1: 6.3, tier2: 7.4, suburban: 8.5 },
+      retail:      { tier1: 7.4, tier2: 8.5, suburban: 10.1 },
     },
     cycle:                  "stable",
     cycleQuartersRemaining: 8,
