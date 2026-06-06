@@ -206,6 +206,9 @@ input::placeholder { color:var(--text-muted); }
 .lb-table { width:100%; border-collapse:collapse; font-size:11px; }
 .lb-table th { text-align:left; padding:4px 6px; color:var(--text-muted); font-size:10px; text-transform:uppercase; border-bottom:1px solid var(--border); }
 .lb-table td { padding:5px 6px; border-bottom:1px solid rgba(51,65,85,.3); }
+.lb-date { white-space:nowrap; font-variant-numeric:tabular-nums; }
+.lb-quarters, .lb-ffo, .lb-rating, .lb-score, .lb-grade { white-space:nowrap; }
+.lb-name, .lb-reit { max-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .lb-row { cursor:pointer; transition:background .15s; }
 .lb-row:hover { background:var(--surface2); }
 .lb-gold   td { color:#fbbf24; }
