@@ -160,6 +160,7 @@ window.UI = (function() {
     setText("pnl-netincome", fmtM(p.netIncome));
     setText("pnl-ffo",       fmtM(p.ffo));
     setText("pnl-affo",      fmtM(p.affo));
+    setText("pnl-prefdiv",   p.preferredDiv > 0 ? "(" + fmtM(p.preferredDiv) + ")" : "—");
     setText("pnl-divpaid",   "(" + fmtM(p.dividendsPaid) + ")");
     setText("pnl-retained",  fmtM(p.retainedCash));
     var retEl = el("pnl-retained");
@@ -178,17 +179,17 @@ window.UI = (function() {
     }
     sr("ratio-ffo-ps",     fmtPS(r.ffoPerShare));
     sr("ratio-affo-ps",    fmtPS(r.affoPerShare));
-    sr("ratio-div-cov",    fmt(r.dividendCoverage, 2) + "x",  r.dividendCoverage >= 1.2,    r.dividendCoverage < 1.0);
-    sr("ratio-payout",     fmtPct(r.payoutRatio),             r.payoutRatio < 0.85,         r.payoutRatio > 1.0);
-    sr("ratio-d2a",        fmtPct(r.debtToAssets),            r.debtToAssets < 0.40,        r.debtToAssets > 0.60);
-    sr("ratio-d2e",        fmt(r.debtToEbitda, 1) + "x",      r.debtToEbitda < 5,           r.debtToEbitda > 8);
-    sr("ratio-int-cov",    fmt(r.interestCoverage, 1) + "x",  r.interestCoverage >= 2.5,    r.interestCoverage < 1.5);
+    sr("ratio-div-cov",    r.dividendCoverage === null ? "N/A" : fmt(r.dividendCoverage, 2) + "x",  r.dividendCoverage !== null && r.dividendCoverage >= 1.2,    r.dividendCoverage !== null && r.dividendCoverage < 1.0);
+    sr("ratio-payout",     r.payoutRatio === null ? "N/A" : fmtPct(r.payoutRatio),             r.payoutRatio !== null && r.payoutRatio < 0.85,         r.payoutRatio !== null && r.payoutRatio > 1.0);
+    sr("ratio-d2a",        r.debtToAssets === null ? "N/A" : fmtPct(r.debtToAssets),            r.debtToAssets !== null && r.debtToAssets < 0.40,        r.debtToAssets !== null && r.debtToAssets > 0.60);
+    sr("ratio-d2e",        r.debtToEbitda === null ? "N/A" : fmt(r.debtToEbitda, 1) + "x",      r.debtToEbitda !== null && r.debtToEbitda < 5,           r.debtToEbitda !== null && r.debtToEbitda > 8);
+    sr("ratio-int-cov",    r.interestCoverage >= 99 ? "N/A" : fmt(r.interestCoverage, 1) + "x",  r.interestCoverage >= 2.5,    r.interestCoverage < 1.5);
     sr("ratio-occ",        fmtPct(r.occupancyPortfolio),      r.occupancyPortfolio >= 0.92, r.occupancyPortfolio < 0.80);
     sr("ratio-noi-margin", fmtPct(r.noiMargin),               r.noiMargin >= 0.45,          r.noiMargin < 0.30);
     sr("ratio-cap-rate",   fmt(r.impliedCapRate, 2) + "%");
     sr("ratio-nav",        fmtPS(r.navPerShare));
-    sr("ratio-pffo",       fmt(r.pToFFO, 1) + "x");
-    sr("ratio-paffo",      fmt(r.pToAFFO, 1) + "x");
+    sr("ratio-pffo",       r.pToFFO === null ? "N/A" : fmt(r.pToFFO, 1) + "x");
+    sr("ratio-paffo",      r.pToAFFO === null ? "N/A" : fmt(r.pToAFFO, 1) + "x");
     sr("ratio-div-yield",  fmt(r.dividendYield, 2) + "%",     r.dividendYield > 4,          r.dividendYield < 2);
   }
 
@@ -197,6 +198,16 @@ window.UI = (function() {
     setText("bs-cash",   fmtM(b.cash));
     setText("bs-assets", fmtM(b.totalAssets));
     setText("bs-debt",   fmtM(b.totalDebt));
+    var prefEl = el("bs-preferred");
+    if (prefEl) {
+      var prefRow = prefEl.closest ? prefEl.closest(".bs-item") : null;
+      if ((b.preferredEquity || 0) > 0) {
+        setText("bs-preferred", fmtM(b.preferredEquity));
+        if (prefRow) prefRow.style.display = "";
+      } else {
+        if (prefRow) prefRow.style.display = "none";
+      }
+    }
     setText("bs-equity", fmtM(b.totalEquity));
     setText("bs-shares", fmt(GameState.company.sharesOutstanding, 1) + "M");
     setText("bs-divps",  fmtPS(GameState.company.dividendPerShare));
@@ -228,7 +239,7 @@ window.UI = (function() {
         '<span class="tranche-label">' + t.label + '</span>' +
         '<span class="tranche-meta">' + t.quartersUntilMaturity + 'q · ' + t.rate + '% · $' + fmt(t.amount, 1) + 'M</span>' +
         '</div><div class="tranche-actions">' +
-        '<button class="btn btn-sm btn-danger" onclick="UI.confirmRetireDebt(\'' + t.id + '\')">Retire</button>' +
+        '<button class="btn btn-sm btn-danger" onclick="UI.confirmRetireDebt(\'' + t.id + '\')">Call</button>' +
         '</div></div>';
     });
     container.innerHTML = html;
@@ -675,6 +686,19 @@ window.UI = (function() {
     setText("action-debt-cooldown", debtCooldown > 0 ?
       "⚠ Debt on cooldown — available in " + debtCooldown + " quarter(s)" : "");
     setText("action-cash-avail",  "Cash available: " + fmtM(GameState.balance.cash));
+    // Preferred stock redeem card — only when preferred is outstanding
+    var prefGroup = el("preferred-redeem-group");
+    if (prefGroup) {
+      var pref = GameState.preferred;
+      if (pref && pref.issued && pref.outstanding > 0) {
+        prefGroup.style.display = "";
+        setText("action-preferred-info",
+          fmtM(pref.outstanding) + " outstanding · " + (pref.dividendRate*100) + "% preferred dividend (" +
+          fmtM(pref.outstanding * pref.dividendRate / 4) + "/q)");
+      } else {
+        prefGroup.style.display = "none";
+      }
+    }
   }
 
   function renderAll(report) {
@@ -826,14 +850,16 @@ window.UI = (function() {
   }
 
   function confirmRetireDebt(trancheId) {
-    var t = GameState.debtTranches.find(function(x) { return x.id === trancheId; });
-    if (!t) return;
-    var pen  = t.quartersUntilMaturity > 4 ? Math.round(t.amount * 0.01 * 10) / 10 : 0;
-    var cost = Math.round((t.amount + pen) * 10) / 10;
-    showModal("Retire " + t.label,
-      "Amount: " + fmtM(t.amount) + "  |  Rate: " + t.rate + "%\n" +
-      "Quarters left: " + t.quartersUntilMaturity + "\nPenalty: " + (pen > 0 ? fmtM(pen) : "None") + "\nTotal cost: " + fmtM(cost) + "\nCash: " + fmtM(GameState.balance.cash),
-      [{ label: "Retire Debt", style: "btn-danger", onClick: function() {
+    var info = Financials.getCallInfo(trancheId);
+    if (!info) return;
+    showModal("Call " + info.label + "?",
+      "Per the bond indenture, this tranche may be redeemed early by paying the outstanding principal plus a call premium.\n\n" +
+      "Principal: " + fmtM(info.principal) + "\n" +
+      "Call premium (2.5%): " + fmtM(info.premium) + "\n" +
+      "Total cost to call: " + fmtM(info.total) + "\n\n" +
+      "Available cash: " + fmtM(GameState.balance.cash) + "\n\n" +
+      "Calling retires the bond and eliminates its future interest. Proceed?",
+      [{ label: "Call Bond", style: "btn-danger", onClick: function() {
         var r = Financials.retireDebt(trancheId);
         showToast(r.message, r.success ? "success" : "error");
         if (r.success) renderAll();
@@ -973,7 +999,20 @@ window.UI = (function() {
       }}]);
   }
 
-  function handleSetDividend() {
+  function handleRedeemPreferred() {
+    var pref = GameState.preferred;
+    if (!pref || !pref.issued || pref.outstanding <= 0) { showToast("No preferred stock outstanding.", "error"); return; }
+    showModal("Redeem Preferred Stock",
+      "Outstanding: " + fmtM(pref.outstanding) + " (" + pref.shares + "M shares @ $" + pref.parValue + " par)\n" +
+      "Redemption cost (at par): " + fmtM(pref.outstanding) + "\n" +
+      "Cash after: " + fmtM(GameState.balance.cash - pref.outstanding) + "\n\n" +
+      "This buys back all preferred shares at par and ends the " + (pref.dividendRate*100) + "% preferred dividend. Proceed?",
+      [{ label: "Redeem at Par", style: "btn-primary", onClick: function() {
+        var r = Financials.redeemPreferred();
+        showToast(r.message, r.success ? "success" : "error");
+        if (r.success) renderAll();
+      }}]);
+  }
     var divEl = el("input-dividend");
     var newDiv = divEl ? parseFloat(divEl.value) : NaN;
     if (isNaN(newDiv) || newDiv < 0) { showToast("Enter valid dividend", "error"); return; }
@@ -1595,6 +1634,9 @@ window.UI = (function() {
     GameState._pendingMegaFind = null;
     GameState._lastMegaRollYear = 0;
     GameState._lastBuyerFindYear = 0;
+    GameState.preferred = { outstanding:0, shares:0, parValue:25, dividendRate:0.05, issued:false };
+    GameState.balance.preferredEquity = 0;
+    GameState._preferredOffered = false;
 
     Market.init();
     // Store baseline cap rates for market conditions indicator
@@ -1661,6 +1703,7 @@ window.UI = (function() {
       "btn-issue-equity":    handleIssueEquity,
       "btn-buyback":         handleBuyback,
       "btn-set-dividend":    handleSetDividend,
+      "btn-redeem-preferred": handleRedeemPreferred,
       "btn-help":            showHelp,
       "btn-help-close":      closeHelp,
     };
@@ -1710,6 +1753,7 @@ window.UI = (function() {
     handleIssueDebt:     handleIssueDebt,
     handleIssueEquity:   handleIssueEquity,
     handleBuyback:       handleBuyback,
+    handleRedeemPreferred: handleRedeemPreferred,
     handleSetDividend:   handleSetDividend,
     leaseUp:             leaseUp,
     confirmRenovate:     confirmRenovate,
