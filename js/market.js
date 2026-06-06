@@ -343,7 +343,7 @@ window.Market = (() => {
   // INITIALISE — call once at game start
   // ----------------------------------------------------------
   function init() {
-    GameState.market.baseInterestRate = 2.5;
+    GameState.market.baseInterestRate = 2.0;
     GameState.market.cycle = "stable";
     GameState.market.cycleQuartersRemaining = randInt(4, 8);
     GameState.market.rateDirection = "flat";
