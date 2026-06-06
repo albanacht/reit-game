@@ -158,6 +158,11 @@ window.Board = (() => {
     var b  = GameState.balance;
     var h  = GameState.history;
 
+    // Coalesce nullable ratios to safe numbers so comparisons behave.
+    // (null coverage/payout/leverage means "undefined this quarter".)
+    var covSafe = (r.dividendCoverage === null || r.dividendCoverage === undefined) ? 1.0 : r.dividendCoverage;
+    var d2aSafe = (r.debtToAssets === null || r.debtToAssets === undefined) ? 0.40 : r.debtToAssets;
+
     // Williams — DIVIDENDS. Dividend GROWTH is his overwhelming concern.
     // Coverage is near-cosmetic: it barely nudges him, and only bites if
     // truly catastrophic — so the early-game solvency struggle doesn't
@@ -175,8 +180,8 @@ window.Board = (() => {
       }
       // Coverage: near-cosmetic. Tiny reward when healthy; small bite ONLY
       // if catastrophically low (well below 1.0). Never a major driver.
-      if (r.dividendCoverage > 1.8)      w.attitude = clamp(w.attitude + 0.1, 0, 10);
-      else if (r.dividendCoverage < 0.5) w.attitude = clamp(w.attitude - 0.15, 0, 10);
+      if (covSafe > 1.8)      w.attitude = clamp(w.attitude + 0.1, 0, 10);
+      else if (covSafe < 0.5) w.attitude = clamp(w.attitude - 0.15, 0, 10);
     }
 
     // Chen — growth
@@ -196,7 +201,7 @@ window.Board = (() => {
     // Okafor — balance sheet
     var ok = getDirectorState("okafor");
     if (ok) {
-      var d2a = r.debtToAssets;
+      var d2a = d2aSafe;
       if (d2a >= 0.25 && d2a <= 0.45) ok.attitude = clamp(ok.attitude + 0.5, 0, 10);
       if (d2a < 0.20 && GameState.meta.year >= 2) ok.attitude = clamp(ok.attitude - 0.5, 0, 10);
       if (d2a > 0.60)                 ok.attitude = clamp(ok.attitude - 1.0, 0, 10);
