@@ -594,7 +594,9 @@ window.UI = (function() {
     if (!container) return;
     var html = "";
     GameState.propertyMarket.forEach(function(p) {
-      var cr = GameState.market.capRates[p.sector][p.location];
+      // Actual cap rate of THIS property = NOI ÷ asking price (not the generic
+      // sector market rate). This is what makes a mega-deal visibly attractive.
+      var cr = p.askingPrice > 0 ? Math.round((p.annualNOI / p.askingPrice) * 1000) / 10 : 0;
       var ca = GameState.balance.cash >= p.askingPrice;
       var megaTag = p.isMega
         ? '<div class="mega-flag">★ Off-market mega-asset · ' + (p.megaCapRate ? p.megaCapRate + '% cap rate · ' : '') + 'single tenant: ' + (p.megaTenant || "anchor") + '</div>'
@@ -1616,7 +1618,7 @@ window.UI = (function() {
     GameState.company.sharePrice          = 10.00;
     GameState.company.sharesOutstanding   = 10;
     GameState.company.marketCap           = 100;
-    GameState.company.dividendPerShare    = 0.10;
+    GameState.company.dividendPerShare    = 0.05;
     GameState.company.dividendHistory     = [];
     GameState.company.dividendCutQuarters = 0;
     GameState.company.equityIssuanceCount    = 0;
