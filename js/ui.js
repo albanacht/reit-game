@@ -1013,6 +1013,8 @@ window.UI = (function() {
         if (r.success) renderAll();
       }}]);
   }
+
+  function handleSetDividend() {
     var divEl = el("input-dividend");
     var newDiv = divEl ? parseFloat(divEl.value) : NaN;
     if (isNaN(newDiv) || newDiv < 0) { showToast("Enter valid dividend", "error"); return; }
