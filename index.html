@@ -250,7 +250,8 @@
             <tr class="pnl-divider pnl-subtotal"><td>Net Income (GAAP)</td><td id="pnl-netincome">—</td></tr>
             <tr class="pnl-divider"><td><strong>FFO</strong></td><td id="pnl-ffo" class="text-green"><strong>—</strong></td></tr>
             <tr><td><strong>AFFO</strong></td><td id="pnl-affo"><strong>—</strong></td></tr>
-            <tr class="pnl-divider"><td class="pnl-indent">Dividends Paid</td><td id="pnl-divpaid" class="text-muted">—</td></tr>
+            <tr class="pnl-divider"><td class="pnl-indent">Preferred Dividends</td><td id="pnl-prefdiv" class="text-muted">—</td></tr>
+            <tr><td class="pnl-indent">Dividends Paid</td><td id="pnl-divpaid" class="text-muted">—</td></tr>
             <tr class="pnl-total"><td>Retained Cash</td><td id="pnl-retained">—</td></tr>
           </table>
         </div>
@@ -263,7 +264,8 @@
             <div class="bs-item"><span class="bs-label">Cash</span><span class="bs-value" id="bs-cash">—</span></div>
             <div class="bs-item"><span class="bs-label">Total Assets</span><span class="bs-value" id="bs-assets">—</span></div>
             <div class="bs-item"><span class="bs-label">Total Debt</span><span class="bs-value text-red" id="bs-debt">—</span></div>
-            <div class="bs-item"><span class="bs-label">Total Equity</span><span class="bs-value text-green" id="bs-equity">—</span></div>
+            <div class="bs-item"><span class="bs-label">Preferred Equity</span><span class="bs-value" id="bs-preferred">—</span></div>
+            <div class="bs-item"><span class="bs-label">Common Equity</span><span class="bs-value text-green" id="bs-equity">—</span></div>
             <div class="bs-item"><span class="bs-label">Shares Out</span><span class="bs-value" id="bs-shares">—</span></div>
             <div class="bs-item"><span class="bs-label">Div/Share (Q)</span><span class="bs-value" id="bs-divps">—</span></div>
           </div>
@@ -424,6 +426,12 @@
               <div class="action-meta" id="action-div-current">Current: —</div>
               <div class="input-row"><input type="number" id="input-dividend" placeholder="New dividend per share ($)" min="0" step="0.01"><button class="btn btn-primary btn-sm" id="btn-set-dividend">Set Dividend</button></div>
               <div class="action-meta text-red" style="margin-top:6px;">⚠ Cutting the dividend causes significant share price drop and board pressure.</div>
+            </div>
+            <div class="action-group" id="preferred-redeem-group" style="grid-column:span 2; display:none;">
+              <div class="action-group-title">Preferred Stock</div>
+              <div class="action-meta" id="action-preferred-info">—</div>
+              <div class="input-row"><button class="btn btn-secondary btn-sm" id="btn-redeem-preferred">Redeem Preferred at Par</button></div>
+              <div class="action-meta" style="margin-top:6px;">Redeeming buys back the preferred shares at par value and ends the preferred dividend.</div>
             </div>
           </div>
         </div>
