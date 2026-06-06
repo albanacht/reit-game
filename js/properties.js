@@ -20,24 +20,24 @@ window.Properties = (() => {
   // ----------------------------------------------------------
   const PROFILES = {
     office: {
-      tier1:    { basePriceMid: 105, noiYield: 0.062, occupancyMid: 0.90, volatility: 0.08, label: "CBD Office Tower" },
-      tier2:    { basePriceMid: 48,  noiYield: 0.072, occupancyMid: 0.85, volatility: 0.10, label: "City Office Park" },
-      suburban: { basePriceMid: 18,  noiYield: 0.082, occupancyMid: 0.80, volatility: 0.13, label: "Suburban Office Campus" },
+      tier1:    { basePriceMid: 105, noiYield: 0.072, occupancyMid: 0.90, volatility: 0.08, label: "CBD Office Tower" },
+      tier2:    { basePriceMid: 48,  noiYield: 0.077, occupancyMid: 0.85, volatility: 0.10, label: "City Office Park" },
+      suburban: { basePriceMid: 18,  noiYield: 0.0845, occupancyMid: 0.80, volatility: 0.13, label: "Suburban Office Campus" },
     },
     industrial: {
-      tier1:    { basePriceMid: 90,  noiYield: 0.052, occupancyMid: 0.95, volatility: 0.04, label: "Urban Logistics Hub" },
-      tier2:    { basePriceMid: 42,  noiYield: 0.062, occupancyMid: 0.93, volatility: 0.05, label: "Regional Distribution Center" },
-      suburban: { basePriceMid: 15,  noiYield: 0.072, occupancyMid: 0.90, volatility: 0.06, label: "Suburban Warehouse Park" },
+      tier1:    { basePriceMid: 90,  noiYield: 0.062, occupancyMid: 0.95, volatility: 0.04, label: "Urban Logistics Hub" },
+      tier2:    { basePriceMid: 42,  noiYield: 0.067, occupancyMid: 0.93, volatility: 0.05, label: "Regional Distribution Center" },
+      suburban: { basePriceMid: 15,  noiYield: 0.0745, occupancyMid: 0.90, volatility: 0.06, label: "Suburban Warehouse Park" },
     },
     multifamily: {
-      tier1:    { basePriceMid: 100, noiYield: 0.057, occupancyMid: 0.93, volatility: 0.05, label: "Urban Apartment Tower" },
-      tier2:    { basePriceMid: 45,  noiYield: 0.067, occupancyMid: 0.90, volatility: 0.07, label: "Mid-City Apartment Complex" },
-      suburban: { basePriceMid: 16,  noiYield: 0.077, occupancyMid: 0.87, volatility: 0.10, label: "Suburban Apartment Community" },
+      tier1:    { basePriceMid: 100, noiYield: 0.067, occupancyMid: 0.93, volatility: 0.05, label: "Urban Apartment Tower" },
+      tier2:    { basePriceMid: 45,  noiYield: 0.072, occupancyMid: 0.90, volatility: 0.07, label: "Mid-City Apartment Complex" },
+      suburban: { basePriceMid: 16,  noiYield: 0.0795, occupancyMid: 0.87, volatility: 0.10, label: "Suburban Apartment Community" },
     },
     retail: {
-      tier1:    { basePriceMid: 95,  noiYield: 0.067, occupancyMid: 0.88, volatility: 0.10, label: "High Street Retail Center" },
-      tier2:    { basePriceMid: 40,  noiYield: 0.077, occupancyMid: 0.83, volatility: 0.13, label: "Community Shopping Center" },
-      suburban: { basePriceMid: 13,  noiYield: 0.092, occupancyMid: 0.78, volatility: 0.16, label: "Suburban Strip Mall" },
+      tier1:    { basePriceMid: 95,  noiYield: 0.077, occupancyMid: 0.88, volatility: 0.10, label: "High Street Retail Center" },
+      tier2:    { basePriceMid: 40,  noiYield: 0.082, occupancyMid: 0.83, volatility: 0.13, label: "Community Shopping Center" },
+      suburban: { basePriceMid: 13,  noiYield: 0.0945, occupancyMid: 0.78, volatility: 0.16, label: "Suburban Strip Mall" },
     },
   };
 
