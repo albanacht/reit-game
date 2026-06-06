@@ -1633,7 +1633,7 @@ window.UI = (function() {
     GameState.board.activeMandates           = [];
     Decisions.init();
     GameState._lastTenantDistressYear = 0;
-    GameState.balance.cash                = 25;
+    GameState.balance.cash                = 30;
 
     GameState.debtTranches = [
       { id: "d001", amount: 35, rate: 5.0, maturityQuarter: 2, maturityYear: 4, quartersUntilMaturity: 13, label: "5.0% Sr Notes due Y4Q2" },
