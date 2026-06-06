@@ -192,7 +192,7 @@ window.Board = (() => {
         var prevFFO = h[h.length - 4] ? h[h.length - 4].ffo : currFFO;
         var growth  = prevFFO > 0 ? (currFFO - prevFFO) / prevFFO : 0;
         if (growth > 0.08)  ch.attitude = clamp(ch.attitude + 0.5, 0, 10);
-        if (growth < 0)     ch.attitude = clamp(ch.attitude - 1.0, 0, 10);
+        if (growth < 0)     ch.attitude = clamp(ch.attitude - 0.6, 0, 10);
       }
       if (GameState.board.acquisitionsThisYear > 0)
         ch.attitude = clamp(ch.attitude + 0.3, 0, 10);
@@ -202,12 +202,12 @@ window.Board = (() => {
     var ok = getDirectorState("okafor");
     if (ok) {
       var d2a = d2aSafe;
-      if (d2a >= 0.25 && d2a <= 0.45) ok.attitude = clamp(ok.attitude + 0.5, 0, 10);
+      if (d2a >= 0.30 && d2a <= 0.55) ok.attitude = clamp(ok.attitude + 0.5, 0, 10);
       if (d2a < 0.20 && GameState.meta.year >= 2) ok.attitude = clamp(ok.attitude - 0.5, 0, 10);
-      if (d2a > 0.60)                 ok.attitude = clamp(ok.attitude - 1.0, 0, 10);
+      if (d2a > 0.70)                 ok.attitude = clamp(ok.attitude - 0.6, 0, 10);
       if (r.interestCoverage > 2.0)   ok.attitude = clamp(ok.attitude + 0.3, 0, 10);
       if (b.cash < 0) {
-        ok.attitude = clamp(ok.attitude - 1.0, 0, 10);
+        ok.attitude = clamp(ok.attitude - 0.6, 0, 10);
         GameState.board.noOverdraftBroken = true;
       }
     }
@@ -223,7 +223,7 @@ window.Board = (() => {
         else                                       pe.attitude = clamp(pe.attitude - 0.1, 0, 10); // flat = mild impatience
       }
       if (co.equityIssuanceYear === GameState.meta.year) {
-        pe.attitude = clamp(pe.attitude - 1.0, 0, 10);
+        pe.attitude = clamp(pe.attitude - 0.6, 0, 10);
         GameState.board.noEquityBroken = true;
       }
     }
@@ -239,6 +239,13 @@ window.Board = (() => {
       if (worstOcc < 0.65) ha.attitude = clamp(ha.attitude - 0.5, 0, 10);
       if (GameState.board.leaseUpsThisYear > 0) ha.attitude = clamp(ha.attitude + 0.3, 0, 10);
     }
+
+    // Gentle mean-reversion: directors slowly drift back toward neutral (5)
+    // when not being actively failed, so one rough patch doesn't permanently
+    // doom you. Only nudges those below neutral upward, by a small amount.
+    GameState.board.directors.forEach(function(d) {
+      if (d.attitude < 5) d.attitude = clamp(d.attitude + 0.15, 0, 5);
+    });
   }
 
   // ----------------------------------------------------------
