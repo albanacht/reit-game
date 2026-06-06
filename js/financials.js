@@ -17,7 +17,7 @@ window.Financials = (() => {
   // CONSTANTS
   // ----------------------------------------------------------
   const OPEX_RATIO        = 0.31;  // Operating expenses as % of GPR (trimmed for breathing room)
-  const DEPRECIATION_RATE = 0.025; // Annual depreciation as % of asset value
+  const DEPRECIATION_RATE = 0.020; // Annual depreciation as % of asset value
   const GA_BASE           = 0.0;   // Fixed G&A per quarter $M (trimmed)
   const GA_PORTFOLIO_PCT  = 0.003; // Additional G&A per $M of portfolio value
   const CAPEX_RESERVE_PCT = 0.005; // Annual normalized capex reserve as % of asset value
