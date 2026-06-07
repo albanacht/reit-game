@@ -515,41 +515,77 @@ window.UI = (function() {
     container.innerHTML = html;
   }
 
-  // NEW: Goals panel — live green/red indicators
+  // Board Goals panel — shows the current year's active mandates with live
+  // met/unmet indicators, driven by the real mandate system.
   function renderGoalsPanel() {
     var container = el("goals-list");
     var yearLabel = el("goals-year-label");
     if (!container) return;
-    var goals = GameState.board.currentGoals;
-    if (!goals || goals.length === 0) {
-      container.innerHTML = '<p class="text-muted" style="font-size:12px">Goals set after Year 1.</p>';
+
+    var mandates = GameState.board.activeMandates || [];
+    if (mandates.length === 0) {
+      container.innerHTML = '<p class="text-muted" style="font-size:12px">The board sets your targets at the first annual meeting (end of Year 1).</p>';
+      if (yearLabel) yearLabel.textContent = "Board Goals";
       return;
     }
-    if (yearLabel) yearLabel.textContent = "Year " + GameState.meta.year + " Targets";
-    var html = "";
-    goals.forEach(function(g) {
-      var met = false;
-      var r = GameState.ratios;
-      var c = GameState.company;
-      if (g.key === "dividendCoverage")   met = r.dividendCoverage >= g.threshold;
-      if (g.key === "dividendPerShare")   met = c.dividendPerShare >= g.threshold;
-      if (g.key === "occupancyPortfolio") met = r.occupancyPortfolio >= g.threshold;
-      if (g.key === "debtToAssets")       met = r.debtToAssets <= g.threshold;
-      if (g.key === "ffoGrowth")          met = (GameState.board.thresholds.ffoGrowth || 0) >= g.threshold;
-      if (g.key === "interestCoverage")   met = r.interestCoverage >= g.threshold;
-      if (g.key === "creditRating") {
-        var order = ["CCC","B","BB","BBB","A","AA","AAA"];
-        met = order.indexOf(GameState.credit.rating) >= order.indexOf(g.threshold);
+    if (yearLabel) yearLabel.textContent = "Year " + GameState.meta.year + " Board Mandates";
+
+    var r = GameState.ratios;
+    var co = GameState.company;
+    var b = GameState.board;
+    var curPortfolio = GameState.portfolio.reduce(function(s, p) { return s + p.currentValue; }, 0);
+    var worstOcc = GameState.portfolio.length > 0
+      ? Math.min.apply(null, GameState.portfolio.map(function(p) { return p.occupancy; })) : 1;
+
+    // Live current value for each metric (mirrors evaluateMandates)
+    function liveValue(metric) {
+      switch (metric) {
+        case "dividendGrowthPct":   return b.startYearDividend > 0 ? (co.dividendPerShare - b.startYearDividend) / b.startYearDividend * 100 : 0;
+        case "noDividendCut":       return co.dividendPerShare >= (b.startYearDividend || 0) ? 1 : 0;
+        case "acquisitionsThisYear":return b.acquisitionsThisYear || 0;
+        case "ffoGrowthPct":        return GameState._lastFFOGrowthPct || 0;
+        case "portfolioGrowthPct":  return (b.startYearPortfolio > 0) ? (curPortfolio - b.startYearPortfolio) / b.startYearPortfolio * 100 : 0;
+        case "debtToAssets":        return (r.debtToAssets || 0) * 100;
+        case "interestCoverage":    return r.interestCoverage >= 99 ? 99 : r.interestCoverage;
+        case "noOverdraft":         return b.noOverdraftBroken ? 0 : 1;
+        case "noDebtIncrease":      return GameState.balance.totalDebt <= (b.startYearDebt || GameState.balance.totalDebt) + 0.5 ? 1 : 0;
+        case "sharePriceHeld":      return co.sharePrice >= (b.startYearSharePrice || co.sharePrice) ? 1 : 0;
+        case "sharePriceGrowthPct": return (b.startYearSharePrice > 0) ? (co.sharePrice - b.startYearSharePrice) / b.startYearSharePrice * 100 : 0;
+        case "noEquityIssued":      return b.noEquityBroken ? 0 : 1;
+        case "occupancyPortfolio":  return (r.occupancyPortfolio || 0) * 100;
+        case "worstOccupancy":      return worstOcc * 100;
+        case "leaseUpsThisYear":    return b.leaseUpsThisYear || 0;
+        default: return 0;
       }
-      var color = met ? "text-green" : "text-red";
-      var icon  = met ? "✅" : "❌";
+    }
+
+    var html = "";
+    mandates.forEach(function(m) {
+      if (m.response === "reject") {
+        html += '<div class="goal-row"><span class="goal-icon">⊘</span><span class="goal-metric">' + dirShort(m.directorId) + ': ' + m.text + '</span><span class="goal-target text-muted">declined</span></div>';
+        return;
+      }
+      var val = liveValue(m.metric);
+      var pct = (["debtToAssets","interestCoverage","noOverdraft","noDebtIncrease","sharePriceHeld","noEquityIssued"].indexOf(m.metric) === -1);
+      var met;
+      if (m.higher) met = val >= (m.metric === "occupancyPortfolio" || m.metric === "worstOccupancy" || m.metric === "debtToAssets" ? m.target * 100 : m.target);
+      else          met = val <= (m.metric === "debtToAssets" ? m.target * 100 : m.target);
+      // boolean metrics
+      if (["noOverdraft","noDebtIncrease","sharePriceHeld","noEquityIssued","noDividendCut"].indexOf(m.metric) !== -1) met = val >= 1;
+
+      var icon = met ? "✅" : "⏳";
+      var color = met ? "text-green" : "text-muted";
       html += '<div class="goal-row">' +
         '<span class="goal-icon">' + icon + '</span>' +
-        '<span class="goal-metric">' + g.metric + '</span>' +
-        '<span class="goal-target ' + color + '">' + g.target + '</span>' +
+        '<span class="goal-metric ' + color + '" style="font-size:11px;">' + dirShort(m.directorId) + ': ' + m.text + '</span>' +
         '</div>';
     });
     container.innerHTML = html;
+  }
+
+  function dirShort(id) {
+    var names = { williams: "Williams", chen: "Chen", okafor: "Okafor", petrova: "Petrova", hassan: "Hassan" };
+    return names[id] || id;
   }
 
   function getPropertyIndicator(p) {
@@ -995,21 +1031,29 @@ window.UI = (function() {
     var years  = yrEl  ? parseInt(yrEl.value)    : NaN;
     if (isNaN(amount) || amount <= 0)            { showToast("Enter a valid amount", "error"); return; }
     if (isNaN(years) || years < 1 || years > 10) { showToast("Select a valid term.", "error"); return; }
-    // NEW: term-adjusted rate
     var rate = Financials.getCurrentBorrowingRateForTerm ? Financials.getCurrentBorrowingRateForTerm(years) : Market.getCurrentBorrowingRate();
     var portfolioValue = GameState.portfolio.reduce(function(s, p) { return s + p.currentValue; }, 0);
     var currentDebt    = GameState.debtTranches.reduce(function(s, t) { return s + t.amount; }, 0);
     var capacity       = Math.round((portfolioValue * 0.80 - currentDebt) * 10) / 10;
     var ltv            = portfolioValue > 0 ? Math.round(currentDebt / portfolioValue * 100) : 0;
-    showModal("Issue New Debt",
-      "Amount: " + fmtM(amount) + "  |  Term: " + years + " yrs  |  Rate: " + fmt(rate, 2) + "%\n" +
-      "Annual interest: " + fmtM(amount * rate / 100) + "  |  Tranches: " + GameState.debtTranches.length + "/10\n" +
-      "Current LTV: " + ltv + "%  |  Borrowing capacity: " + fmtM(Math.max(0, capacity)) + " (80% LTV ceiling)",
-      [{ label: "Issue at " + fmt(rate, 2) + "%", style: "btn-primary", onClick: function() {
-        var r = Financials.issueDebt(amount, years);
+    var hasCFO         = typeof Staff !== "undefined" && Staff.hasRole("financial");
+    var buttons = [{ label: "Issue Secured at " + fmt(rate, 2) + "%", style: "btn-primary", onClick: function() {
+        var r = Financials.issueDebt(amount, years, false);
         showToast(r.message, r.success ? "success" : "error");
         if (r.success) { if (amtEl) amtEl.value = ""; renderAll(); }
-      }}]);
+      }}];
+    if (hasCFO) {
+      buttons.push({ label: "Issue Unsecured at " + fmt(rate + 1.5, 2) + "%", style: "btn-secondary", onClick: function() {
+        var r = Financials.issueDebt(amount, years, true);
+        showToast(r.message, r.success ? "success" : "error");
+        if (r.success) { if (amtEl) amtEl.value = ""; renderAll(); }
+      }});
+    }
+    showModal("Issue New Debt",
+      "Amount: " + fmtM(amount) + "  |  Term: " + years + " yrs  |  Secured rate: " + fmt(rate, 2) + "%\n" +
+      "Current LTV: " + ltv + "%  |  Secured capacity: " + fmtM(Math.max(0, capacity)) + " (80% LTV)\n" +
+      (hasCFO ? "Unsecured available (CFO): +1.5% rate, bypasses LTV, capped ~25% of portfolio." : "Hire a CFO to unlock unsecured corporate debt (bypasses the LTV ceiling)."),
+      buttons);
   }
 
   function handleIssueEquity() {
@@ -1524,6 +1568,16 @@ window.UI = (function() {
 
     // NEW: Show macro event popup if any fired, then continue
     function continueAfterEvents() {
+      // Year-15 victory (or any win) overrides the normal year-end flow.
+      if (GameState.meta.gameOver && GameState.meta.gameWon) {
+        renderAll(rp);
+        var sdWin = Leaderboard.calculateScore();
+        setTimeout(function() {
+          showGameOver();
+          setTimeout(function() { Leaderboard.showSubmitScreen(sdWin); }, 1200);
+        }, 800);
+        return;
+      }
       if (justEndedYear) {
         var snap = Board.generateAnnualReport();
         renderAll(rp);
@@ -1604,7 +1658,7 @@ window.UI = (function() {
           GameState._esgJustFired = false;
           showJenkinsPopup("Jenkins — ESG Conversion Program",
             "Boss, the nephew's latest crusade: a portfolio-wide <strong>ESG conversion program</strong> — green retrofits, wellness lobbies, 'biophilic' nonsense. " +
-            "It's raising our operating expenses by about <strong>3%</strong> across every property. The board applauded. Of course they did.");
+            "It's raising our operating expenses by about <strong>5%</strong> across every property. The board applauded. Of course they did.");
           return;
         }
         if (GameState._towerJustStarted) {
@@ -1806,6 +1860,7 @@ window.UI = (function() {
     GameState.preferred = { outstanding:0, shares:0, parValue:25, dividendRate:0.05, issued:false };
     GameState.balance.preferredEquity = 0;
     GameState._preferredOffered = false;
+    GameState._privatePlacementUsed = false;
     GameState._negEventCooldown = 0;
     GameState._legacyRenamed = false;
     GameState._legacyRenameMsg = null;
@@ -1846,23 +1901,17 @@ window.UI = (function() {
       showModal(
         "Letter from the Board of Directors",
         "Dear " + playerName + ",\n\n" +
-        "The Board of Directors is pleased to appoint you as Chief Executive Officer of " + reitName + " REIT.\n\n" +
-        "YEAR 1 — ORIENTATION PERIOD\n" +
-        "You cannot be fired this year. However the board is scoring you silently. Failures carry forward as pressure into Year 2.\n\n" +
-        "YOUR STARTING POSITION\n" +
-        "▸ Cash: $5M — almost nothing. Use it wisely.\n" +
-        "▸ Four properties already owned\n" +
-        "▸ Debt: $100M across two tranches\n" +
-        "▸ Dividend: $0.10/share/quarter\n\n" +
-        "THE BOARD'S EXPECTATIONS\n" +
-        "▸ USE DEBT — a REIT that avoids leverage is a savings account\n" +
-        "▸ We expect debt/assets between 30-50% within two years\n" +
-        "▸ Grow the portfolio aggressively — acquire properties\n" +
-        "▸ Raise dividends as FFO grows — share the earnings\n" +
-        "▸ Keep occupancy above 80% across all properties\n\n" +
-        "You have a $1B credit facility available. Deploy it. Borrow, acquire, grow. " +
-        "The board does not reward caution — it rewards results.\n\n" +
-        "Press F1 anytime for help on ratios and mechanics.\n\n" +
+        "The Board is pleased to appoint you Chief Executive Officer of " + reitName + " REIT. Your mandate is simple to state and hard to achieve: lead this company for fifteen years. Survive that long and you retire a legend.\n\n" +
+        "YEAR 1 — ORIENTATION\n" +
+        "You cannot be fired this year. Use it to learn the controls.\n\n" +
+        "HOW THE BUSINESS WORKS\n" +
+        "▸ DEBT — Borrow to grow. You can take secured loans against your properties; a REIT that hoards cash is just a savings account.\n" +
+        "▸ PROPERTIES — Acquire buildings that yield more than your borrowing costs. That spread is how you make money.\n" +
+        "▸ DIVIDENDS — Pay shareholders from your cash flow, and raise the dividend as you grow. The board cares about this.\n" +
+        "▸ BOARD MEETINGS — Each year the directors vote on your future. Keep enough of them content or you're out. Each one cares about something different.\n" +
+        "▸ STAFF — Hire department heads to unlock capabilities: an Acquisitions Lead finds better deals, a CFO opens new financing, an Asset Manager improves occupancy, and more.\n\n" +
+        "Press F1 anytime for help on the financial ratios and mechanics.\n\n" +
+        "Lead well, " + playerName + ". The board does not reward caution — it rewards results.\n\n" +
         "— The Board of Directors",
         [{ label: "Begin", style: "btn-primary", onClick: function() {
           // After the welcome letter, Jenkins gives the first tutorial beat
