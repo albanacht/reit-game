@@ -99,6 +99,13 @@ window.Financials = (() => {
       ga += Staff.totalSalary();
     }
 
+    // Chief Placemaking Officer (Williams' affiliate): from Year 6 his
+    // "initiatives" inflate G&A by 10% — a permanent drain you can't escape.
+    if (GameState.placemaking && GameState.placemaking.active) {
+      ga += GameState.placemaking.cost; // his function cost (~$0.85M/q)
+      if (GameState.placemaking.traitActive) ga *= 1.10;
+    }
+
     return fmt(ga);
   }
 
@@ -849,10 +856,10 @@ window.Financials = (() => {
     GameState.balance.cash = fmt(GameState.balance.cash - cost);
     GameState.company.lastBuybackYear = GameState.meta.year;
 
-    // Buyback slightly boosts share price
-    GameState.company.sharePrice = fmt(
-      GameState.company.sharePrice * 1.01
-    );
+    // Small immediate uptick — the mirror image of issuance dropping the
+    // price. This makes the price higher than last quarter, which pleases
+    // Petrova when the board evaluates this quarter.
+    GameState.company.sharePrice = fmt(GameState.company.sharePrice * 1.02);
 
     // Newsfeed
     if (typeof News !== "undefined" && News.add) {
@@ -946,6 +953,30 @@ window.Financials = (() => {
       Market.applyYearlyEscalation();
       Properties.applyAnnualDecay();
       if (typeof Staff !== "undefined" && Staff.processYearEnd) Staff.processYearEnd();
+
+      // Chief Placemaking Officer — Williams installs his affiliate at Year 5.
+      if (GameState.placemaking) {
+        if (GameState.meta.year >= 5 && !GameState.placemaking.active) {
+          GameState.placemaking.active = true;        // joins, costs $0.85M/q
+          GameState._placemakingJustJoined = true;    // trigger Jenkins popup
+        }
+        if (GameState.meta.year >= 6 && GameState.placemaking.active && !GameState.placemaking.traitActive) {
+          GameState.placemaking.traitActive = true;   // +10% G&A "initiatives"
+          GameState._placemakingTraitJustFired = true;
+        }
+      }
+
+      // Easter egg: reaching Year 10 — the board names a building in your
+      // honor. Fires once, renames your oldest held property. UI shows the
+      // congratulatory Jenkins popup via the _legacyRename flag.
+      if (GameState.meta.year === 10 && !GameState._legacyRenamed && GameState.portfolio.length > 0) {
+        var honoree = GameState.portfolio[0];
+        var pname = (GameState.player && GameState.player.name) ? GameState.player.name : "The CEO";
+        var newName = pname.split(" ")[0] + " Tower";
+        honoree.name = newName;
+        GameState._legacyRenamed = true;
+        GameState._legacyRenameMsg = newName;
+      }
     }
 
     // Reset unusual items (events.js will populate this before we run)
