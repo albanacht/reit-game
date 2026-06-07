@@ -8,7 +8,7 @@
 // - BIN_ID and API_KEY are set here — do not move them elsewhere
 // ============================================================
 
-const Leaderboard = (() => {
+window.Leaderboard = (() => {
 
   // ----------------------------------------------------------
   // CONFIG
@@ -301,6 +301,8 @@ const Leaderboard = (() => {
       .replace(/"/g, "&quot;");
   }
 
+  // Cache for detail view
+  Leaderboard._cachedScores = [];
 
   // ----------------------------------------------------------
   // PUBLIC API
