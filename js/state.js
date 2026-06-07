@@ -64,6 +64,14 @@ window.GameState = {
     issued:      false,   // once-per-game offer guard
   },
 
+  // Chief Placemaking Officer — Williams' unfireable affiliate (joins Year 5)
+  placemaking: {
+    active:      false,   // installed after Year 5
+    cost:        0.85,    // $M per quarter function cost
+    traitActive: false,   // Year 6+: inflates G&A 10%
+    announced:   false,   // guard for the Jenkins popup
+  },
+
   // ----------------------------------------------------------
   // DEBT TRANCHES
   // ----------------------------------------------------------
