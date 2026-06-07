@@ -322,6 +322,21 @@ window.UI = (function() {
           '<span class="text-muted" style="font-size:10px;font-style:italic;">Cannot be fired</span>' +
         '</div>' +
         '</div>';
+      // Janice Ling — Owner Relations (Y8), also unfireable
+      if (GameState.placemaking.ownerRelations) {
+        rh += '<div class="staff-row" style="border-left:2px solid #b45309;">' +
+          '<img class="staff-portrait" src="assets/staff/port17.png" alt="Janice Ling">' +
+          '<div class="staff-info">' +
+            '<div class="staff-name-row"><span class="staff-name">Janice Ling</span></div>' +
+            '<div class="staff-title">Head of Owner Relations</div>' +
+            '<div class="staff-trait text-muted">Builds "stakeholder bridges." Unclear what that means.</div>' +
+          '</div>' +
+          '<div class="staff-right">' +
+            '<div class="staff-cost">$' + fmt(GameState.placemaking.ownerRelationsCost, 2) + 'M/q</div>' +
+            '<span class="text-muted" style="font-size:10px;font-style:italic;">Cannot be fired</span>' +
+          '</div>' +
+          '</div>';
+      }
     }
 
     if (rh === "") {
@@ -1083,9 +1098,23 @@ window.UI = (function() {
   };
 
   function showBoardMeeting() {
-    // Generate mandates and evaluate last year
-    var capital = Board.earnPoliticalCapital();
-    var mandates = Board.generateMandates();
+    // Earn capital ONCE per board meeting (guard against re-entry inflating it)
+    var capital;
+    if (GameState.board._capitalEarnedYear !== GameState.meta.year) {
+      capital = Board.earnPoliticalCapital();
+      GameState.board._capitalEarnedYear = GameState.meta.year;
+      GameState.board._lastEarnedCapital = capital;
+    } else {
+      capital = GameState.board._lastEarnedCapital || [];
+    }
+    var mandates;
+    if (GameState.board._mandatesYear === GameState.meta.year && GameState.board._cachedMandates) {
+      mandates = GameState.board._cachedMandates;
+    } else {
+      mandates = Board.generateMandates();
+      GameState.board._mandatesYear = GameState.meta.year;
+      GameState.board._cachedMandates = mandates;
+    }
     var mandateResults = Board.evaluateMandates();
 
     _boardMeetingState.mandates       = mandates;
@@ -1564,6 +1593,43 @@ window.UI = (function() {
             "Translation: it does nothing measurable and it's inflating our G&A by about <strong>10%</strong> from here on. I did try to talk him out of it.");
           return;
         }
+        if (GameState._ownerRelationsJustFired) {
+          GameState._ownerRelationsJustFired = false;
+          showJenkinsPopup("Jenkins — A New Department",
+            "Boss, more news from upstairs. The Placemaking Officer has spun up an entire <strong>Owner Relations Department</strong>, headed by his hire <strong>Janice Ling</strong>. " +
+            "What it does is anyone's guess, but it's adding <strong>$0.4M a quarter</strong> to our overhead. The org chart grows ever stranger.");
+          return;
+        }
+        if (GameState._esgJustFired) {
+          GameState._esgJustFired = false;
+          showJenkinsPopup("Jenkins — ESG Conversion Program",
+            "Boss, the nephew's latest crusade: a portfolio-wide <strong>ESG conversion program</strong> — green retrofits, wellness lobbies, 'biophilic' nonsense. " +
+            "It's raising our operating expenses by about <strong>3%</strong> across every property. The board applauded. Of course they did.");
+          return;
+        }
+        if (GameState._towerJustStarted) {
+          GameState._towerJustStarted = false;
+          var towerSp = GameState.placemaking ? fmt(GameState.placemaking.towerSpend) : 0;
+          showJenkinsPopup("Jenkins — 'Celestial Heights'",
+            "Boss, brace yourself. The board — egged on by you-know-who — has approved a signature supertall trophy tower: <strong>Celestial Heights</strong>. " +
+            "'A legacy landmark for the firm.' It commits us to roughly <strong>$" + towerSp + "M every quarter for three years</strong>, earns nothing while it's built, and we can't stop without writing off everything. " +
+            "This is exactly how empires fall, boss. Survive it and you're immortal.");
+          return;
+        }
+        if (GameState._towerOverrunJustFired) {
+          GameState._towerOverrunJustFired = false;
+          showJenkinsPopup("Jenkins — Cost Overrun",
+            "Boss, Celestial Heights is over budget — naturally. Steel prices, redesigns, the architect's ego. " +
+            "Our committed quarterly spend just jumped <strong>35%</strong>. The hole gets deeper.");
+          return;
+        }
+        if (GameState._towerJustFinished) {
+          GameState._towerJustFinished = false;
+          showJenkinsPopup("Jenkins — It's Finished",
+            "Boss... Celestial Heights is complete. We survived it — I genuinely didn't think we would. " +
+            "The drain is over. Whatever comes next, you've earned your place in this firm's history.");
+          return;
+        }
         // Year-10 legacy easter egg takes priority
         if (GameState._legacyRenameMsg) {
           var nm = GameState._legacyRenameMsg;
@@ -1679,6 +1745,7 @@ window.UI = (function() {
     GameState.meta.totalQuarters  = 0;
     GameState.meta.gameOver       = false;
     GameState.meta.gameOverReason = "";
+    GameState.meta.gameWon = false;
     GameState.meta.started        = true;
     GameState.meta.tutorialYear   = true;
 
@@ -1697,6 +1764,10 @@ window.UI = (function() {
     GameState.board.noOverdraftBroken        = false;
     GameState.board.noEquityBroken           = false;
     GameState.board.politicalCapital         = 2;
+    GameState.board._capitalEarnedYear = 0;
+    GameState.board._lastEarnedCapital = [];
+    GameState.board._mandatesYear = 0;
+    GameState.board._cachedMandates = null;
     GameState.board.activeMandates           = [];
     Decisions.init();
     GameState._lastTenantDistressYear = 0;
@@ -1720,9 +1791,14 @@ window.UI = (function() {
     GameState._negEventCooldown = 0;
     GameState._legacyRenamed = false;
     GameState._legacyRenameMsg = null;
-    GameState.placemaking = { active:false, cost:0.85, traitActive:false, announced:false };
+    GameState.placemaking = { active:false, cost:0.85, traitActive:false, ownerRelations:false, ownerRelationsCost:0.40, esgActive:false, towerActive:false, towerQuarters:0, towerSpend:0, towerOverrun:false };
     GameState._placemakingJustJoined = false;
     GameState._placemakingTraitJustFired = false;
+    GameState._ownerRelationsJustFired = false;
+    GameState._esgJustFired = false;
+    GameState._towerJustStarted = false;
+    GameState._towerOverrunJustFired = false;
+    GameState._towerJustFinished = false;
     GameState._divReminderYear = 0;
 
     Market.init();
