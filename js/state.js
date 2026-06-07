@@ -64,12 +64,20 @@ window.GameState = {
     issued:      false,   // once-per-game offer guard
   },
 
-  // Chief Placemaking Officer — Williams' unfireable affiliate (joins Year 5)
+  // Chief Placemaking Officer — Williams' nephew (joins Year 5). His escalating
+  // "initiatives" are the visible, thematic late-game cost pressure.
   placemaking: {
-    active:      false,   // installed after Year 5
-    cost:        0.85,    // $M per quarter function cost
-    traitActive: false,   // Year 6+: inflates G&A 10%
-    announced:   false,   // guard for the Jenkins popup
+    active:      false,   // Y5: installed, costs $0.85M/q
+    cost:        0.85,    // $M per quarter (placemaking officer)
+    traitActive: false,   // Y6: +10% G&A "holistic program"
+    ownerRelations: false,// Y8: Janice Ling, +$0.4M/q
+    ownerRelationsCost: 0.40,
+    esgActive:   false,   // Y10: +3% OPEX "ESG conversion"
+    // Y12: "Celestial Heights" vanity supertall — committed multi-quarter drain
+    towerActive:   false, // construction underway
+    towerQuarters: 0,     // quarters of construction remaining
+    towerSpend:    0,     // $M per quarter committed spend (scaled at start)
+    towerOverrun:  false, // mid-project cost overrun fired
   },
 
   // ----------------------------------------------------------
