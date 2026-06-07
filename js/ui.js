@@ -66,9 +66,10 @@ window.UI = (function() {
             "I'll give you a shout when one's coming up."
     },
     "1-4": {
-      title: "Jenkins — The Board Awaits",
-      body: "Year-end approaches. From next year the <strong>board votes</strong> on your future. <strong>Chairman Williams</strong> leads them — keep him content above all, and he cares most about a <strong>rising dividend</strong>. " +
-            "You've a few political-capital points to smooth things over, but don't lean on them — do the real work of keeping the board on side yourself."
+      title: "Jenkins — The Board & Political Capital",
+      body: "Year-end approaches. From next year the <strong>board votes</strong> on your future. <strong>Chairman Williams</strong> leads them — keep him content above all, and he cares most about a <strong>rising dividend</strong>.<br><br>" +
+            "One more thing: strong yearly results earn <strong>political capital</strong> — you gain it by raising the dividend, lifting the share price, growing FFO, or winning a credit upgrade. " +
+            "Bank it, then spend it to smooth over board disputes or seize special opportunities. It's the board's goodwill made tangible."
     },
   };
 
@@ -285,27 +286,47 @@ window.UI = (function() {
     if (!roster || !market) return;
 
     // Roster of hired staff — court-style cards with portrait
-    if (GameState.staff.length === 0) {
+    var rh = "";
+    GameState.staff.forEach(function(s) {
+      var traitClass = Staff.traitColor(s);
+      var traitTxt   = Staff.traitLabel(s);
+      var traitDesc  = Staff.traitDesc(s);
+      rh += '<div class="staff-row">' +
+        '<img class="staff-portrait" src="assets/staff/' + (s.portrait || "port1.png") + '" alt="' + s.name + '">' +
+        '<div class="staff-info">' +
+          '<div class="staff-name-row"><span class="staff-name">' + s.name + '</span><span class="staff-stars">' + (s.stars || "") + '</span></div>' +
+          '<div class="staff-title">' + s.title + '</div>' +
+          '<div class="staff-trait ' + traitClass + '">' + traitTxt + (traitDesc ? ' — <span class="text-muted">' + traitDesc + '</span>' : '') + '</div>' +
+        '</div>' +
+        '<div class="staff-right">' +
+          '<div class="staff-cost">$' + fmt(s.salary, 2) + 'M/q</div>' +
+          '<button class="btn btn-sm btn-danger" onclick="UI.fireStaff(\'' + s.roleId + '\')">Fire</button>' +
+        '</div>' +
+        '</div>';
+    });
+
+    // Chief Placemaking Officer — Williams' affiliate, cannot be fired
+    if (GameState.placemaking && GameState.placemaking.active) {
+      var pmTrait = GameState.placemaking.traitActive
+        ? '<div class="staff-trait text-red">"Synergy Initiatives" — <span class="text-muted">inflates G&amp;A by 10%</span></div>'
+        : '<div class="staff-trait text-muted">Assessing impact… (vague)</div>';
+      rh += '<div class="staff-row" style="border-left:2px solid #b45309;">' +
+        '<img class="staff-portrait" src="assets/staff/port16.png" alt="Reginald Thorne-Whitley">' +
+        '<div class="staff-info">' +
+          '<div class="staff-name-row"><span class="staff-name">Reginald Thorne-Whitley</span></div>' +
+          '<div class="staff-title">Chief Placemaking Officer</div>' +
+          pmTrait +
+        '</div>' +
+        '<div class="staff-right">' +
+          '<div class="staff-cost">$' + fmt(GameState.placemaking.cost, 2) + 'M/q</div>' +
+          '<span class="text-muted" style="font-size:10px;font-style:italic;">Cannot be fired</span>' +
+        '</div>' +
+        '</div>';
+    }
+
+    if (rh === "") {
       roster.innerHTML = '<p class="text-muted" style="font-size:12px">No staff hired yet. Browse the talent market below.</p>';
     } else {
-      var rh = "";
-      GameState.staff.forEach(function(s) {
-        var traitClass = Staff.traitColor(s);
-        var traitTxt   = Staff.traitLabel(s);
-        var traitDesc  = Staff.traitDesc(s);
-        rh += '<div class="staff-row">' +
-          '<img class="staff-portrait" src="assets/staff/' + (s.portrait || "port1.png") + '" alt="' + s.name + '">' +
-          '<div class="staff-info">' +
-            '<div class="staff-name-row"><span class="staff-name">' + s.name + '</span><span class="staff-stars">' + (s.stars || "") + '</span></div>' +
-            '<div class="staff-title">' + s.title + '</div>' +
-            '<div class="staff-trait ' + traitClass + '">' + traitTxt + (traitDesc ? ' — <span class="text-muted">' + traitDesc + '</span>' : '') + '</div>' +
-          '</div>' +
-          '<div class="staff-right">' +
-            '<div class="staff-cost">$' + fmt(s.salary, 2) + 'M/q</div>' +
-            '<button class="btn btn-sm btn-danger" onclick="UI.fireStaff(\'' + s.roleId + '\')">Fire</button>' +
-          '</div>' +
-          '</div>';
-      });
       roster.innerHTML = rh;
     }
 
@@ -1528,7 +1549,34 @@ window.UI = (function() {
       // Jenkins Year-1 tutorial (queued after other popups)
       setTimeout(function() {
         if (el("modal-overlay") && !el("modal-overlay").classList.contains("hidden")) return; // don't stack
+        // Chief Placemaking Officer events take priority
+        if (GameState._placemakingJustJoined) {
+          GameState._placemakingJustJoined = false;
+          showJenkinsPopup("Jenkins — A New Colleague",
+            "Boss, awkward news. Chairman Williams has installed his associate <strong>Reginald Thorne-Whitley</strong> as our new <strong>Chief Placemaking Officer</strong> — something about 'activating synergies in the built environment.' " +
+            "Nobody's quite sure what he does. He costs us <strong>$0.85M a quarter</strong>, and... we can't let him go. Board's orders. Best smile and bear it.");
+          return;
+        }
+        if (GameState._placemakingTraitJustFired) {
+          GameState._placemakingTraitJustFired = false;
+          showJenkinsPopup("Jenkins — Placemaking 'Initiatives'",
+            "Boss, our Chief Placemaking Officer has launched his 'holistic tenant-experience reimagining program.' " +
+            "Translation: it does nothing measurable and it's inflating our G&A by about <strong>10%</strong> from here on. I did try to talk him out of it.");
+          return;
+        }
+        // Year-10 legacy easter egg takes priority
+        if (GameState._legacyRenameMsg) {
+          var nm = GameState._legacyRenameMsg;
+          GameState._legacyRenameMsg = null;
+          showJenkinsPopup("Jenkins — A Lasting Legacy",
+            "Boss... ten years at the helm. No one expected you to last this long. " +
+            "The board voted to rename one of our properties <strong>" + nm + "</strong> in your honor. " +
+            "They're already whispering your name in the same breath as the greats. Enjoy it — then back to work.");
+          return;
+        }
         if (maybeShowTutorial()) return;
+        // Q4 dividend-target reminder (every year), then board warning
+        if (maybeShowDividendReminder()) return;
         // Q4 board warning (max once/year): if a director is angry before the vote
         maybeShowBoardWarning();
       }, 1200);
@@ -1563,15 +1611,34 @@ window.UI = (function() {
     var body;
     if (worst.id === "williams") {
       var startDiv = GameState.board.startYearDividend || GameState.company.dividendPerShare;
-      var target = fmt(startDiv * 1.10, 2);
-      body = "Boss, <strong>Chairman Williams</strong> is unhappy heading into the vote. He expects the dividend to keep rising — " +
-             "consider lifting it toward <strong>$" + target + "/share</strong> before the meeting, or he may turn on us. " +
-             "Raise it this quarter and his mood will improve before they vote.";
+      var reqGrowth = GameState.board.williamsTargetGrowth || 0.10;
+      var target = fmt(startDiv * (1 + reqGrowth), 2);
+      body = "Boss, remember our promise to <strong>Chairman Williams</strong> — we pledged to lift the dividend about <strong>" + Math.round(reqGrowth*100) + "%</strong> this year, to <strong>$" + target + "/share</strong>. " +
+             "We're not there yet and he's losing patience. Raise it to that level before the vote and he'll come around — otherwise he may turn on us.";
     } else {
       body = "Boss, <strong>" + dirName + "</strong> is unhappy heading into the annual vote (watching " + (info.watches || "performance") + "). " +
              "We've this quarter to improve things — address their concern, or spend political capital to smooth it over before the meeting.";
     }
     showJenkinsPopup("Jenkins — Board Warning", body);
+  }
+
+  // Q4 reminder of Williams' dividend target — fires every year in Q4 (Y2+)
+  // even if he's not yet hostile, so the player always knows the number to hit.
+  function maybeShowDividendReminder() {
+    if (GameState.meta.quarter !== 4 || GameState.meta.year < 2) return false;
+    if (GameState._divReminderYear === GameState.meta.year) return false;
+    var w = Board.getDirectorState ? Board.getDirectorState("williams") : null;
+    if (!w) return false;
+    GameState._divReminderYear = GameState.meta.year;
+    var startDiv = GameState.board.startYearDividend || GameState.company.dividendPerShare;
+    var reqGrowth = GameState.board.williamsTargetGrowth || 0.10;
+    var target = fmt(startDiv * (1 + reqGrowth), 2);
+    var actual = GameState.company.dividendPerShare;
+    if (actual >= target - 0.001) return false; // already met — no nag
+    showJenkinsPopup("Jenkins — Dividend Promise",
+      "Boss, you remember we promised Chairman Williams a <strong>" + Math.round(reqGrowth*100) + "%</strong> dividend hike this year — that means <strong>$" + target + "/share</strong>. " +
+      "We're at $" + fmt(actual, 2) + " right now. We should really deliver this before year-end, or he'll take it personally at the vote.");
+    return true;
   }
 
   // ----------------------------------------------------------
@@ -1651,6 +1718,12 @@ window.UI = (function() {
     GameState.balance.preferredEquity = 0;
     GameState._preferredOffered = false;
     GameState._negEventCooldown = 0;
+    GameState._legacyRenamed = false;
+    GameState._legacyRenameMsg = null;
+    GameState.placemaking = { active:false, cost:0.85, traitActive:false, announced:false };
+    GameState._placemakingJustJoined = false;
+    GameState._placemakingTraitJustFired = false;
+    GameState._divReminderYear = 0;
 
     Market.init();
     // Store baseline cap rates for market conditions indicator
