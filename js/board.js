@@ -160,9 +160,7 @@ window.Board = (() => {
     var b  = GameState.balance;
     var h  = GameState.history;
 
-    // Coalesce nullable ratios to safe numbers so comparisons behave.
-    // (null coverage/payout/leverage means "undefined this quarter".)
-    var covSafe = (r.dividendCoverage === null || r.dividendCoverage === undefined) ? 1.0 : r.dividendCoverage;
+    // Coalesce nullable leverage ratio for Okafor's logic.
     var d2aSafe = (r.debtToAssets === null || r.debtToAssets === undefined) ? 0.40 : r.debtToAssets;
 
     // Williams — DIVIDENDS. Dividend GROWTH is his overwhelming concern.
@@ -198,9 +196,8 @@ window.Board = (() => {
       } else {
         w.attitude = clamp(w.attitude - 0.5, 0, 10);          // flat — displeased
       }
-      // Coverage stays near-cosmetic.
-      if (covSafe > 1.8)      w.attitude = clamp(w.attitude + 0.1, 0, 10);
-      else if (covSafe < 0.5) w.attitude = clamp(w.attitude - 0.15, 0, 10);
+      // Williams cares ONLY about the dividend. Coverage, FFO, leverage —
+      // none of it moves him. Dividend growth is his entire world.
       }
     }
 
