@@ -69,6 +69,14 @@ window.Financials = (() => {
       noi                += propNOI;
     });
 
+    // Y10 ESG conversion program: +3% to operating expenses across the
+    // portfolio (a visible, thematic late-game cost — Williams' nephew again).
+    if (GameState.placemaking && GameState.placemaking.esgActive) {
+      var esgExtra = fmt(operatingExpenses * 0.03);
+      operatingExpenses = fmt(operatingExpenses + esgExtra);
+      noi = fmt(noi - esgExtra);
+    }
+
     return {
       grossPotentialRent: fmt(grossPotentialRent),
       vacancyLoss:        fmt(vacancyLoss),
@@ -99,11 +107,11 @@ window.Financials = (() => {
       ga += Staff.totalSalary();
     }
 
-    // Chief Placemaking Officer (Williams' affiliate): from Year 6 his
-    // "initiatives" inflate G&A by 10% — a permanent drain you can't escape.
+    // Williams' nephew's empire of initiatives (visible late-game drag):
     if (GameState.placemaking && GameState.placemaking.active) {
-      ga += GameState.placemaking.cost; // his function cost (~$0.85M/q)
-      if (GameState.placemaking.traitActive) ga *= 1.10;
+      ga += GameState.placemaking.cost;                       // Placemaking officer
+      if (GameState.placemaking.ownerRelations) ga += GameState.placemaking.ownerRelationsCost; // Owner Relations (Janice Ling)
+      if (GameState.placemaking.traitActive) ga *= 1.10;      // holistic program +10% G&A
     }
 
     return fmt(ga);
@@ -954,16 +962,48 @@ window.Financials = (() => {
       Properties.applyAnnualDecay();
       if (typeof Staff !== "undefined" && Staff.processYearEnd) Staff.processYearEnd();
 
-      // Chief Placemaking Officer — Williams installs his affiliate at Year 5.
+      // ── Williams' nephew: escalating "initiatives" ladder ──
       if (GameState.placemaking) {
-        if (GameState.meta.year >= 5 && !GameState.placemaking.active) {
-          GameState.placemaking.active = true;        // joins, costs $0.85M/q
-          GameState._placemakingJustJoined = true;    // trigger Jenkins popup
+        var pm = GameState.placemaking;
+        // Y5: Chief Placemaking Officer joins
+        if (GameState.meta.year >= 5 && !pm.active) {
+          pm.active = true;
+          GameState._placemakingJustJoined = true;
         }
-        if (GameState.meta.year >= 6 && GameState.placemaking.active && !GameState.placemaking.traitActive) {
-          GameState.placemaking.traitActive = true;   // +10% G&A "initiatives"
+        // Y6: "holistic program" → +10% G&A
+        if (GameState.meta.year >= 6 && pm.active && !pm.traitActive) {
+          pm.traitActive = true;
           GameState._placemakingTraitJustFired = true;
         }
+        // Y8: Owner Relations Department (Janice Ling) → +$0.4M/q
+        if (GameState.meta.year >= 8 && pm.active && !pm.ownerRelations) {
+          pm.ownerRelations = true;
+          GameState._ownerRelationsJustFired = true;
+        }
+        // Y10: ESG property conversion → +3% OPEX
+        if (GameState.meta.year >= 10 && pm.active && !pm.esgActive) {
+          pm.esgActive = true;
+          GameState._esgJustFired = true;
+        }
+        // Y12: "Celestial Heights" vanity supertall — committed 3-year drain
+        if (GameState.meta.year >= 12 && pm.active && !pm.towerActive && pm.towerQuarters === 0 && !pm._towerDone) {
+          pm.towerActive = true;
+          pm.towerQuarters = 12;  // 3 years of committed construction
+          // Spend scales with portfolio so it's lethal to big survivors,
+          // survivable (barely) for modest ones. ~6-9% of portfolio/yr.
+          var pv = GameState.portfolio.reduce(function(s, p) { return s + p.currentValue; }, 0);
+          pm.towerSpend = fmt(Math.max(6, pv * 0.018)); // per quarter
+          pm.towerOverrun = false;
+          GameState._towerJustStarted = true;
+        }
+      }
+
+      // ── DIVINE STATUS: surviving to Year 15 wins the game ──
+      if (GameState.meta.year >= 15 && !GameState.meta.gameOver) {
+        GameState.meta.gameOver = true;
+        GameState.meta.gameWon  = true;
+        GameState.meta.gameOverReason = GameState.player.name + ", you have done the impossible. Fifteen years at the helm — through rising rates, board coups, disasters, and an empire of absurd departments. " +
+          GameState.company.name + " stands as a monument to your endurance. They no longer call you a CEO. They call you a legend. You retire with divine status. (Year 15 — the maximum.)";
       }
 
       // Easter egg: reaching Year 10 — the board names a building in your
@@ -984,6 +1024,25 @@ window.Financials = (() => {
 
     // 1. Roll random events (they modify portfolio and unusualItems)
     const firedEvents = Events.rollEvents();
+
+    // Celestial Heights vanity tower — committed construction drain (Unusual
+    // Items). Bleeds cash for 3 years, no income, with a mid-build overrun.
+    if (GameState.placemaking && GameState.placemaking.towerActive && GameState.placemaking.towerQuarters > 0) {
+      var pmk = GameState.placemaking;
+      GameState.pnl.unusualItems = fmt(GameState.pnl.unusualItems - pmk.towerSpend);
+      pmk.towerQuarters -= 1;
+      // Mid-project cost overrun (~halfway) — classic megaproject blowout
+      if (!pmk.towerOverrun && pmk.towerQuarters <= 6) {
+        pmk.towerOverrun = true;
+        pmk.towerSpend = fmt(pmk.towerSpend * 1.35); // 35% overrun
+        GameState._towerOverrunJustFired = true;
+      }
+      if (pmk.towerQuarters <= 0) {
+        pmk.towerActive = false;
+        pmk._towerDone = true;
+        GameState._towerJustFinished = true;
+      }
+    }
 
     // 2. Update market conditions and property values
     const marketResult = Market.quarterlyUpdate();
