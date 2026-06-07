@@ -273,10 +273,11 @@ window.Properties = (() => {
       // Physical depreciation on the asset's base value (2.0%/yr)
       prop.baseValue = Math.round(prop.baseValue * 0.98 * 10) / 10;
 
-      // NOI decay (~1.25%/yr) — gentle, offset partly by escalation clauses.
-      // A renovated property resists decay for a few years.
+      // NOI decay (~0.4%/yr) — very gentle now; the real late-game cost
+      // pressure comes from the bullshit-department escalation, not silent
+      // rent erosion. Renovated properties resist it.
       var decayResist = (prop.renovated && prop.renovatedYear && (GameState.meta.year - prop.renovatedYear) < 4) ? 0.5 : 1.0;
-      prop.annualNOI = Math.round(prop.annualNOI * (1 - 0.0125 * decayResist) * 10) / 10;
+      prop.annualNOI = Math.round(prop.annualNOI * (1 - 0.004 * decayResist) * 10) / 10;
 
       prop.age = (prop.age || 0) + 1;
     });
