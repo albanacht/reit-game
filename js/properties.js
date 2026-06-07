@@ -195,6 +195,9 @@ window.Properties = (() => {
       prop.quarterOwned  = 1;
       prop.askingPrice   = null;
       prop.daysOnMarket  = null;
+      // Easter egg: the starting multifamily building is named after a
+      // certain seaside workplace in Phuket.
+      if (sector === "multifamily") prop.name = "Sunshine Beach Residences";
       return prop;
     });
 
