@@ -69,10 +69,10 @@ window.Financials = (() => {
       noi                += propNOI;
     });
 
-    // Y10 ESG conversion program: +3% to operating expenses across the
+    // Y10 ESG conversion program: +5% to operating expenses across the
     // portfolio (a visible, thematic late-game cost — Williams' nephew again).
     if (GameState.placemaking && GameState.placemaking.esgActive) {
-      var esgExtra = fmt(operatingExpenses * 0.03);
+      var esgExtra = fmt(operatingExpenses * 0.05);
       operatingExpenses = fmt(operatingExpenses + esgExtra);
       noi = fmt(noi - esgExtra);
     }
@@ -628,47 +628,58 @@ window.Financials = (() => {
     return fmt(Market.getCurrentBorrowingRate() + getTermPremium(years));
   }
 
-  function issueDebt(amount, years) {
-    if (GameState.debtTranches.length >= 10) {
-      return { success: false, message: "Maximum 10 debt tranches reached. Retire existing debt first." };
+  function issueDebt(amount, years, unsecured) {
+    if (GameState.debtTranches.length >= 12) {
+      return { success: false, message: "Maximum debt tranches reached. Retire existing debt first." };
     }
     if (amount <= 0) {
       return { success: false, message: "Amount must be greater than zero." };
     }
 
-    // Borrowing capacity = 80% LTV against PORTFOLIO VALUE (real-estate lending
-    // is based on loan-to-value, not total assets — so cash doesn't inflate the
-    // limit, and capacity grows as you acquire more property).
     var portfolioValue = GameState.portfolio.reduce(function(s, p) { return s + p.currentValue; }, 0);
     var currentDebt    = GameState.debtTranches.reduce(function(s, t) { return s + t.amount; }, 0);
-    var maxTotalDebt   = fmt(portfolioValue * 0.80);
-    var headroom       = fmt(maxTotalDebt - currentDebt);
 
-    if (headroom <= 0) {
-      return { success: false, message: "You're at the 80% loan-to-value ceiling against your property portfolio. Acquire more property or retire debt before borrowing more." };
-    }
-    if (amount > headroom) {
-      return { success: false, message: "That would breach the 80% LTV ceiling. Your remaining borrowing capacity is $" + headroom + "M (against a $" + fmt(portfolioValue) + "M portfolio)." };
-    }
-
-    // Frequency: lenders are happy to fund you while you're modestly levered
-    // (borrow freely below 50% LTV), but make you wait once you're highly
-    // levered (a 2-quarter cooldown kicks in above 50% LTV).
-    var currentLTV = portfolioValue > 0 ? (currentDebt / portfolioValue) : 1;
-    if (currentLTV >= 0.50) {
-      var lastDebtQ     = GameState.company.debtIssuanceQuarter || 0;
-      var currentQ      = GameState.meta.totalQuarters;
-      var quartersSince = currentQ - lastDebtQ;
-      if (lastDebtQ > 0 && quartersSince < 2) {
-        return { success: false, message: "You're above 50% leverage — lenders need time between issuances. Wait " + (2 - quartersSince) + " more quarter(s), or pay down debt to borrow freely again." };
+    if (unsecured) {
+      // UNSECURED CORPORATE DEBT — unlocked by hiring a CFO. Backed by company
+      // credit, not specific property, so it bypasses the LTV ceiling. Priced
+      // higher, capped at ~25% of portfolio value.
+      if (!(typeof Staff !== "undefined" && Staff.hasRole("financial"))) {
+        return { success: false, message: "Unsecured corporate debt requires a CFO. Hire one to access the credit markets." };
+      }
+      var unsecOut  = GameState.debtTranches.reduce(function(s, t) { return s + (t.unsecured ? t.amount : 0); }, 0);
+      var unsecCap  = fmt(portfolioValue * 0.25);
+      var unsecHead = fmt(unsecCap - unsecOut);
+      if (unsecHead <= 0) {
+        return { success: false, message: "You've reached your unsecured credit capacity ($" + unsecCap + "M, ~25% of portfolio)." };
+      }
+      if (amount > unsecHead) {
+        return { success: false, message: "That exceeds unsecured capacity. Remaining: $" + unsecHead + "M." };
+      }
+    } else {
+      var maxTotalDebt = fmt(portfolioValue * 0.80);
+      var headroom     = fmt(maxTotalDebt - currentDebt);
+      if (headroom <= 0) {
+        return { success: false, message: "You're at the 80% LTV ceiling. Acquire more property, retire debt, or use unsecured corporate debt (requires a CFO)." };
+      }
+      if (amount > headroom) {
+        return { success: false, message: "That would breach the 80% LTV ceiling. Remaining secured capacity is $" + headroom + "M. (A CFO unlocks unsecured borrowing.)" };
+      }
+      var currentLTV = portfolioValue > 0 ? (currentDebt / portfolioValue) : 1;
+      if (currentLTV >= 0.50) {
+        var lastDebtQ     = GameState.company.debtIssuanceQuarter || 0;
+        var quartersSince = GameState.meta.totalQuarters - lastDebtQ;
+        if (lastDebtQ > 0 && quartersSince < 2) {
+          return { success: false, message: "You're above 50% leverage — lenders need time between issuances. Wait " + (2 - quartersSince) + " more quarter(s)." };
+        }
       }
     }
 
     var rate    = getCurrentBorrowingRateForTerm(years);
+    if (unsecured) rate = fmt(rate + 1.5);
     var matYear = GameState.meta.year + years;
     var matQ    = GameState.meta.quarter;
     var id      = "d" + Date.now();
-    var label   = rate + "% Sr Notes due Y" + matYear + "Q" + matQ;
+    var label   = rate + "% " + (unsecured ? "Unsec. Notes" : "Sr Notes") + " due Y" + matYear + "Q" + matQ;
 
     GameState.debtTranches.push({
       id:                   id,
@@ -678,6 +689,7 @@ window.Financials = (() => {
       maturityYear:         matYear,
       quartersUntilMaturity:years * 4,
       label:                label,
+      unsecured:            !!unsecured,
     });
 
     GameState.balance.cash = fmt(GameState.balance.cash + amount);
