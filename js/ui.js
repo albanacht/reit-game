@@ -1713,12 +1713,30 @@ window.UI = (function() {
   function showGameOver() {
     var o = el("gameover-overlay");
     if (!o) return;
+    var won = GameState.meta.gameWon;
+    var titleEl = el("gameover-title");
+    var videoEl = el("gameover-video");
+
+    if (won) {
+      if (titleEl) { setText("gameover-title", "DIVINE STATUS"); titleEl.style.color = "#fbbf24"; }
+      // Show and play the victory video
+      if (videoEl) {
+        videoEl.classList.remove("hidden");
+        try { videoEl.currentTime = 0; videoEl.play().catch(function(){}); } catch (e) {}
+      }
+    } else {
+      if (titleEl) { setText("gameover-title", "YOU'RE FIRED"); titleEl.style.color = ""; }
+      if (videoEl) { videoEl.classList.add("hidden"); try { videoEl.pause(); } catch (e) {} }
+    }
+
     setText("gameover-reason",   GameState.meta.gameOverReason);
     setText("gameover-quarters", "Survived " + GameState.meta.totalQuarters + " quarters (" + GameState.meta.year + " years)");
     setText("gameover-ffo",      fmtPS(GameState.ratios.ffoPerShare));
     setText("gameover-occ",      fmtPct(GameState.ratios.occupancyPortfolio));
     setText("gameover-d2a",      fmtPct(GameState.ratios.debtToAssets));
     setText("gameover-props",    GameState.portfolio.length + " properties");
+    var btn = el("btn-new-game");
+    if (btn) btn.textContent = won ? "Play Again" : "Try Again";
     o.classList.remove("hidden");
   }
 
