@@ -421,6 +421,137 @@ window.Events = (() => {
     },
 
     {
+      id: "hurricane_citywide",
+      name: "Hurricane Sweeps the City",
+      type: "property",
+      target: null,
+      baseProbability: 0.05,
+      cycleBias: { expanding: 1.0, stable: 1.0, contracting: 1.0, recession: 1.0 },
+      apply() {
+        if (GameState.portfolio.length === 0) return null;
+        // Citywide — hits several properties, suburban/coastal worse
+        var hits = 0, totalCost = 0;
+        GameState.portfolio.forEach(function(p) {
+          var exposure = p.location === "suburban" ? 0.7 : p.location === "tier2" ? 0.5 : 0.35;
+          if (Math.random() < exposure) {
+            var occHit = randBetween(0.03, 0.10);
+            p.occupancy = Math.max(0.30, fmt(p.occupancy - occHit));
+            var c = randBetween(0.4, fmt(p.currentValue * 0.025));
+            totalCost += c; hits++;
+          }
+        });
+        if (hits === 0) return null;
+        addUnusualItem(-fmt(totalCost));
+        return { headline: "🌀 Hurricane Hits the City", body: "A major hurricane swept across the metro area, damaging " + hits + " of our properties. Cleanup, repairs and tenant disruption cost $" + fmt(totalCost) + "M this quarter, with occupancy dented across the affected assets. Recovery will be gradual.", impact: "-$" + fmt(totalCost) + "M, " + hits + " properties hit" };
+      },
+    },
+
+    {
+      id: "obsolete_equipment",
+      name: "Obsolete Equipment (Industrial)",
+      type: "property",
+      target: null,
+      baseProbability: 0.10,
+      cycleBias: { expanding: 1.2, stable: 1.0, contracting: 0.8, recession: 0.6 },
+      apply() {
+        var industrial = GameState.portfolio.filter(function(p) { return p.sector === "industrial"; });
+        if (industrial.length === 0) return null;
+        var prop = pick(industrial);
+        var cost = randBetween(1.0, fmt(prop.currentValue * 0.05));
+        addUnusualItem(-fmt(cost));
+        // Upgrading preserves NOI; we model auto-upgrade (keeps the tenant)
+        return { headline: "🏭 Equipment Modernization", body: prop.name + "'s anchor tenant demanded modernization of aging loading docks and climate systems to renew their lease. We funded the $" + fmt(cost) + "M upgrade to retain them — the alternative was losing a major tenant.", impact: "-$" + fmt(cost) + "M capital upgrade" };
+      },
+    },
+
+    {
+      id: "crime_wave_suburban",
+      name: "Crime Wave (Suburban)",
+      type: "property",
+      target: null,
+      baseProbability: 0.09,
+      cycleBias: { expanding: 0.6, stable: 1.0, contracting: 1.4, recession: 1.8 },
+      apply() {
+        var suburban = GameState.portfolio.filter(function(p) { return p.location === "suburban"; });
+        if (suburban.length === 0) return null;
+        var prop = pick(suburban);
+        var cost = randBetween(0.3, 0.8);
+        var occHit = randBetween(0.03, 0.08);
+        prop.occupancy = Math.max(0.30, fmt(prop.occupancy - occHit));
+        addUnusualItem(-fmt(cost));
+        return { headline: "🚨 Rising Crime Hits Suburb", body: "A spike in property crime around " + prop.name + " has spooked tenants. We've engaged a private security firm ($" + fmt(cost) + "M) but some tenants didn't renew — occupancy slipped " + fmt(occHit*100) + "%.", impact: prop.name + " occupancy -" + fmt(occHit*100) + "%" };
+      },
+    },
+
+    {
+      id: "anchor_renegotiation",
+      name: "Anchor Tenant Renegotiation (Retail)",
+      type: "property",
+      target: null,
+      baseProbability: 0.10,
+      cycleBias: { expanding: 0.6, stable: 1.0, contracting: 1.5, recession: 2.0 },
+      apply() {
+        var retail = GameState.portfolio.filter(function(p) { return p.sector === "retail"; });
+        if (retail.length === 0) return null;
+        var prop = pick(retail);
+        // Anchor demands rent cut; we model accepting a modest NOI reduction
+        var noiCut = randBetween(0.04, 0.10);
+        prop.annualNOI = fmt(prop.annualNOI * (1 - noiCut));
+        return { headline: "🏬 Anchor Tenant Squeeze", body: "The anchor tenant at " + prop.name + " leveraged soft retail conditions to renegotiate their lease downward. We accepted a " + fmt(noiCut*100) + "% rent reduction to keep them — losing them would have been worse.", impact: prop.name + " NOI -" + fmt(noiCut*100) + "%" };
+      },
+    },
+
+    {
+      id: "environmental_remediation",
+      name: "Environmental Remediation",
+      type: "property",
+      target: null,
+      baseProbability: 0.07,
+      cycleBias: { expanding: 1.0, stable: 1.0, contracting: 1.0, recession: 1.0 },
+      apply() {
+        var eligible = GameState.portfolio.filter(function(p) { return p.sector === "office" || p.sector === "industrial"; });
+        if (eligible.length === 0) return null;
+        var prop = pick(eligible);
+        var cost = randBetween(1.0, fmt(prop.currentValue * 0.045));
+        addUnusualItem(-fmt(cost));
+        return { headline: "☣️ Environmental Cleanup", body: "Mandatory environmental testing at " + prop.name + " uncovered asbestos and soil contamination requiring remediation. Regulators gave us no choice — the $" + fmt(cost) + "M cleanup was expensed this quarter.", impact: "-$" + fmt(cost) + "M remediation" };
+      },
+    },
+
+    {
+      id: "tax_reassessment",
+      name: "Property Tax Reassessment",
+      type: "market",
+      target: null,
+      baseProbability: 0.09,
+      cycleBias: { expanding: 1.4, stable: 1.0, contracting: 0.7, recession: 0.5 },
+      apply() {
+        if (GameState.portfolio.length === 0) return null;
+        // Citywide reassessment nudges NOI down a touch across the portfolio
+        var noiCut = randBetween(0.01, 0.03);
+        GameState.portfolio.forEach(function(p) { p.annualNOI = fmt(p.annualNOI * (1 - noiCut)); });
+        return { headline: "🏛️ Tax Reassessment", body: "The city reassessed commercial property values upward, raising our property tax burden across the portfolio. Net operating income takes a " + fmt(noiCut*100) + "% haircut. We could appeal, but the odds and legal costs rarely favor it.", impact: "Portfolio NOI -" + fmt(noiCut*100) + "%" };
+      },
+    },
+
+    {
+      id: "viral_prestige_moment",
+      name: "Viral / Prestige Moment",
+      type: "property",
+      target: null,
+      baseProbability: 0.08,
+      cycleBias: { expanding: 1.5, stable: 1.0, contracting: 0.7, recession: 0.4 },
+      apply() {
+        if (GameState.portfolio.length === 0) return null;
+        var prop = pick(GameState.portfolio);
+        var occBoost = randBetween(0.03, 0.07);
+        prop.occupancy = Math.min(0.99, fmt(prop.occupancy + occBoost));
+        return { headline: "✨ A Property Goes Viral", body: prop.name + " caught fire on social media after a viral moment, and a prestige tenant signed on to be associated with it. Leasing demand surged — occupancy climbed " + fmt(occBoost*100) + "%. Sometimes you get lucky.", impact: prop.name + " occupancy +" + fmt(occBoost*100) + "%" };
+      },
+    },
+
+
+    {
       id: "acquisition_offer",
       name: "Unsolicited Acquisition Offer",
       type: "property",
@@ -485,6 +616,8 @@ window.Events = (() => {
       credit_crunch:true, pandemic_shock:true, interest_rate_shock:true,
       retail_oversupply:true, office_wfh:true, multifamily_oversupply:true,
       major_tenant_bankruptcy:true, major_repair:true, natural_disaster:true,
+      hurricane_citywide:true, obsolete_equipment:true, crime_wave_suburban:true,
+      anchor_renegotiation:true, environmental_remediation:true, tax_reassessment:true,
     };
 
     // Build probability-adjusted list
