@@ -1,6 +1,6 @@
 // ============================================================
 // board.js — Board of Directors system
-// REIT Simulator Game 
+// REIT Simulator Game v0.6
 // ============================================================
 
 window.Board = (() => {
@@ -65,7 +65,6 @@ window.Board = (() => {
       { id: "div_raise",    text: (t) => `Raise the quarterly dividend by at least ${t}% this year.`, metric: "dividendGrowthPct", target: (y) => 8 + y * 3,      higher: true  },
       { id: "div_raise2",   text: (t) => `Deliver dividend growth of ${t}% — shareholders expect rising income.`, metric: "dividendGrowthPct", target: (y) => 8 + y * 3, higher: true  },
       { id: "div_nocut",    text: () => `Do not cut the dividend at any point this year.`,         metric: "noDividendCut",       target: () => 1,               higher: true  },
-      { id: "div_coverage", text: (t) => `Keep FFO coverage of the dividend above a healthy ${t}x.`, metric: "dividendCoverage",  target: (y) => 0.9 + y * 0.03, higher: true  },
     ],
     chen: [
       { id: "acquisitions", text: (t) => `Acquire at least ${t} properties this year.`,           metric: "acquisitionsThisYear",target: (y) => 1 + Math.floor(y/2), higher: true },
@@ -73,10 +72,10 @@ window.Board = (() => {
       { id: "portfolio_sz", text: (t) => `Portfolio assets must exceed $${t}M by year end.`,      metric: "totalAssets",         target: (y) => 200 + y * 150,  higher: true  },
     ],
     okafor: [
-      { id: "leverage",     text: (t) => `Debt/assets must stay between 25-${t}%.`,               metric: "debtToAssets",        target: (y) => 0.50 - y * 0.01,higher: false },
+      { id: "leverage",     text: (t) => `Debt/assets must not exceed ${t}%.`,                    metric: "debtToAssets",        target: (y) => 0.72,           higher: false },
       { id: "int_coverage", text: (t) => `Interest coverage must exceed ${t}x.`,                  metric: "interestCoverage",    target: (y) => 1.5 + y * 0.1,  higher: true  },
       { id: "no_overdraft", text: () => `No overdraft at any point this year.`,                    metric: "noOverdraft",         target: () => 1,               higher: true  },
-      { id: "min_leverage", text: (t) => `Debt/assets must be at least ${t}% — deploy capital.`,  metric: "minDebtToAssets",     target: (y) => 0.20 + y * 0.02,higher: true  },
+      { id: "no_debt_grow", text: () => `Do not grow total debt this year — refinance, don't expand it.`, metric: "noDebtIncrease", target: () => 1,            higher: true  },
     ],
     petrova: [
       { id: "share_price",  text: () => `Share price must not fall below current level.`,          metric: "sharePriceHeld",      target: () => 1,               higher: true  },
@@ -132,6 +131,8 @@ window.Board = (() => {
     GameState.board.startYearSharePrice = GameState.company.sharePrice;
     GameState.board.startYearFFO      = 0;
     GameState.board.startYearDividend = GameState.company.dividendPerShare;
+    GameState.board.startYearDebt     = GameState.balance.totalDebt;
+    GameState.board.debtIncreasedThisYear = false;
 
     // Legacy pressure fields — kept for UI compatibility
     GameState.board.pressurePoints = 0;
@@ -243,13 +244,17 @@ window.Board = (() => {
     // Hassan — operations
     var ha = getDirectorState("hassan");
     if (ha) {
-      if (r.occupancyPortfolio > 0.90) ha.attitude = clamp(ha.attitude + 0.5, 0, 10);
-      if (r.occupancyPortfolio < 0.80) ha.attitude = clamp(ha.attitude - 0.5, 0, 10);
+      // Hassan is a demanding operator — he expects HIGH occupancy and is
+      // unimpressed by merely "okay" numbers.
+      if (r.occupancyPortfolio >= 0.93)      ha.attitude = clamp(ha.attitude + 0.5, 0, 10);  // excellent
+      else if (r.occupancyPortfolio >= 0.88) ha.attitude = clamp(ha.attitude + 0.1, 0, 10);  // fine, barely
+      else if (r.occupancyPortfolio >= 0.83) ha.attitude = clamp(ha.attitude - 0.4, 0, 10);  // mediocre — displeased
+      else                                    ha.attitude = clamp(ha.attitude - 0.8, 0, 10);  // poor — angry
       var worstOcc = GameState.portfolio.length > 0
         ? Math.min.apply(null, GameState.portfolio.map(function(p) { return p.occupancy; }))
         : 1;
-      if (worstOcc < 0.65) ha.attitude = clamp(ha.attitude - 0.5, 0, 10);
-      if (GameState.board.leaseUpsThisYear > 0) ha.attitude = clamp(ha.attitude + 0.3, 0, 10);
+      if (worstOcc < 0.70) ha.attitude = clamp(ha.attitude - 0.5, 0, 10);   // a weak property irritates him
+      if (GameState.board.leaseUpsThisYear > 0) ha.attitude = clamp(ha.attitude + 0.2, 0, 10);
     }
 
     // Gentle mean-reversion: directors slowly drift back toward neutral (5)
@@ -346,6 +351,7 @@ window.Board = (() => {
       sharePriceHeld:      co.sharePrice >= startYearSharePrice ? 1 : 0,
       sharePriceGrowthPct: startYearSharePrice > 0 ? ((co.sharePrice - startYearSharePrice) / startYearSharePrice) * 100 : 0,
       noEquityIssued:      b.noEquityBroken ? 0 : 1,
+      noDebtIncrease:      GameState.balance.totalDebt <= (b.startYearDebt || GameState.balance.totalDebt) + 0.5 ? 1 : 0,
       occupancyPortfolio:  r.occupancyPortfolio,
       worstOccupancy:      worstOcc,
       leaseUpsThisYear:    b.leaseUpsThisYear,
@@ -474,6 +480,8 @@ window.Board = (() => {
     GameState.board.startYearSharePrice   = GameState.company.sharePrice;
     GameState.board.startYearFFO          = GameState.pnl.ffo;
     GameState.board.startYearDividend     = GameState.company.dividendPerShare;
+    GameState.board.startYearDebt         = GameState.balance.totalDebt;
+    GameState.board.debtIncreasedThisYear = false;
   }
 
   // ----------------------------------------------------------
