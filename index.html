@@ -67,7 +67,10 @@
 
   <!-- GAME OVER -->
   <div id="gameover-overlay" class="hidden">
-    <div class="gameover-title">YOU'RE FIRED</div>
+    <div class="gameover-title" id="gameover-title">YOU'RE FIRED</div>
+    <video id="gameover-video" class="hidden" width="480" playsinline controls style="max-width:90%;border-radius:8px;margin:0 auto 16px;display:block;">
+      <source src="assets/victory.mp4" type="video/mp4">
+    </video>
     <div class="gameover-subtitle" id="gameover-quarters"></div>
     <div class="gameover-letter" id="gameover-reason"></div>
     <div class="gameover-stats">
