@@ -1,6 +1,6 @@
 // ============================================================
 // board.js — Board of Directors system
-// REIT Simulator Game v0.6
+// REIT Simulator Game 
 // ============================================================
 
 window.Board = (() => {
@@ -170,16 +170,28 @@ window.Board = (() => {
     var w = getDirectorState("williams");
     if (w) {
       var startDiv = GameState.board.startYearDividend || co.dividendPerShare;
-      // Primary driver: is the dividend rising vs the year-start level?
-      if (co.dividendPerShare > startDiv * 1.02) {
-        w.attitude = clamp(w.attitude + 0.6, 0, 10);   // raised — he's pleased
-      } else if (co.dividendPerShare < startDiv - 0.001) {
-        w.attitude = clamp(w.attitude - 0.8, 0, 10);   // cut — he's angry
+      // Williams demands ESCALATING dividend growth. The required annual growth
+      // rate ratchets up over time (8% early, climbing ~1.5%/yr), so the player
+      // must keep raising the payout faster and faster — the primary late-game
+      // pressure and the main brake on cash hoarding.
+      var requiredGrowth = 0.08 + (GameState.meta.year - 1) * 0.015;  // 8% Y1 → ~21% Y10
+      GameState.board.williamsTargetGrowth = requiredGrowth;
+      var actualGrowth = startDiv > 0 ? (co.dividendPerShare - startDiv) / startDiv : 0;
+
+      if (co.dividendPerShare < startDiv - 0.001) {
+        // Cut the dividend — Williams is furious
+        w.attitude = clamp(w.attitude - 1.2, 0, 10);
+      } else if (actualGrowth >= requiredGrowth) {
+        // Met or beat his escalating target — pleased
+        w.attitude = clamp(w.attitude + 0.6, 0, 10);
+      } else if (co.dividendPerShare > startDiv * 1.02) {
+        // Raised, but short of his (rising) demand — partial credit, mild unease
+        w.attitude = clamp(w.attitude - 0.2, 0, 10);
       } else {
-        w.attitude = clamp(w.attitude - 0.25, 0, 10);  // stagnant — mild displeasure (anti-snowball)
+        // Flat dividend — he's increasingly impatient (penalty grows with years)
+        w.attitude = clamp(w.attitude - (0.4 + GameState.meta.year * 0.03), 0, 10);
       }
-      // Coverage: near-cosmetic. Tiny reward when healthy; small bite ONLY
-      // if catastrophically low (well below 1.0). Never a major driver.
+      // Coverage stays near-cosmetic.
       if (covSafe > 1.8)      w.attitude = clamp(w.attitude + 0.1, 0, 10);
       else if (covSafe < 0.5) w.attitude = clamp(w.attitude - 0.15, 0, 10);
     }
