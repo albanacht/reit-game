@@ -1769,18 +1769,22 @@ window.UI = (function() {
     if (!o) return;
     var won = GameState.meta.gameWon;
     var titleEl = el("gameover-title");
-    var videoEl = el("gameover-video");
+    var videoSlot = el("gameover-video-slot");
 
     if (won) {
       if (titleEl) { setText("gameover-title", "DIVINE STATUS"); titleEl.style.color = "#fbbf24"; }
-      // Show and play the victory video
-      if (videoEl) {
-        videoEl.classList.remove("hidden");
-        try { videoEl.currentTime = 0; videoEl.play().catch(function(){}); } catch (e) {}
+      // Build the victory video fresh and play it — only exists on a win.
+      if (videoSlot) {
+        videoSlot.innerHTML = '<video id="gameover-video" width="480" playsinline controls autoplay ' +
+          'style="max-width:90%;border-radius:8px;margin:0 auto 16px;display:block;">' +
+          '<source src="assets/victory.mp4" type="video/mp4"></video>';
+        var v = el("gameover-video");
+        if (v) { try { v.currentTime = 0; v.play().catch(function(){}); } catch (e) {} }
       }
     } else {
       if (titleEl) { setText("gameover-title", "YOU'RE FIRED"); titleEl.style.color = ""; }
-      if (videoEl) { videoEl.classList.add("hidden"); try { videoEl.pause(); } catch (e) {} }
+      // No video on a firing — remove it from the DOM entirely.
+      if (videoSlot) videoSlot.innerHTML = "";
     }
 
     setText("gameover-reason",   GameState.meta.gameOverReason);
