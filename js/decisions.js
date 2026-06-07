@@ -447,7 +447,7 @@ window.Decisions = (function() {
     GameState._preferredOffered = true;
     var cfo = Staff.getStaff("financial");
     var cfoName = cfo ? cfo.name : "Your CFO";
-    var shares = 2, par = 25, rate = 0.05;
+    var shares = 3, par = 25, rate = 0.05;
     var proceeds = shares * par;
     var qtrCost = fmt(proceeds * rate / 4);
     return {
@@ -468,6 +468,55 @@ window.Decisions = (function() {
           label: "Decline — keep the cap table clean",
           costType: "none",
           apply: function() { return "You declined the preferred stock issuance."; }
+        }
+      ]
+    };
+  }
+
+  // CFO-gated one-time PRIVATE PLACEMENT — a $100M high-yield institutional
+  // loan to help survive the Celestial Heights construction years. Only fires
+  // when the tower is active, you have a CFO, and you haven't used it before.
+  function checkPrivatePlacement() {
+    if (typeof Staff === "undefined" || !Staff.hasRole("financial")) return null;
+    if (GameState._privatePlacementUsed) return null;
+    if (!(GameState.placemaking && GameState.placemaking.towerActive)) return null;
+    return true; // offered reliably during tower years if CFO present
+  }
+
+  function generatePrivatePlacement() {
+    GameState._privatePlacementUsed = true;
+    var cfo = Staff.getStaff("financial");
+    var cfoName = cfo ? cfo.name : "Your CFO";
+    var amount = 100, rate = 9.5, years = 8;
+    return {
+      id: "private_placement",
+      title: "💼 " + cfoName + " — Private Placement Opportunity",
+      isMacro: false,
+      body: cfoName + " (CFO): \"Boss, with Celestial Heights draining us, the public debt markets are tapped out — but I've arranged a <strong>private placement</strong>. A consortium of insurance companies and a sovereign fund will lend us <strong>$" + amount + "M</strong> directly, " + years + "-year term at <strong>" + rate + "%</strong>. It's expensive and unsecured, but it's committed capital that doesn't touch our LTV — exactly the bridge we need to survive the tower. This is a one-time window. Take it?\"",
+      choices: [
+        {
+          label: "Accept $" + amount + "M private placement (" + rate + "%)",
+          costType: "none",
+          apply: function() {
+            GameState.debtTranches.push({
+              id: "pp" + Date.now(),
+              amount: amount,
+              rate: rate,
+              maturityQuarter: GameState.meta.quarter,
+              maturityYear: GameState.meta.year + years,
+              quartersUntilMaturity: years * 4,
+              label: rate + "% Private Placement due Y" + (GameState.meta.year + years) + "Q" + GameState.meta.quarter,
+              unsecured: true,
+            });
+            GameState.balance.cash = fmt(GameState.balance.cash + amount);
+            if (typeof News !== "undefined" && News.add) News.add(GameState.company.name + " secures a $" + amount + "M private placement from institutional lenders to fund construction.", "capital");
+            return "Private placement closed. $" + amount + "M in committed capital raised at " + rate + "% — your bridge through the construction years.";
+          }
+        },
+        {
+          label: "Decline — find another way",
+          costType: "none",
+          apply: function() { return "You declined the private placement. The construction drain continues."; }
         }
       ]
     };
@@ -599,8 +648,20 @@ window.Decisions = (function() {
     if (GameState._lastDecisionQuarter &&
         GameState.meta.totalQuarters - GameState._lastDecisionQuarter < 2) return null;
 
+    // Priority lifelines (checked first, not shuffled) — rescue options a
+    // stressed company should reliably see.
+    var lifelines = [
+      { check: checkPrivatePlacement, gen: generatePrivatePlacement },
+      { check: checkPreferredOffer,   gen: generatePreferredOffer    },
+    ];
+    for (var L = 0; L < lifelines.length; L++) {
+      if (lifelines[L].check()) {
+        var lev = lifelines[L].gen();
+        if (lev) { GameState._lastDecisionQuarter = GameState.meta.totalQuarters; return lev; }
+      }
+    }
+
     var checks = [
-      { check: checkPreferredOffer,    gen: generatePreferredOffer    },
       { check: checkTenantDistress,    gen: generateTenantDistress    },
       { check: checkDistressedProperty,gen: generateDistressedProperty},
       { check: checkZoning,            gen: generateZoning            },
@@ -608,14 +669,6 @@ window.Decisions = (function() {
       { check: checkActivist,          gen: generateActivist          },
       { check: checkMicroReit,         gen: generateMicroReit         },
     ];
-
-    // The preferred lifeline is checked FIRST (not shuffled) so a stressed
-    // company reliably sees its rescue option.
-    var lifeline = checks.shift();
-    if (lifeline.check()) {
-      var levt = lifeline.gen();
-      if (levt) { GameState._lastDecisionQuarter = GameState.meta.totalQuarters; return levt; }
-    }
 
     // Shuffle so no single event type gets first-check priority each quarter
     // (Fisher-Yates). Without this, tenant distress always won the tie.
