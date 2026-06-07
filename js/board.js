@@ -67,9 +67,9 @@ window.Board = (() => {
       { id: "div_nocut",    text: () => `Do not cut the dividend at any point this year.`,         metric: "noDividendCut",       target: () => 1,               higher: true  },
     ],
     chen: [
-      { id: "acquisitions", text: (t) => `Acquire at least ${t} properties this year.`,           metric: "acquisitionsThisYear",target: (y) => 1 + Math.floor(y/2), higher: true },
-      { id: "ffo_growth",   text: (t) => `FFO must grow at least ${t}% year over year.`,          metric: "ffoGrowthPct",        target: (y) => 10 + y * 3,     higher: true  },
-      { id: "portfolio_sz", text: (t) => `Portfolio assets must exceed $${t}M by year end.`,      metric: "totalAssets",         target: (y) => 200 + y * 150,  higher: true  },
+      { id: "acquisitions", text: (t) => `Acquire at least ${t} ${t > 1 ? "properties" : "property"} this year.`, metric: "acquisitionsThisYear", target: (y) => Math.min(3, 1 + Math.floor(y/4)), higher: true },
+      { id: "ffo_growth",   text: (t) => `FFO must grow at least ${t}% year over year.`,          metric: "ffoGrowthPct",        target: (y) => Math.min(20, 8 + y),     higher: true  },
+      { id: "portfolio_sz", text: (t) => `Grow portfolio value by at least ${t}% this year.`,     metric: "portfolioGrowthPct",  target: (y) => Math.min(15, 5 + y),     higher: true  },
     ],
     okafor: [
       { id: "leverage",     text: (t) => `Debt/assets must not exceed ${t}%.`,                    metric: "debtToAssets",        target: (y) => 0.72,           higher: false },
@@ -83,8 +83,8 @@ window.Board = (() => {
       { id: "price_growth", text: (t) => `Grow the share price by at least ${t}% this year.`,       metric: "sharePriceGrowthPct", target: (y) => 5 + y,          higher: true  },
     ],
     hassan: [
-      { id: "occupancy",    text: (t) => `Portfolio occupancy must exceed ${t}%.`,                metric: "occupancyPortfolio",  target: (y) => 0.82 + y * 0.01,higher: true  },
-      { id: "no_bad_prop",  text: (t) => `No property below ${t}% occupancy at year end.`,        metric: "worstOccupancy",      target: (y) => 0.65 + y * 0.01,higher: true  },
+      { id: "occupancy",    text: (t) => `Portfolio occupancy must exceed ${t}%.`,                metric: "occupancyPortfolio",  target: (y) => Math.min(0.90, 0.82 + y * 0.008),higher: true  },
+      { id: "no_bad_prop",  text: (t) => `No property below ${t}% occupancy at year end.`,        metric: "worstOccupancy",      target: (y) => Math.min(0.75, 0.62 + y * 0.01),higher: true  },
       { id: "lease_ups",    text: (t) => `Use the lease-up action at least ${t} times this year.`,metric: "leaseUpsThisYear",    target: () => 2,               higher: true  },
     ],
   };
@@ -133,6 +133,7 @@ window.Board = (() => {
     GameState.board.startYearDividend = GameState.company.dividendPerShare;
     GameState.board.startYearDebt     = GameState.balance.totalDebt;
     GameState.board.debtIncreasedThisYear = false;
+    GameState.board.startYearPortfolio = GameState.portfolio.reduce(function(s, p) { return s + p.currentValue; }, 0);
 
     // Legacy pressure fields — kept for UI compatibility
     GameState.board.pressurePoints = 0;
@@ -170,31 +171,37 @@ window.Board = (() => {
     // unfairly enrage him. The real pressure is to keep raising the payout.
     var w = getDirectorState("williams");
     if (w) {
+      // During Celestial Heights construction, Williams understands cash must
+      // fund the tower — he suspends his dividend-growth demand (no penalty for
+      // holding it flat; cutting it still stings a little).
+      if (GameState.placemaking && GameState.placemaking.towerActive) {
+        if (co.dividendPerShare < (GameState.board.startYearDividend || co.dividendPerShare) - 0.001) {
+          w.attitude = clamp(w.attitude - 0.4, 0, 10);
+        } else {
+          w.attitude = clamp(w.attitude + 0.1, 0, 10); // patient during the build
+        }
+      } else {
       var startDiv = GameState.board.startYearDividend || co.dividendPerShare;
-      // Williams demands ESCALATING dividend growth. The required annual growth
-      // rate ratchets up over time (8% early, climbing ~1.5%/yr), so the player
-      // must keep raising the payout faster and faster — the primary late-game
-      // pressure and the main brake on cash hoarding.
-      var requiredGrowth = 0.08 + (GameState.meta.year - 1) * 0.015;  // 8% Y1 → ~21% Y10
+      // Williams wants the dividend to keep rising. His target escalates early
+      // but CAPS at 12% so it stays achievable as the payout compounds — the
+      // bug before was an ever-rising % demand that "a few cents" couldn't meet.
+      var requiredGrowth = Math.min(0.12, 0.06 + (GameState.meta.year - 1) * 0.01); // 6%→cap 12%
       GameState.board.williamsTargetGrowth = requiredGrowth;
       var actualGrowth = startDiv > 0 ? (co.dividendPerShare - startDiv) / startDiv : 0;
 
       if (co.dividendPerShare < startDiv - 0.001) {
-        // Cut the dividend — Williams is furious
-        w.attitude = clamp(w.attitude - 1.2, 0, 10);
+        w.attitude = clamp(w.attitude - 1.2, 0, 10);          // cut — furious
       } else if (actualGrowth >= requiredGrowth) {
-        // Met or beat his escalating target — pleased
-        w.attitude = clamp(w.attitude + 0.6, 0, 10);
-      } else if (co.dividendPerShare > startDiv * 1.02) {
-        // Raised, but short of his (rising) demand — partial credit, mild unease
-        w.attitude = clamp(w.attitude - 0.2, 0, 10);
+        w.attitude = clamp(w.attitude + 0.8, 0, 10);          // met his target — very pleased
+      } else if (actualGrowth > 0.005) {
+        w.attitude = clamp(w.attitude + 0.2, 0, 10);          // raised at all — still net positive
       } else {
-        // Flat dividend — he's increasingly impatient (penalty grows with years)
-        w.attitude = clamp(w.attitude - (0.4 + GameState.meta.year * 0.03), 0, 10);
+        w.attitude = clamp(w.attitude - 0.5, 0, 10);          // flat — displeased
       }
       // Coverage stays near-cosmetic.
       if (covSafe > 1.8)      w.attitude = clamp(w.attitude + 0.1, 0, 10);
       else if (covSafe < 0.5) w.attitude = clamp(w.attitude - 0.15, 0, 10);
+      }
     }
 
     // Chen — growth
@@ -325,6 +332,7 @@ window.Board = (() => {
       var prevFFO = h.length >= 8 ? h[h.length - 5].ffo * 4 : currFFO;
       ffoGrowthPct = prevFFO > 0 ? ((currFFO - prevFFO) / prevFFO) * 100 : 0;
     }
+    GameState._lastFFOGrowthPct = ffoGrowthPct;
 
     var divGrowthPct = b.startYearDividend > 0
       ? ((co.dividendPerShare - b.startYearDividend) / b.startYearDividend) * 100
@@ -336,12 +344,18 @@ window.Board = (() => {
 
     var startYearSharePrice = b.startYearSharePrice || co.sharePrice;
 
+    var curPortfolioVal = GameState.portfolio.reduce(function(s, p) { return s + p.currentValue; }, 0);
+    var portfolioGrowthPct = (b.startYearPortfolio && b.startYearPortfolio > 0)
+      ? ((curPortfolioVal - b.startYearPortfolio) / b.startYearPortfolio) * 100
+      : 0;
+
     var metricValues = {
       dividendYield:       r.dividendYield,
       dividendGrowthPct:   divGrowthPct,
       dividendCoverage:    r.dividendCoverage,
       acquisitionsThisYear:b.acquisitionsThisYear,
       ffoGrowthPct:        ffoGrowthPct,
+      portfolioGrowthPct:  portfolioGrowthPct,
       totalAssets:         GameState.balance.totalAssets,
       debtToAssets:        r.debtToAssets,
       minDebtToAssets:     r.debtToAssets,
@@ -482,6 +496,7 @@ window.Board = (() => {
     GameState.board.startYearDividend     = GameState.company.dividendPerShare;
     GameState.board.startYearDebt         = GameState.balance.totalDebt;
     GameState.board.debtIncreasedThisYear = false;
+    GameState.board.startYearPortfolio    = GameState.portfolio.reduce(function(s, p) { return s + p.currentValue; }, 0);
   }
 
   // ----------------------------------------------------------
