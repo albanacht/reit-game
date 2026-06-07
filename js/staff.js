@@ -155,7 +155,7 @@ window.Staff = (function() {
     "port10.png": ["Nina Falk", "Mei Lin", "Priya Nair", "Zoe Hart", "Carmen Diaz"],                   // stylish young woman
     "port11.png": ["Hank Brennan", "Bill Tucker", "Duane Foss", "Earl Maddox", "Roy Stubbs"],          // weathered moustache man
     "port12.png": ["James Okoro", "Marcus Adebayo", "Daniel Mensah", "Andre Coleman", "Theo Banks"],   // Black businessman
-    "port13.png": ["A. Crow"],                                                                          // easter egg (you)
+    "port13.png": ["Alexander Crow"],                                                                   // easter egg (you)
     "port14.png": ["Mei Lin", "Aiko Tanaka", "Grace Yun", "Hana Sato", "Lily Chang"],                  // Asian woman
     "port15.png": ["Hassan Ali", "Greg Mason", "Owen Brett", "Felix Roe", "Caleb Storm"],              // scruffy bearded man
   };
@@ -194,18 +194,23 @@ window.Staff = (function() {
     if (traitId === "expensive") cost *= 1.15;
     cost = fmt(Math.max(0.1, cost), 2);
 
-    // Portrait — pick one not already used in this refresh (best effort)
+    // Portrait — pick one not already used this refresh AND not already on
+    // staff (so you can't end up with two of the same person, e.g. two Crows).
+    var employedPortraits = (GameState.staff || []).map(function(s) { return s.portrait; });
     var portrait;
     var attempts = 0;
     do {
       portrait = "port" + randInt(1, 15) + ".png";
       attempts++;
-    } while (usedPortraits.indexOf(portrait) !== -1 && attempts < 20);
+    } while (
+      (usedPortraits.indexOf(portrait) !== -1 || employedPortraits.indexOf(portrait) !== -1)
+      && attempts < 40
+    );
     usedPortraits.push(portrait);
 
     var name, hint;
     if (portrait === "port13.png") {
-      name = "A. Crow";
+      name = "Alexander Crow";
       hint = "Unusually confident. Won't say where he's from.";
     } else {
       // Name matches the portrait's appearance, not the role
