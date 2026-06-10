@@ -438,9 +438,14 @@ window.Decisions = (function() {
     if (typeof Staff === "undefined" || !Staff.hasRole("financial")) return null;
     if (GameState.preferred && GameState.preferred.issued) return null;
     if (GameState._preferredOffered) return null;
-    var stressed = (GameState.pnl && GameState.pnl.affo < 0) || GameState.balance.cash < 10;
+    // Broader stress detection: negative AFFO, low cash, OR cash draining fast.
+    var lowCash   = GameState.balance.cash < 15;
+    var negAffo   = GameState.pnl && GameState.pnl.affo < 0;
+    var draining  = GameState.pnl && GameState.pnl.retainedCash < -2; // losing >$2M/qtr
+    var stressed  = lowCash || negAffo || draining;
     if (!stressed) return null;
-    return Math.random() < 0.5 ? true : null;
+    // When genuinely stressed, the CFO reliably steps in (not a coin flip).
+    return Math.random() < 0.85 ? true : null;
   }
 
   function generatePreferredOffer() {
@@ -645,11 +650,9 @@ window.Decisions = (function() {
   // ----------------------------------------------------------
   function checkForEvent() {
     if (GameState.meta.totalQuarters < 2) return null;
-    if (GameState._lastDecisionQuarter &&
-        GameState.meta.totalQuarters - GameState._lastDecisionQuarter < 2) return null;
 
-    // Priority lifelines (checked first, not shuffled) — rescue options a
-    // stressed company should reliably see.
+    // Priority lifelines — checked BEFORE the cooldown gate so a company in
+    // real trouble always sees its rescue, even if another event fired recently.
     var lifelines = [
       { check: checkPrivatePlacement, gen: generatePrivatePlacement },
       { check: checkPreferredOffer,   gen: generatePreferredOffer    },
@@ -660,6 +663,10 @@ window.Decisions = (function() {
         if (lev) { GameState._lastDecisionQuarter = GameState.meta.totalQuarters; return lev; }
       }
     }
+
+    // Regular decision events respect the 2-quarter breather.
+    if (GameState._lastDecisionQuarter &&
+        GameState.meta.totalQuarters - GameState._lastDecisionQuarter < 2) return null;
 
     var checks = [
       { check: checkTenantDistress,    gen: generateTenantDistress    },
