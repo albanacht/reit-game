@@ -51,25 +51,24 @@ window.UI = (function() {
   // ----------------------------------------------------------
   var TUTORIAL_SCRIPT = {
     "1-1": {
-      title: "Jenkins — Getting Started",
-      body: "Welcome aboard, boss. Keep your eye on <strong>AFFO</strong> — that's our true free cash flow, the bottom line that keeps us alive. " +
-            "Cash is tight early on, so use <strong>debt</strong> to buy high-yielding properties, hire an <strong>Asset Manager</strong> to lease them up, and squeeze every dollar of income out of them. Keep AFFO climbing or we go belly up."
+      title: "Jenkins — How We Make Money",
+      body: "Welcome aboard, boss. It's simple: we <strong>borrow money</strong> and <strong>buy buildings</strong> that earn more than the loan costs. The gap is our profit.<br><br>" +
+            "Open the <strong>💰 Capital Actions</strong> tab, find <strong>Issue Debt</strong>, type an amount (try 50), pick a term, and click Issue. You'll have cash to spend."
     },
     "1-2": {
-      title: "Jenkins — Reading the Market",
-      body: "See the <strong>cap rates</strong> in the market panel? A higher cap rate means cheaper property for the income it throws off. " +
-            "But mind this — the juiciest yields are often the riskiest: more exposed to nasty events and falling occupancy. Balance the high-yield bargains against safer, steadier buildings."
+      title: "Jenkins — Buying Property",
+      body: "Now spend that cash. Open the <strong>Property Market</strong> tab and buy a building. Higher <strong>cap rate</strong> = more income for the price — but the cheapest ones are often the riskiest.<br><br>" +
+            "Buy one or two, then hit <strong>Advance Quarter</strong> and watch the rent come in."
     },
     "1-3": {
-      title: "Jenkins — Mind the Debt Wall",
-      body: "Our debt matures on fixed dates. Don't bunch it all into one year — <strong>ladder it</strong> across time so we're never hit by a wall we can't refinance. " +
-            "I'll give you a shout when one's coming up."
+      title: "Jenkins — Paying Down Debt",
+      body: "Our loans come due on set dates. When cash is strong, you can <strong>retire a loan early</strong> — open the <strong>Debt</strong> tab, pick a loan, and pay it off to cut interest.<br><br>" +
+            "Don't pile every loan into the same year. Spread them out so we're never stuck refinancing all at once. I'll warn you before one's due."
     },
     "1-4": {
-      title: "Jenkins — The Board & Political Capital",
-      body: "Year-end approaches. From next year the <strong>board votes</strong> on your future. <strong>Chairman Williams</strong> leads them — keep him content above all, and he cares most about a <strong>rising dividend</strong>.<br><br>" +
-            "One more thing: strong yearly results earn <strong>political capital</strong> — you gain it by raising the dividend, lifting the share price, growing FFO, or winning a credit upgrade. " +
-            "Bank it, then spend it to smooth over board disputes or seize special opportunities. It's the board's goodwill made tangible."
+      title: "Jenkins — The Board",
+      body: "From next year, the <strong>board votes</strong> on whether you keep your job. Five directors, each wants one thing.<br><br>" +
+            "<strong>Chairman Williams</strong> matters most — he wants a <strong>rising dividend</strong> every year. Raise it in Capital Actions and he stays happy. Good results also earn you <strong>political capital</strong> you can spend to win board fights or handle tough events."
     },
   };
 
@@ -757,7 +756,7 @@ window.UI = (function() {
         }
       });
     }
-    setText("action-div-current", "Current: $" + fmt(GameState.company.dividendPerShare, 2) + "/share/qtr");
+    setText("action-div-current", "$" + fmt(GameState.company.dividendPerShare, 2) + " /share each quarter");
     var equityUsedThisYear = GameState.company.equityIssuanceYear === GameState.meta.year;
     var debtCooldown = GameState.company.debtIssuanceQuarter > 0 ?
       Math.max(0, 2 - (GameState.meta.totalQuarters - GameState.company.debtIssuanceQuarter)) : 0;
@@ -1128,9 +1127,21 @@ window.UI = (function() {
       }}]);
   }
 
-  // ----------------------------------------------------------
-  // BOARD MEETING SYSTEM
-  // ----------------------------------------------------------
+  function handleDividendQuickRaise(pct) {
+    var old = GameState.company.dividendPerShare;
+    var newDiv = fmt(old * (1 + pct / 100), 4);
+    // Round to a clean cent
+    newDiv = Math.round(newDiv * 100) / 100;
+    if (newDiv <= old) newDiv = fmt(old + 0.01, 2); // ensure it actually rises
+    showModal("Raise Dividend +" + pct + "%",
+      "Current: " + fmtPS(old) + "  →  New: " + fmtPS(newDiv) + "\nQuarterly cost: " + fmtM(newDiv * GameState.company.sharesOutstanding) + "\n\nRaising the dividend pleases the board and signals confidence.",
+      [{ label: "Raise to " + fmtPS(newDiv), style: "btn-primary", onClick: function() {
+        var r = Financials.setDividend(newDiv);
+        showToast(r.message, r.success ? "success" : "error");
+        if (r.success) renderAll();
+      }}]);
+  }
+
 
   var _boardMeetingState = {
     mandates:       [],
@@ -1941,6 +1952,9 @@ window.UI = (function() {
       "btn-issue-equity":    handleIssueEquity,
       "btn-buyback":         handleBuyback,
       "btn-set-dividend":    handleSetDividend,
+      "btn-div-10":          function() { handleDividendQuickRaise(10); },
+      "btn-div-20":          function() { handleDividendQuickRaise(20); },
+      "btn-div-50":          function() { handleDividendQuickRaise(50); },
       "btn-redeem-preferred": handleRedeemPreferred,
       "btn-help":            showHelp,
       "btn-help-close":      closeHelp,
