@@ -1005,12 +1005,27 @@ window.Financials = (() => {
         if (GameState.meta.year >= 12 && pm.active && !pm.towerActive && pm.towerQuarters === 0 && !pm._towerDone) {
           pm.towerActive = true;
           pm.towerQuarters = 12;  // 3 years of committed construction
-          // Spend scales with portfolio so it's lethal to big survivors,
-          // survivable (barely) for modest ones. ~6-9% of portfolio/yr.
+          // Spend scales with portfolio. Reduced for playability (~5% of
+          // portfolio/yr) — still a serious drain, but survivable with care.
           var pv = GameState.portfolio.reduce(function(s, p) { return s + p.currentValue; }, 0);
-          pm.towerSpend = fmt(Math.max(6, pv * 0.018)); // per quarter
+          pm.towerSpend = fmt(Math.max(4, pv * 0.013)); // per quarter
           pm.towerOverrun = false;
+          pm.towerTotalSpent = 0;
           GameState._towerJustStarted = true;
+          // Add a visible "under construction" entry to the portfolio so the
+          // player SEES the megaproject draining cash, not just a hidden line.
+          GameState.portfolio.push({
+            id: "celestial_heights",
+            name: "Celestial Heights",
+            sector: "office",
+            location: "tier1",
+            currentValue: 0,       // no realisable value while building
+            purchasePrice: 0,
+            annualNOI: 0,          // earns nothing during construction
+            occupancy: 0,
+            underConstruction: true,
+            _tower: true,
+          });
         }
       }
 
@@ -1046,17 +1061,28 @@ window.Financials = (() => {
     if (GameState.placemaking && GameState.placemaking.towerActive && GameState.placemaking.towerQuarters > 0) {
       var pmk = GameState.placemaking;
       GameState.pnl.unusualItems = fmt(GameState.pnl.unusualItems - pmk.towerSpend);
+      pmk.towerTotalSpent = fmt((pmk.towerTotalSpent || 0) + pmk.towerSpend);
       pmk.towerQuarters -= 1;
       // Mid-project cost overrun (~halfway) — classic megaproject blowout
       if (!pmk.towerOverrun && pmk.towerQuarters <= 6) {
         pmk.towerOverrun = true;
-        pmk.towerSpend = fmt(pmk.towerSpend * 1.35); // 35% overrun
+        pmk.towerSpend = fmt(pmk.towerSpend * 1.25); // 25% overrun (softened)
         GameState._towerOverrunJustFired = true;
       }
       if (pmk.towerQuarters <= 0) {
         pmk.towerActive = false;
         pmk._towerDone = true;
         GameState._towerJustFinished = true;
+        // Completion payoff: the tower becomes a real, income-producing trophy
+        // asset — reward for surviving the drain.
+        var tower = GameState.portfolio.filter(function(p){ return p._tower; })[0];
+        if (tower) {
+          tower.underConstruction = false;
+          tower.currentValue  = fmt(pmk.towerTotalSpent * 0.9);   // slightly below cost
+          tower.purchasePrice = tower.currentValue;
+          tower.occupancy     = 0.85;
+          tower.annualNOI     = fmt(tower.currentValue * 0.06);   // 6% yield trophy
+        }
       }
     }
 
