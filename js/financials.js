@@ -114,6 +114,10 @@ window.Financials = (() => {
       if (GameState.placemaking.traitActive) ga *= 1.10;      // holistic program +10% G&A
     }
 
+    // Persistent surcharges from decision events (e.g. union settlement,
+    // retained-talent bonus). Stored as a flat $M/quarter addition.
+    if (GameState._gaSurcharge) ga += GameState._gaSurcharge;
+
     return fmt(ga);
   }
 
@@ -1054,6 +1058,16 @@ window.Financials = (() => {
         pmk._towerDone = true;
         GameState._towerJustFinished = true;
       }
+    }
+
+    // Recurring penalties from declined decision events (e.g. carbon mandate
+    // non-compliance). Each ticks down and charges Unusual Items per quarter.
+    if (GameState._recurringPenalties && GameState._recurringPenalties.length) {
+      GameState._recurringPenalties = GameState._recurringPenalties.filter(function(pen) {
+        GameState.pnl.unusualItems = fmt(GameState.pnl.unusualItems - pen.amount);
+        pen.quartersLeft -= 1;
+        return pen.quartersLeft > 0;
+      });
     }
 
     // 2. Update market conditions and property values
