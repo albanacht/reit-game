@@ -102,6 +102,28 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 
 /* PROPERTIES */
 .property-card { background:var(--surface2); border:1px solid var(--border); border-radius:var(--radius-sm); padding:10px 12px; margin-bottom:8px; transition:border-color .2s; }
+
+/* Celestial Heights under-construction card */
+.tower-construction {
+  border:2px dashed var(--orange);
+  background:linear-gradient(135deg, rgba(249,115,22,0.10), var(--surface2));
+}
+.tower-tag {
+  background:var(--orange);
+  color:#1a1a1a;
+  font-size:10px;
+  font-weight:800;
+  letter-spacing:1px;
+  padding:3px 10px;
+  border-radius:4px;
+  margin-left:auto;
+}
+.tower-drain {
+  color:var(--red);
+  font-size:14px;
+  margin:6px 0;
+  font-weight:600;
+}
 .property-card:hover { border-color:var(--blue); }
 .prop-unaffordable { opacity:.55; }
 .prop-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; }
