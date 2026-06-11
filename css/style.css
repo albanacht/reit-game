@@ -143,6 +143,34 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 .actions-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; padding:14px; }
 .action-group { background:var(--surface2); border-radius:var(--radius-sm); padding:12px; }
 .action-group-title { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--text-muted); margin-bottom:8px; }
+
+/* Dividend & debt groups get a subtle highlight — they matter most */
+.action-group-dividend { border:1px solid var(--yellow); background:linear-gradient(180deg, rgba(245,158,11,0.08), var(--surface2)); }
+.action-group-debt { border:1px solid var(--blue); }
+
+/* Input unit labels so the player always knows what to type */
+.input-prefix, .input-suffix { color:var(--text-muted); font-size:14px; font-weight:600; white-space:nowrap; }
+.input-prefix { margin-right:-2px; }
+.input-row-lg input { font-size:16px !important; padding:10px 10px !important; font-weight:600; }
+.input-row-lg { background:var(--bg); border:1px solid var(--border); border-radius:var(--radius-sm); padding:2px 8px; }
+.input-row-lg input { background:transparent !important; border:none !important; }
+
+/* Dividend quick-raise buttons */
+.dividend-quick-row { display:flex; gap:8px; }
+.btn-quick {
+  flex:1;
+  padding:10px;
+  font-size:14px;
+  font-weight:700;
+  background:var(--green);
+  color:#fff;
+  border:none;
+  border-radius:var(--radius-sm);
+  cursor:pointer;
+  transition:transform .1s, filter .15s;
+}
+.btn-quick:hover { filter:brightness(1.1); transform:translateY(-1px); }
+.btn-quick:active { transform:translateY(0); }
 .action-meta { font-size:11px; color:var(--text-muted); margin-bottom:8px; font-family:monospace; }
 .input-row { display:flex; gap:6px; align-items:center; }
 input[type="number"],input[type="text"] { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-sm); color:var(--text); padding:6px 10px; font-size:13px; font-family:monospace; width:100%; outline:none; transition:border-color .2s; }
@@ -151,9 +179,39 @@ input::placeholder { color:var(--text-muted); }
 
 /* TABS */
 .section-tabs { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; }
-.section-tab-bar { display:flex; border-bottom:1px solid var(--border); background:var(--surface2); }
-.section-tab-btn { padding:10px 18px; border:none; background:transparent; color:var(--text-muted); font-size:12px; font-weight:600; cursor:pointer; border-bottom:2px solid transparent; transition:color .15s,border-color .15s; }
-.section-tab-btn.active { color:var(--text); border-bottom-color:var(--blue); }
+.section-tab-bar { display:flex; gap:4px; border-bottom:2px solid var(--border); background:var(--surface2); padding:6px 6px 0 6px; flex-wrap:wrap; }
+.section-tab-btn {
+  padding:12px 20px;
+  border:1px solid var(--border);
+  border-bottom:none;
+  background:var(--bg);
+  color:var(--text-muted);
+  font-size:13px;
+  font-weight:600;
+  cursor:pointer;
+  border-radius:8px 8px 0 0;
+  transition:all .15s;
+  position:relative;
+  top:2px;
+}
+.section-tab-btn:hover { background:var(--surface); color:var(--text); top:0; }
+.section-tab-btn.active {
+  color:#fff;
+  background:var(--blue);
+  border-color:var(--blue);
+  top:0;
+}
+/* Capital Actions tab stands out — it's the most important */
+.section-tab-btn.tab-emphasis {
+  background:linear-gradient(135deg, var(--surface), var(--surface2));
+  border-color:var(--yellow);
+  color:var(--yellow);
+}
+.section-tab-btn.tab-emphasis.active {
+  background:var(--yellow);
+  color:#1a1a1a;
+  border-color:var(--yellow);
+}
 .section-tab-content { display:none; padding:14px; }
 .section-tab-content.active { display:block; }
 .scroll-list { max-height:420px; overflow-y:auto; padding-right:4px; }
