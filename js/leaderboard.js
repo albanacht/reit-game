@@ -17,6 +17,7 @@ window.Leaderboard = (() => {
   const API_KEY = "$2a$10$nav59ju0KVTvhg9N/NoXout8zV7VXoORRnSbSH7ur7uwW5D7M7Ycq";
   const API_URL = `https://api.jsonbin.io/v3/b/${BIN_ID}`;
   const MAX_SCORES = 100; // store top 100, display top 10
+  var _cachedScores = [];  // cache for the leaderboard detail view
 
   // ----------------------------------------------------------
   // LEGACY SCORE CALCULATION
@@ -219,14 +220,14 @@ window.Leaderboard = (() => {
       </table>`;
 
     // Store for detail view
-    Leaderboard._cachedScores = top10;
+    _cachedScores = top10;
   }
 
   // ----------------------------------------------------------
   // SHOW ENTRY DETAIL (click on a row)
   // ----------------------------------------------------------
   function showEntryDetail(index) {
-    const entry = Leaderboard._cachedScores?.[index];
+    const entry = _cachedScores?.[index];
     if (!entry) return;
 
     UI.showModal(
@@ -300,9 +301,6 @@ window.Leaderboard = (() => {
       .replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;");
   }
-
-  // Cache for detail view
-  Leaderboard._cachedScores = [];
 
   // ----------------------------------------------------------
   // PUBLIC API
