@@ -144,8 +144,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 .action-group { background:var(--surface2); border-radius:var(--radius-sm); padding:12px; }
 .action-group-title { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--text-muted); margin-bottom:8px; }
 
-/* Dividend & debt groups get a subtle highlight — they matter most */
-.action-group-dividend { border:1px solid var(--yellow); background:linear-gradient(180deg, rgba(245,158,11,0.08), var(--surface2)); }
+/* Debt group keeps a subtle blue highlight; dividend matches the rest */
 .action-group-debt { border:1px solid var(--blue); }
 
 /* Input unit labels so the player always knows what to type */
@@ -155,22 +154,24 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 .input-row-lg { background:var(--bg); border:1px solid var(--border); border-radius:var(--radius-sm); padding:2px 8px; }
 .input-row-lg input { background:transparent !important; border:none !important; }
 
-/* Dividend quick-raise buttons */
-.dividend-quick-row { display:flex; gap:8px; }
+/* Current dividend — shown prominently like a headline figure */
+.dividend-current { font-size:18px; font-weight:700; color:var(--text); margin-bottom:8px; }
+
+/* Dividend quick-raise — small, muted, secondary */
+.dividend-quick-row { display:flex; gap:6px; align-items:center; margin-top:6px; }
+.dividend-quick-label { font-size:11px; color:var(--text-muted); margin-right:2px; }
 .btn-quick {
-  flex:1;
-  padding:10px;
-  font-size:14px;
-  font-weight:700;
-  background:var(--green);
-  color:#fff;
-  border:none;
+  padding:4px 10px;
+  font-size:11px;
+  font-weight:600;
+  background:var(--surface);
+  color:var(--text-muted);
+  border:1px solid var(--border);
   border-radius:var(--radius-sm);
   cursor:pointer;
-  transition:transform .1s, filter .15s;
+  transition:all .15s;
 }
-.btn-quick:hover { filter:brightness(1.1); transform:translateY(-1px); }
-.btn-quick:active { transform:translateY(0); }
+.btn-quick:hover { background:var(--surface2); color:var(--text); border-color:var(--blue); }
 .action-meta { font-size:11px; color:var(--text-muted); margin-bottom:8px; font-family:monospace; }
 .input-row { display:flex; gap:6px; align-items:center; }
 input[type="number"],input[type="text"] { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-sm); color:var(--text); padding:6px 10px; font-size:13px; font-family:monospace; width:100%; outline:none; transition:border-color .2s; }
