@@ -359,7 +359,7 @@
           <button class="section-tab-btn active" onclick="switchTab('tab-portfolio', this)">Portfolio</button>
           <button class="section-tab-btn" onclick="switchTab('tab-market', this)">Property Market</button>
           <button class="section-tab-btn" onclick="switchTab('tab-debt', this)">Debt</button>
-          <button class="section-tab-btn" onclick="switchTab('tab-capital', this)">Capital Actions</button>
+          <button class="section-tab-btn tab-emphasis" onclick="switchTab('tab-capital', this)">💰 Capital Actions</button>
           <button class="section-tab-btn" onclick="switchTab('tab-staff', this)">Staff</button>
         </div>
         <div id="tab-portfolio" class="section-tab-content active">
@@ -389,13 +389,17 @@
         </div>
         <div id="tab-capital" class="section-tab-content">
           <div class="actions-grid">
-            <div class="action-group">
-              <div class="action-group-title">Issue Debt</div>
+            <div class="action-group action-group-debt">
+              <div class="action-group-title">🏦 Issue Debt <span style="color:var(--text-muted);font-weight:600;">— borrow to buy property</span></div>
               <div class="action-meta" id="action-borrow-rate">Current rate: —</div>
               <div class="action-meta" id="action-borrow-capacity" style="color:var(--accent);">Capacity: —</div>
-              <div class="input-row" style="margin-bottom:6px;"><input type="number" id="input-debt-amount" placeholder="Amount $M" min="1" step="5"></div>
+              <div class="input-row input-row-lg" style="margin-bottom:6px;">
+                <span class="input-prefix">$</span>
+                <input type="number" id="input-debt-amount" placeholder="e.g. 50" min="1" step="5">
+                <span class="input-suffix">million</span>
+              </div>
               <div class="input-row">
-                <select id="input-debt-years" style="flex:1;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:var(--radius-sm);padding:6px 8px;font-size:12px;">
+                <select id="input-debt-years" style="flex:1;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px;font-size:13px;">
                   <option value="1">1 year</option>
                   <option value="2">2 years</option>
                   <option value="3">3 years</option>
@@ -403,7 +407,7 @@
                   <option value="7">7 years</option>
                   <option value="10">10 years</option>
                 </select>
-                <button class="btn btn-primary btn-sm" id="btn-issue-debt">Issue</button>
+                <button class="btn btn-primary" id="btn-issue-debt">Issue Debt</button>
               </div>
             </div>
             <div class="action-group">
@@ -413,21 +417,31 @@
               <div class="action-meta text-yellow" id="action-debt-cooldown"></div>
             </div>
             <div class="action-group">
-              <div class="action-group-title">Issue Equity</div>
+              <div class="action-group-title">📈 Issue Equity <span style="color:var(--text-muted);font-weight:600;">— raise cash, dilutes shares</span></div>
               <div class="action-meta" id="action-shares-out">Shares outstanding: —</div>
-              <div class="input-row"><input type="number" id="input-equity-shares" placeholder="New shares (M)" min="0.1" step="0.5"><button class="btn btn-primary btn-sm" id="btn-issue-equity">Issue</button></div>
+              <div class="input-row input-row-lg"><input type="number" id="input-equity-shares" placeholder="e.g. 2" min="0.1" step="0.5"><span class="input-suffix">M shares</span><button class="btn btn-primary btn-sm" id="btn-issue-equity">Issue</button></div>
               <div class="action-meta text-muted" style="margin-top:5px;">Issued at 5% discount. Dilutive.</div>
             </div>
             <div class="action-group">
-              <div class="action-group-title">Share Buyback</div>
+              <div class="action-group-title">🔁 Share Buyback <span style="color:var(--text-muted);font-weight:600;">— spend cash, fewer shares</span></div>
               <div class="action-meta" id="action-cash-avail">Cash available: —</div>
-              <div class="input-row"><input type="number" id="input-buyback-shares" placeholder="Shares to buy (M)" min="0.1" step="0.5"><button class="btn btn-primary btn-sm" id="btn-buyback">Buy Back</button></div>
+              <div class="input-row input-row-lg"><input type="number" id="input-buyback-shares" placeholder="e.g. 1" min="0.1" step="0.5"><span class="input-suffix">M shares</span><button class="btn btn-primary btn-sm" id="btn-buyback">Buy Back</button></div>
             </div>
-            <div class="action-group" style="grid-column:span 2;">
-              <div class="action-group-title">Set Quarterly Dividend</div>
-              <div class="action-meta" id="action-div-current">Current: —</div>
-              <div class="input-row"><input type="number" id="input-dividend" placeholder="New dividend per share ($)" min="0" step="0.01"><button class="btn btn-primary btn-sm" id="btn-set-dividend">Set Dividend</button></div>
-              <div class="action-meta text-red" style="margin-top:6px;">⚠ Cutting the dividend causes significant share price drop and board pressure.</div>
+            <div class="action-group action-group-dividend" style="grid-column:span 2;">
+              <div class="action-group-title">💵 Set Quarterly Dividend <span style="color:var(--yellow);font-weight:600;">— the board watches this closely</span></div>
+              <div class="action-meta" id="action-div-current" style="font-size:13px;margin-bottom:8px;">Current: —</div>
+              <div class="dividend-quick-row">
+                <button class="btn btn-quick" id="btn-div-10">+10%</button>
+                <button class="btn btn-quick" id="btn-div-20">+20%</button>
+                <button class="btn btn-quick" id="btn-div-50">+50%</button>
+              </div>
+              <div class="input-row" style="margin-top:8px;">
+                <span class="input-prefix">$</span>
+                <input type="number" id="input-dividend" placeholder="or type exact amount per share" min="0" step="0.01">
+                <span class="input-suffix">/share</span>
+                <button class="btn btn-primary btn-sm" id="btn-set-dividend">Set</button>
+              </div>
+              <div class="action-meta text-muted" style="margin-top:6px;">Quick buttons raise from your current dividend. Type a lower number to cut it (this angers the board and drops the share price).</div>
             </div>
             <div class="action-group" id="preferred-redeem-group" style="grid-column:span 2; display:none;">
               <div class="action-group-title">Preferred Stock</div>
