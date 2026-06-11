@@ -634,6 +634,25 @@ window.UI = (function() {
     }
     var html = "";
     GameState.portfolio.forEach(function(p) {
+      // Celestial Heights — special "under construction" card showing the drain
+      if (p._tower && p.underConstruction) {
+        var pmk = GameState.placemaking || {};
+        var qLeft = pmk.towerQuarters || 0;
+        var spend = pmk.towerSpend || 0;
+        html += '<div class="property-card tower-construction">' +
+          '<div class="prop-header">' +
+          '<span class="prop-name">🏗️ ' + p.name + '</span>' +
+          '<span class="tower-tag">UNDER CONSTRUCTION</span></div>' +
+          '<div class="tower-drain">Cash outflow: <strong>−' + fmtM(spend) + ' / quarter</strong></div>' +
+          '<div class="prop-stats">' +
+          '<span>Status: <strong class="text-yellow">Building</strong></span>' +
+          '<span>Time left: <strong>' + qLeft + ' quarters</strong></span>' +
+          '<span>Income: <strong class="text-muted">none yet</strong></span>' +
+          '</div>' +
+          '<div class="action-meta text-muted" style="margin-top:6px;">The board\'s vanity supertall. Earns nothing until complete — then becomes a trophy asset. You cannot stop construction.</div>' +
+          '</div>';
+        return;
+      }
       var oc = p.occupancy >= 0.90 ? "text-green" : p.occupancy >= 0.80 ? "text-yellow" : "text-red";
       var gl = p.purchasePrice ? fmt(p.currentValue - p.purchasePrice, 1) : 0;
       var gc = gl >= 0 ? "text-green" : "text-red";
@@ -1910,7 +1929,7 @@ window.UI = (function() {
     GameState._negEventCooldown = 0;
     GameState._legacyRenamed = false;
     GameState._legacyRenameMsg = null;
-    GameState.placemaking = { active:false, cost:0.85, traitActive:false, ownerRelations:false, ownerRelationsCost:0.40, esgActive:false, towerActive:false, towerQuarters:0, towerSpend:0, towerOverrun:false };
+    GameState.placemaking = { active:false, cost:0.85, traitActive:false, ownerRelations:false, ownerRelationsCost:0.40, esgActive:false, towerActive:false, towerQuarters:0, towerSpend:0, towerOverrun:false, towerTotalSpent:0, _towerDone:false };
     GameState._placemakingJustJoined = false;
     GameState._placemakingTraitJustFired = false;
     GameState._ownerRelationsJustFired = false;
