@@ -50,26 +50,39 @@ window.UI = (function() {
   // JENKINS TUTORIAL — Year 1 quarterly guidance (optional)
   // ----------------------------------------------------------
   var TUTORIAL_SCRIPT = {
-    "1-1": {
-      title: "Jenkins — How We Make Money",
-      body: "Welcome aboard, boss. It's simple: we <strong>borrow money</strong> and <strong>buy buildings</strong> that earn more than the loan costs. The gap is our profit.<br><br>" +
-            "Open the <strong>💰 Capital Actions</strong> tab, find <strong>Issue Debt</strong>, type an amount (try 50), pick a term, and click Issue. You'll have cash to spend."
-    },
-    "1-2": {
-      title: "Jenkins — Buying Property",
-      body: "Now spend that cash. Open the <strong>Property Market</strong> tab and buy a building. Higher <strong>cap rate</strong> = more income for the price — but the cheapest ones are often the riskiest.<br><br>" +
-            "Buy one or two, then hit <strong>Advance Quarter</strong> and watch the rent come in."
-    },
-    "1-3": {
-      title: "Jenkins — Paying Down Debt",
-      body: "Our loans come due on set dates. When cash is strong, you can <strong>retire a loan early</strong> — open the <strong>Debt</strong> tab, pick a loan, and pay it off to cut interest.<br><br>" +
-            "Don't pile every loan into the same year. Spread them out so we're never stuck refinancing all at once. I'll warn you before one's due."
-    },
-    "1-4": {
-      title: "Jenkins — The Board",
-      body: "From next year, the <strong>board votes</strong> on whether you keep your job. Five directors, each wants one thing.<br><br>" +
-            "<strong>Chairman Williams</strong> matters most — he wants a <strong>rising dividend</strong> every year. Raise it in Capital Actions and he stays happy. Good results also earn you <strong>political capital</strong> you can spend to win board fights or handle tough events."
-    },
+    "1-1": [
+      {
+        title: "Jenkins — Step 1: Borrow",
+        body: "Welcome aboard, boss. Let's get to work — first we need cash to grow.<br><br>" +
+              "Open <strong>💰 Capital Actions → Issue Debt</strong>. Issue <strong>$50M</strong> and choose a <strong>10-year</strong> term — rates are low right now, so locking in long is to our advantage."
+      },
+      {
+        title: "Jenkins — Step 2: Raise a Little Equity",
+        body: "While you're in <strong>Capital Actions</strong>, raise a bit more by selling shares. Under <strong>Issue Equity</strong>, issue about <strong>2M shares</strong>.<br><br>" +
+              "But don't make a habit of it — selling shares dilutes the owners, and <strong>Director Petrova</strong> hates dilution. Use it sparingly."
+      }
+    ],
+    "1-2": [
+      {
+        title: "Jenkins — Step 3: Buy a Building",
+        body: "Now put that cash to work. Open the <strong>Property Market</strong> tab and buy a property.<br><br>" +
+              "Check the <strong>cap rate</strong> — higher means more income for the price. Just know the cheapest, highest-yielding ones are usually the riskiest. Buy one or two, then hit <strong>Advance Quarter</strong>."
+      }
+    ],
+    "1-3": [
+      {
+        title: "Jenkins — Step 4: Hire a CFO",
+        body: "You're running a real company now — build a team. Open the <strong>Staff</strong> tab and hire a <strong>CFO</strong>.<br><br>" +
+              "A CFO unlocks <strong>unsecured loans</strong> — borrowing beyond what our properties alone allow, a lifeline when money's tight. Later you can hire others: an Asset Manager to lift occupancy, an Acquisitions Lead for better deals. Each hire earns their keep."
+      }
+    ],
+    "1-4": [
+      {
+        title: "Jenkins — The Board",
+        body: "Last thing, boss. From next year the <strong>board votes</strong> on whether you keep your job. Five directors, each wants one thing — and <strong>Chairman Williams</strong> matters most. He wants a <strong>rising dividend</strong> every year.<br><br>" +
+              "Strong results earn <strong>political capital</strong> you can spend to win board fights or handle tough events. Keep them happy and survive 15 years — that's the whole game."
+      }
+    ],
   };
 
   function maybeShowTutorial() {
@@ -81,12 +94,23 @@ window.UI = (function() {
     if (GameState._tutorialShown && GameState._tutorialShown[key]) return false;
     GameState._tutorialShown = GameState._tutorialShown || {};
     GameState._tutorialShown[key] = true;
-    showJenkinsPopup(entry.title, entry.body);
+    var steps = Array.isArray(entry) ? entry : [entry];
+    showJenkinsSequence(steps, 0);
     return true;
   }
 
+  // Show a chain of Jenkins popups one after another (each "Got it" advances).
+  function showJenkinsSequence(steps, i) {
+    if (i >= steps.length) return;
+    var step = steps[i];
+    var moreLabel = (i < steps.length - 1) ? "Next" : "Got it";
+    showJenkinsPopup(step.title, step.body, moreLabel, function() {
+      showJenkinsSequence(steps, i + 1);
+    });
+  }
+
   // Jenkins portrait popup (tutorial + advisories)
-  function showJenkinsPopup(title, body) {
+  function showJenkinsPopup(title, body, btnLabel, onClose) {
     var overlay = el("modal-overlay");
     if (!overlay) return;
     el("modal-title").textContent = title;
@@ -97,9 +121,12 @@ window.UI = (function() {
       '</div>';
     el("modal-actions").innerHTML = "";
     var btn = document.createElement("button");
-    btn.textContent = "Got it";
+    btn.textContent = btnLabel || "Got it";
     btn.className = "btn btn-primary";
-    btn.onclick = closeModal;
+    btn.onclick = function() {
+      closeModal();
+      if (typeof onClose === "function") setTimeout(onClose, 250);
+    };
     el("modal-actions").appendChild(btn);
     overlay.classList.remove("hidden");
   }
