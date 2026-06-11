@@ -235,6 +235,7 @@ window.Properties = (() => {
     const capRates = GameState.market.capRates;
 
     GameState.portfolio.forEach(prop => {
+      if (prop.underConstruction) return; // tower under construction has no market value yet
       // Establish a baseline cap rate the first time we see this property
       if (prop.baseCapRate === undefined) {
         prop.baseCapRate = capRates[prop.sector][prop.location];
@@ -452,7 +453,8 @@ window.Properties = (() => {
   // ----------------------------------------------------------
   function quarterlyUpdate() {
     GameState.portfolio.forEach(prop => {
-      prop.quarterOwned += 1;
+      if (prop.underConstruction) return; // skip the tower until built
+      prop.quarterOwned = (prop.quarterOwned || 0) + 1;
 
       // Age increases every 4 quarters
       if (prop.quarterOwned % 4 === 0) prop.age += 1;
