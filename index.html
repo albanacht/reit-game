@@ -61,7 +61,7 @@
       </div>
 
       <div class="start-copyright">© 2026 Alexander Voronin. All rights reserved.</div>
-      <div class="start-version">v1.32 · Designed by Alexander Voronin · Built with Claude AI</div>
+      <div class="start-version">v1.3 · Designed by Alexander Voronin · Built with Claude AI</div>
     </div>
   </div>
 
@@ -411,10 +411,20 @@
               </div>
             </div>
             <div class="action-group">
-              <div class="action-group-title">Retire Debt Early</div>
-              <div class="action-meta">Select a tranche in the Debt tab and click Retire Early.</div>
-              <div class="action-meta text-muted">Prepayment penalty applies if &gt;4 quarters remain.</div>
-              <div class="action-meta text-yellow" id="action-debt-cooldown"></div>
+              <div class="action-group-title">💵 Set Quarterly Dividend <span style="color:var(--text-muted);font-weight:600;">— the board watches this</span></div>
+              <div class="dividend-current" id="action-div-current">Current: —</div>
+              <div class="input-row input-row-lg" style="margin-bottom:6px;">
+                <span class="input-prefix">$</span>
+                <input type="number" id="input-dividend" placeholder="new amount per share" min="0" step="0.01">
+                <span class="input-suffix">/share</span>
+                <button class="btn btn-primary btn-sm" id="btn-set-dividend">Set</button>
+              </div>
+              <div class="dividend-quick-row">
+                <span class="dividend-quick-label">Quick raise:</span>
+                <button class="btn btn-quick" id="btn-div-10">+10%</button>
+                <button class="btn btn-quick" id="btn-div-20">+20%</button>
+                <button class="btn btn-quick" id="btn-div-50">+50%</button>
+              </div>
             </div>
             <div class="action-group">
               <div class="action-group-title">📈 Issue Equity <span style="color:var(--text-muted);font-weight:600;">— raise cash, dilutes shares</span></div>
@@ -427,23 +437,12 @@
               <div class="action-meta" id="action-cash-avail">Cash available: —</div>
               <div class="input-row input-row-lg"><input type="number" id="input-buyback-shares" placeholder="e.g. 1" min="0.1" step="0.5"><span class="input-suffix">M shares</span><button class="btn btn-primary btn-sm" id="btn-buyback">Buy Back</button></div>
             </div>
-            <div class="action-group action-group-dividend" style="grid-column:span 2;">
-              <div class="action-group-title">💵 Set Quarterly Dividend <span style="color:var(--yellow);font-weight:600;">— the board watches this closely</span></div>
-              <div class="action-meta" id="action-div-current" style="font-size:13px;margin-bottom:8px;">Current: —</div>
-              <div class="dividend-quick-row">
-                <button class="btn btn-quick" id="btn-div-10">+10%</button>
-                <button class="btn btn-quick" id="btn-div-20">+20%</button>
-                <button class="btn btn-quick" id="btn-div-50">+50%</button>
-              </div>
-              <div class="input-row" style="margin-top:8px;">
-                <span class="input-prefix">$</span>
-                <input type="number" id="input-dividend" placeholder="or type exact amount per share" min="0" step="0.01">
-                <span class="input-suffix">/share</span>
-                <button class="btn btn-primary btn-sm" id="btn-set-dividend">Set</button>
-              </div>
-              <div class="action-meta text-muted" style="margin-top:6px;">Quick buttons raise from your current dividend. Type a lower number to cut it (this angers the board and drops the share price).</div>
+            <div class="action-group">
+              <div class="action-group-title">📉 Retire Debt Early <span style="color:var(--text-muted);font-weight:600;">— pay off a loan</span></div>
+              <div class="action-meta text-muted">Pick a tranche in the Debt tab to retire it.</div>
+              <div class="action-meta text-yellow" id="action-debt-cooldown"></div>
             </div>
-            <div class="action-group" id="preferred-redeem-group" style="grid-column:span 2; display:none;">
+            <div class="action-group" id="preferred-redeem-group" style="display:none;">
               <div class="action-group-title">Preferred Stock</div>
               <div class="action-meta" id="action-preferred-info">—</div>
               <div class="input-row"><button class="btn btn-secondary btn-sm" id="btn-redeem-preferred">Redeem Preferred at Par</button></div>
