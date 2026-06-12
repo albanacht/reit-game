@@ -98,7 +98,7 @@ window.Events = (() => {
           `In a widely anticipated move, the Fed hiked rates ${hike*100}bps. Your floating-rate exposure is now a concern.`,
           `The Fed delivered a ${hike*100}bps hike, pushing the base rate to ${GameState.market.baseInterestRate}%. Refinancing costs are rising.`,
         ]);
-        return { isMacro: true, headline: "🏦 Fed Hikes Rates", body: msg, impact: `-${hike*100}bps to base rate` };
+        return { isMacro: true, harmful: true, headline: "🏦 Fed Raises Rates", body: msg, impact: "Base rate now " + GameState.market.baseInterestRate + "% — borrowing costs up" };
       },
     },
 
@@ -119,7 +119,7 @@ window.Events = (() => {
           `A surprise ${cut*100}bps cut from the Fed. Your refinancing window just got more attractive.`,
           `Fed eases by ${cut*100}bps. Cap rates may follow over coming quarters.`,
         ]);
-        return { isMacro: true, headline: "🏦 Fed Cuts Rates", body: msg, impact: `+${cut*100}bps relief to base rate` };
+        return { isMacro: true, headline: "🏦 Fed Cuts Rates", body: msg, impact: "Base rate now " + GameState.market.baseInterestRate + "% — borrowing cheaper" };
       },
     },
 
