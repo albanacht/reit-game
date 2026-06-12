@@ -61,7 +61,7 @@
       </div>
 
       <div class="start-copyright">© 2026 Alexander Voronin. All rights reserved.</div>
-      <div class="start-version">v1.35 · Designed by Alexander Voronin · Built with Claude AI</div>
+      <div class="start-version">v1.3 · Designed by Alexander Voronin · Built with Claude AI</div>
     </div>
   </div>
 
@@ -102,26 +102,22 @@
       <div class="help-body">
 
         <div id="help-mechanics" class="help-tab-content active">
-          <h3>How a Quarter Works</h3>
-          <p>Each quarter runs automatically when you press <strong>Advance Quarter</strong>. The sequence is:</p>
-          <ol>
-            <li>Random events roll (tenant bankruptcies, market shocks, etc.)</li>
-            <li>Market conditions update (interest rates, cap rates)</li>
-            <li>Property values are recalculated from cap rates</li>
-            <li>P&L is calculated: GPR → Vacancy Loss → NOI → Interest → G&A → Net Income → FFO → AFFO</li>
-            <li>Balance sheet updates with real cash flows</li>
-            <li>Ratios calculated and credit rating updated</li>
-            <li>Board evaluates your performance and adds/removes pressure</li>
-            <li>Earnings report generated</li>
-          </ol>
-          <h3>Board Pressure</h3>
-          <p>The board tracks 8 metrics. Each quarter you breach a threshold adds pressure points. Hit the maximum and you're fired. Doing well on metrics removes pressure. The maximum pressure allowed drops each year — survival gets harder.</p>
-          <h3>Year 1 — Orientation</h3>
-          <p>No firing possible in Year 1, but the board scores you silently. At year end they issue an assessment and carry any failures forward as starting pressure in Year 2. A bad Year 1 puts you immediately in danger.</p>
-          <h3>Market Cycles</h3>
-          <p>The economy moves through Expanding → Stable → Contracting → Recession phases. Each phase shifts interest rates and cap rates differently. Rising cap rates = falling property values even if your NOI stays the same.</p>
-          <h3>Credit Rating</h3>
-          <p>Your rating (AAA to CCC) is calculated from debt/assets and interest coverage. It only moves one notch per quarter — you can't fix a bad balance sheet overnight. Your borrowing rate = base rate + credit spread. CCC rating means a 6% spread on top of whatever the base rate is.</p>
+          <h3>The Goal</h3>
+          <p>Survive <strong>15 years</strong> without the board firing you.</p>
+          <h3>How It Works</h3>
+          <p style="font-size:15px;line-height:1.8;">Issue debt → buy properties that yield more than the debt costs → survive negative events with what's left.</p>
+          <h3>Each Quarter</h3>
+          <p>Press <strong>Advance Quarter</strong>. <strong>Retained Cash</strong> is what's left after all expenses — keep it positive and you're growing.</p>
+          <h3>The Tabs</h3>
+          <ul>
+            <li><strong>💰 Capital Actions</strong> — borrow money, issue shares, set your dividend</li>
+            <li><strong>Property Market</strong> — buy buildings (higher cap rate = more income, but riskier)</li>
+            <li><strong>Portfolio</strong> — the properties you own</li>
+            <li><strong>Debt</strong> — your loans; retire them early here</li>
+            <li><strong>Staff</strong> — hire a CFO and others to unlock abilities</li>
+          </ul>
+          <h3>The Board</h3>
+          <p>Five directors vote on you each year. <strong>Chairman Williams</strong> wants a rising dividend above all. Keep enough of them happy to survive the vote. Good results earn <strong>political capital</strong> you can spend in board fights or tough events.</p>
         </div>
 
         <div id="help-ratios" class="help-tab-content">
@@ -339,19 +335,9 @@
     </div>
 
     <div id="content">
-      <div id="earnings-report" class="panel">
-        <div class="panel-header"><span class="panel-title">CFO Earnings Report</span></div>
+      <div id="earnings-report" class="panel panel-feed">
+        <div class="panel-header"><span class="panel-title">📋 Quarter Report</span></div>
         <div class="panel-body"><p class="text-muted">Press <strong>Advance Quarter</strong> to begin.</p></div>
-      </div>
-
-      <div id="news-terminal" class="panel">
-        <div class="panel-header">
-          <span class="panel-title">📟 Market Wire</span>
-          <span class="news-live">● LIVE</span>
-        </div>
-        <div class="panel-body">
-          <div id="news-feed" class="news-feed"><p class="text-muted" style="font-size:11px">Awaiting market open…</p></div>
-        </div>
       </div>
 
       <div class="section-tabs">
