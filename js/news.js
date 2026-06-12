@@ -22,11 +22,12 @@ window.News = (function() {
   // ----------------------------------------------------------
   // ADD a headline. category drives the colour tag.
   // ----------------------------------------------------------
-  function add(text, category) {
+  function add(text, category, tone) {
     var feed = ensureFeed();
     feed.unshift({
       text:    text,
       category: category || "market",
+      tone:    tone || "neutral",   // "good" | "bad" | "neutral" | "action"
       year:    GameState.meta ? GameState.meta.year : 1,
       quarter: GameState.meta ? GameState.meta.quarter : 1,
       t:       Date.now(),
