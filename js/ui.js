@@ -749,7 +749,7 @@ window.UI = (function() {
         // tone: harmful = bad (red), explicit good keywords = good (green), else neutral
         var tone = "neutral";
         if (e.harmful) tone = "bad";
-        else if (/Boom|Windfall|Signed|Approval|Surge|Prestige|Shortage Windfall|Rate Cut|relief/i.test(e.headline + " " + (e.impact||""))) tone = "good";
+        else if (/Boom|Windfall|Signed|Approval|Surge|Prestige|Shortage|Rate Cut|Cuts Rates|cheaper|relief/i.test(e.headline + " " + (e.impact||""))) tone = "good";
         else if (/Fed|Rate|Cycle|Regulation/i.test(e.headline)) tone = "neutral";
         eventsHTML +=
           '<div class="feed-event feed-' + tone + '">' +
@@ -1603,14 +1603,9 @@ window.UI = (function() {
   // MACRO EVENT POPUP — shows before earnings report for major events
   // ----------------------------------------------------------
   function showMacroEventPopup(firedEvents, callback) {
-    var macroEvents = firedEvents.filter(function(e) { return e.isMacro === true; });
-    if (macroEvents.length === 0) { callback(); return; }
-    var body = macroEvents.map(function(e) {
-      return e.headline + "\n" + e.body + "\n\nImpact: " + e.impact;
-    }).join("\n\n─────────────────\n\n");
-    showModal("⚡ Major Market Event — " + GameState.currentPeriodLabel(), body,
-      [{ label: "Understood — Continue", style: "btn-primary", onClick: callback }]
-    );
+    // Macro events (Fed rate moves, etc.) now flow into the unified quarter
+    // feed like everything else — no separate popup. One place for all news.
+    callback();
   }
 
   // ----------------------------------------------------------
