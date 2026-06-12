@@ -1369,6 +1369,7 @@ window.UI = (function() {
     if (response === "reject")    GameState.board.politicalCapital -= 2;
 
     // Handle negotiate roll
+    var outcome = response; // for dialogue lookup
     if (response === "negotiate") {
       var director = Board.DIRECTORS.find(function(d) { return d.id === mandate.directorId; });
       var successRate = director ? director.negotiateSuccessRate : 0.5;
@@ -1377,33 +1378,85 @@ window.UI = (function() {
       if (success) {
         mandate.response = "negotiate";
         mandate.target   = mandate.target * 0.55;
-        showToast("Negotiation successful! Target reduced by 45%.", "success");
+        outcome = "negotiateOk";
       } else {
         var ds = Board.getDirectorState(mandate.directorId);
         if (ds) ds.attitude = Math.max(0, ds.attitude - 0.5);
         mandate.response = "accept"; // falls back to accept at original target
-        showToast("Negotiation failed. Director is not pleased. Target unchanged.", "error");
+        outcome = "negotiateFail";
       }
     } else {
       mandate.response = response;
     }
 
-    // Show result feedback
-    var feedback = {
-      accept:     "You have accepted the mandate. Deliver on your promise.",
-      negotiate:  "",
-      doubledown: "Bold commitment. The director is watching closely.",
-      reject:     "Mandate rejected. The director is displeased but it is removed.",
-    };
-    if (feedback[response]) showToast(feedback[response], "info");
+    // Director replies in their own voice, shown in the speech area.
+    var reply = directorSays(mandate.directorId, outcome);
+    var nameEl = el("bm-speaker-name");
+    if (nameEl) nameEl.textContent = reply.name;
+    typeText("bm-speech-text", reply.line);
+    // Hide the response buttons while the director replies.
+    var btnArea = el("bm-response-buttons");
+    if (btnArea) btnArea.innerHTML = "";
 
-    // Advance to next mandate
+    // Advance to next mandate after the reply is read.
     _boardMeetingState.currentIndex++;
     setTimeout(function() {
       showCurrentMandate();
       renderBoardMeetingHeader();
       setText("bm-capital-display", "Political Capital: " + GameState.board.politicalCapital + "/" + GameState.board.maxCapital);
-    }, 800);
+    }, 2200);
+  }
+
+  // In-character director dialogue for mandate responses. Each director speaks
+  // in their own voice instead of a mechanical "reduced by 45%" toast.
+  var DIRECTOR_DIALOGUE = {
+    williams: {
+      name: "Chairman Williams",
+      negotiateOk:   ["Hmph. Fine. But I expect the dividend to keep climbing — don't test my patience again.", "Very well. I'll soften it this once. Shareholders still come first, always."],
+      negotiateFail: ["The dividend is sacred. There is nothing to negotiate.", "No. Shareholders are owed their due, and that is final."],
+      accept:        ["Good. See that it's done.", "As it should be. I'll be watching the payout."],
+      doubledown:    ["Bold. I respect ambition — but fail and it's on your head.", "Now that's the spirit. Don't disappoint me."],
+      reject:        ["Rejecting me? Reckless. I won't forget this.", "You overstep. The board will remember your defiance."],
+    },
+    chen: {
+      name: "Director Chen",
+      negotiateOk:   ["Reasonable. Growth takes time — I can live with a gentler pace this year.", "Agreed. Let's set a target we can actually hit."],
+      negotiateFail: ["No. This company must grow, and growth is non-negotiable.", "Stagnation is death for a REIT. My target stands."],
+      accept:        ["Excellent. Let's build something.", "Good. I want to see this portfolio expand."],
+      doubledown:    ["Ambitious! I like it. Deliver and you'll have my full backing.", "Now we're talking. Go big."],
+      reject:        ["Disappointing. Without growth, what are we even doing here?", "A mistake. The market rewards the bold, not the timid."],
+    },
+    okafor: {
+      name: "Director Okafor",
+      negotiateOk:   ["Prudent. I'll accept a measured approach — keep the balance sheet clean.", "Fair enough. Discipline matters more than the exact figure."],
+      negotiateFail: ["Risk is risk. I won't loosen my guard on this.", "No. Over-leverage has sunk better firms than ours."],
+      accept:        ["Sensible. Keep us solvent and we'll have no quarrel.", "Good. Caution is never wasted."],
+      doubledown:    ["A firm commitment to discipline — I approve wholeheartedly.", "Resolute. That's what I like to see on risk."],
+      reject:        ["Recklessness. You gamble with this company's survival.", "Noted, and not favourably. Risk ignored is risk multiplied."],
+    },
+    petrova: {
+      name: "Director Petrova",
+      negotiateOk:   ["All right, I understand. Just don't let the share price slide too far this year.", "Fine. I'll ease off — but the market is always watching, and so am I."],
+      negotiateFail: ["My targets are firm. There's no further discussion.", "The share price reflects everything. I won't compromise on it."],
+      accept:        ["Good. The market will reward steady hands.", "Wise. Keep the equity story intact."],
+      doubledown:    ["Confident. If you can lift the stock, I'll be impressed.", "Bold move. The shareholders are watching with me."],
+      reject:        ["Unwise. The market punishes those who ignore it.", "You'll regret dismissing the share price so lightly."],
+    },
+    hassan: {
+      name: "Director Hassan",
+      negotiateOk:   ["Acceptable. Keep the buildings full and I'll keep quiet.", "Fine. A little flexibility — but occupancy is everything to me."],
+      negotiateFail: ["Empty buildings earn nothing. My standard holds.", "No. If the assets aren't leased, we have no business at all."],
+      accept:        ["Good. Full buildings, happy tenants. That's the job.", "Right answer. Keep those occupancy numbers up."],
+      doubledown:    ["Strong commitment to operations — I respect that.", "Ambitious on occupancy. Prove it to me."],
+      reject:        ["Careless. Occupancy is the lifeblood of this portfolio.", "A poor choice. Neglect the buildings and they'll neglect us."],
+    },
+  };
+
+  function directorSays(dirId, outcome) {
+    var d = DIRECTOR_DIALOGUE[dirId];
+    if (!d) return { name: "The director", line: "Very well." };
+    var lines = d[outcome] || ["Very well."];
+    return { name: d.name, line: lines[Math.floor(Math.random() * lines.length)] };
   }
 
   function showBoardVote() {
