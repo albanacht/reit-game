@@ -655,6 +655,7 @@ window.Events = (() => {
       if (Math.random() < probability) {
         const result = evt.apply();
         if (result) {
+          result.harmful = true;
           firedIds.add(evt.id);
           firedEvents.push(result);
           firedNegativeThisQuarter++;
@@ -669,7 +670,7 @@ window.Events = (() => {
       if (firedIds.has(evt.id)) return;
       if (Math.random() < probability) {
         const result = evt.apply();
-        if (result) { firedIds.add(evt.id); firedEvents.push(result); }
+        if (result) { result.harmful = false; firedIds.add(evt.id); firedEvents.push(result); }
       }
     });
 
