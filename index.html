@@ -3,55 +3,57 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>REIT Simulator</title>
+  <title>Auto Dealership Tycoon</title>
   <link rel="stylesheet" href="css/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
 <div id="app">
-
-  <!-- START SCREEN -->
-  <div id="start-overlay" class="hidden">
+  <div id="start-overlay">
     <div class="start-inner">
-      <div class="start-logo">REIT SIM</div>
-      <p class="start-subtitle">Run a publicly traded Real Estate Investment Trust. Survive the board. Grow shareholder value.</p>
-
+      <div class="start-logo">AUTO DEALER TYCOON</div>
+      <p class="start-subtitle">Build your empire. Manage inventory. Hire the best. Master the numbers.</p>
       <div class="start-setup">
         <div class="setup-row">
           <label>Your Name</label>
           <input type="text" id="input-player-name" placeholder="e.g. John Smith" maxlength="30">
         </div>
         <div class="setup-row">
-          <label>REIT Name</label>
-          <div class="reit-name-row">
-            <input type="text" id="input-reit-name" placeholder="e.g. Albanacht Capital" maxlength="30">
-            <span class="reit-suffix">REIT</span>
+          <label>Dealership Name</label>
+          <div class="dealership-name-row">
+            <input type="text" id="input-dealership-name" placeholder="e.g. Smith Auto Group" maxlength="30">
+            <span class="dealership-suffix">AUTO</span>
           </div>
+        </div>
+        <div class="setup-row">
+          <label>Starting Capital</label>
+          <select id="input-starting-capital">
+            <option value="100000">$100K - Conservative</option>
+            <option value="250000">$250K - Standard</option>
+            <option value="500000" selected>$500K - Aggressive</option>
+            <option value="1000000">$1M - Tycoon Mode</option>
+          </select>
         </div>
         <div class="setup-row tutorial-toggle-row">
           <label class="tutorial-toggle">
             <input type="checkbox" id="input-tutorial" checked>
-            <span>Tutorial mode — Jenkins guides you through Year 1</span>
+            <span>Tutorial mode</span>
           </label>
         </div>
       </div>
-
-      <button id="btn-new-game-go" class="btn btn-primary btn-lg">Start Game</button>
-
+      <button id="btn-new-game-go" class="btn btn-primary btn-lg">Start Dealership</button>
       <div class="start-cols">
         <div class="start-rules">
           <h3>How to Play</h3>
           <ul>
-            <li>Press <strong>Advance Quarter</strong> to run each quarter</li>
-            <li>Buy properties to grow your NOI base</li>
-            <li>Issue and retire debt — watch your credit rating</li>
-            <li>Set dividends carefully — cutting them angers the board</li>
-            <li>Keep occupancy up, leverage down, FFO growing</li>
-            <li>Year 1 is an orientation year — no firing, but you're being scored</li>
-            <li>From Year 2 the board applies full pressure. Survive as long as you can.</li>
-            <li>Press <strong>F1</strong> anytime for help and ratio explanations</li>
+            <li>Buy vehicles from auctions or private sellers</li>
+            <li>Hire mechanics, salesman, finance, body repair staff</li>
+            <li>Repair vehicles to maximize profit margins</li>
+            <li>Set prices strategically</li>
+            <li>Sell to customers, manage cash flow and debt</li>
+            <li>Track inventory turnover, gross margin, and ROI</li>
           </ul>
         </div>
-
         <div class="start-leaderboard">
           <h3>🏆 Global Leaderboard</h3>
           <div id="leaderboard-container">
@@ -59,33 +61,24 @@
           </div>
         </div>
       </div>
-
-      <div class="start-copyright">© 2026 Alexander Voronin. All rights reserved.</div>
-      <div class="start-version">v1.35 · Designed by Alexander Voronin · Built with Claude AI</div>
+      <div class="start-copyright">© 2026 Auto Dealership Tycoon. All rights reserved.</div>
+      <div class="start-version">v1.0 · Auto Dealership Simulator · Built with Claude AI</div>
     </div>
   </div>
 
-  <!-- GAME OVER -->
   <div id="gameover-overlay" class="hidden">
-    <div class="gameover-title" id="gameover-title">YOU'RE FIRED</div>
-    <div id="gameover-video-slot"></div>
-    <div class="gameover-subtitle" id="gameover-quarters"></div>
+    <div class="gameover-title" id="gameover-title">DEALERSHIP CLOSED</div>
+    <div class="gameover-subtitle" id="gameover-months"></div>
     <div class="gameover-letter" id="gameover-reason"></div>
     <div class="gameover-stats">
-      <div class="go-stat"><div class="go-stat-label">FFO/Share</div><div class="go-stat-value" id="gameover-ffo">—</div></div>
-      <div class="go-stat"><div class="go-stat-label">Occupancy</div><div class="go-stat-value" id="gameover-occ">—</div></div>
-      <div class="go-stat"><div class="go-stat-label">Debt/Assets</div><div class="go-stat-value" id="gameover-d2a">—</div></div>
-      <div class="go-stat"><div class="go-stat-label">Portfolio</div><div class="go-stat-value" id="gameover-props">—</div></div>
+      <div class="go-stat"><div class="go-stat-label">Total Revenue</div><div class="go-stat-value" id="gameover-revenue">—</div></div>
+      <div class="go-stat"><div class="go-stat-label">Avg Gross Margin</div><div class="go-stat-value" id="gameover-margin">—</div></div>
+      <div class="go-stat"><div class="go-stat-label">Vehicles Sold</div><div class="go-stat-value" id="gameover-sold">—</div></div>
+      <div class="go-stat"><div class="go-stat-label">Net Worth</div><div class="go-stat-value" id="gameover-networth">—</div></div>
     </div>
     <button id="btn-new-game" class="btn btn-primary btn-lg">Try Again</button>
   </div>
 
-  <!-- ANNUAL REPORT OVERLAY -->
-  <div id="annual-report-overlay" class="hidden">
-    <div id="annual-report-content" class="annual-report-box"></div>
-  </div>
-
-  <!-- HELP OVERLAY (F1) -->
   <div id="help-overlay" class="hidden">
     <div class="help-box">
       <div class="help-header">
@@ -94,421 +87,234 @@
       </div>
       <div class="help-tab-bar">
         <button class="help-tab-btn active" onclick="UI.switchHelpTab('help-mechanics', this)">Mechanics</button>
-        <button class="help-tab-btn" onclick="UI.switchHelpTab('help-ratios', this)">Ratios</button>
+        <button class="help-tab-btn" onclick="UI.switchHelpTab('help-metrics', this)">Metrics</button>
         <button class="help-tab-btn" onclick="UI.switchHelpTab('help-glossary', this)">Glossary</button>
-        <button class="help-tab-btn" onclick="UI.switchHelpTab('help-cfa', this)">CFA Connection</button>
+        <button class="help-tab-btn" onclick="UI.switchHelpTab('help-strategy', this)">Strategy</button>
       </div>
-
       <div class="help-body">
-
         <div id="help-mechanics" class="help-tab-content active">
-          <h3>How a Quarter Works</h3>
-          <p>Each quarter runs automatically when you press <strong>Advance Quarter</strong>. The sequence is:</p>
+          <h3>How a Month Works</h3>
           <ol>
-            <li>Random events roll (tenant bankruptcies, market shocks, etc.)</li>
-            <li>Market conditions update (interest rates, cap rates)</li>
-            <li>Property values are recalculated from cap rates</li>
-            <li>P&L is calculated: GPR → Vacancy Loss → NOI → Interest → G&A → Net Income → FFO → AFFO</li>
-            <li>Balance sheet updates with real cash flows</li>
-            <li>Ratios calculated and credit rating updated</li>
-            <li>Board evaluates your performance and adds/removes pressure</li>
-            <li>Earnings report generated</li>
+            <li>Vehicle auctions refresh with new inventory</li>
+            <li>Private sellers list vehicles</li>
+            <li>Your staff works (mechanics repair, salesman sells)</li>
+            <li>Customers arrive based on inventory quality & prices</li>
+            <li>Sales are calculated with gross margin</li>
+            <li>Expenses are deducted (payroll, lot fees, utilities)</li>
+            <li>Debt payments are made</li>
+            <li>Monthly financial report generated</li>
           </ol>
-          <h3>Board Pressure</h3>
-          <p>The board tracks 8 metrics. Each quarter you breach a threshold adds pressure points. Hit the maximum and you're fired. Doing well on metrics removes pressure. The maximum pressure allowed drops each year — survival gets harder.</p>
-          <h3>Year 1 — Orientation</h3>
-          <p>No firing possible in Year 1, but the board scores you silently. At year end they issue an assessment and carry any failures forward as starting pressure in Year 2. A bad Year 1 puts you immediately in danger.</p>
-          <h3>Market Cycles</h3>
-          <p>The economy moves through Expanding → Stable → Contracting → Recession phases. Each phase shifts interest rates and cap rates differently. Rising cap rates = falling property values even if your NOI stays the same.</p>
-          <h3>Credit Rating</h3>
-          <p>Your rating (AAA to CCC) is calculated from debt/assets and interest coverage. It only moves one notch per quarter — you can't fix a bad balance sheet overnight. Your borrowing rate = base rate + credit spread. CCC rating means a 6% spread on top of whatever the base rate is.</p>
+          <h3>Employee Performance</h3>
+          <p>Each hire has a skill level (1-10) that improves over time.</p>
         </div>
-
-        <div id="help-ratios" class="help-tab-content">
+        <div id="help-metrics" class="help-tab-content">
           <div class="ratio-explain">
             <div class="re-item">
-              <div class="re-name">FFO — Funds From Operations</div>
-              <div class="re-formula">Net Income + Depreciation + Unusual Items</div>
-              <div class="re-desc">The primary earnings measure for REITs. Adds back depreciation because real estate doesn't actually lose value like equipment does. Healthy range: coverage of dividend by 1.2x+.</div>
+              <div class="re-name">Gross Margin %</div>
+              <div class="re-desc">Percentage profit on each sale. Typical range: 10-25%.</div>
             </div>
             <div class="re-item">
-              <div class="re-name">AFFO — Adjusted FFO</div>
-              <div class="re-formula">FFO − Normalized Capex Reserve</div>
-              <div class="re-desc">More conservative than FFO — subtracts estimated maintenance capital. The closest thing to true free cash flow for a REIT. Payout ratio (dividends/AFFO) above 100% is a danger signal.</div>
+              <div class="re-name">Debt-to-Assets</div>
+              <div class="re-desc">Leverage ratio. Keep below 70% to stay solvent.</div>
             </div>
             <div class="re-item">
-              <div class="re-name">Dividend Coverage</div>
-              <div class="re-formula">FFO ÷ Dividends Paid</div>
-              <div class="re-desc">Must stay above 1.0x. Below 1.0x means you're paying dividends from capital, not earnings. The board watches this closely. Target: above 1.2x.</div>
-            </div>
-            <div class="re-item">
-              <div class="re-name">Debt / Assets</div>
-              <div class="re-formula">Total Debt ÷ Total Assets</div>
-              <div class="re-desc">Your leverage ratio. Board limit is 60%. Above 60% starts triggering pressure. Above 65% is a crisis. Industrial REITs typically run 30-40%; aggressive REITs push 55%+.</div>
-            </div>
-            <div class="re-item">
-              <div class="re-name">Interest Coverage</div>
-              <div class="re-formula">NOI ÷ Quarterly Interest Expense</div>
-              <div class="re-desc">How many times your NOI covers interest payments. Below 1.5x is weak, below 1.2x triggers board pressure, below 1.0x means you can't pay your lenders from operations.</div>
-            </div>
-            <div class="re-item">
-              <div class="re-name">Implied Cap Rate</div>
-              <div class="re-formula">Annualized NOI ÷ Portfolio Value × 100</div>
-              <div class="re-desc">The yield your portfolio generates. Higher cap rate = cheaper assets, more cash flow per dollar. Lower cap rate = expensive assets in prime locations. Market cap rates drive your property valuations.</div>
-            </div>
-            <div class="re-item">
-              <div class="re-name">NAV per Share</div>
-              <div class="re-formula">Total Equity ÷ Shares Outstanding</div>
-              <div class="re-desc">Net Asset Value — what each share is theoretically worth based on assets minus debt. Compare to share price: trading below NAV = discount, above NAV = premium.</div>
-            </div>
-            <div class="re-item">
-              <div class="re-name">P/FFO</div>
-              <div class="re-formula">Share Price ÷ Annualized FFO per Share</div>
-              <div class="re-desc">The REIT equivalent of P/E ratio. Typical range: 12-22x. Low P/FFO may signal undervaluation or risk. High P/FFO may signal growth expectations or overvaluation.</div>
+              <div class="re-name">Operating Margin</div>
+              <div class="re-desc">Net profit as % of revenue. Healthy range: 5-15%.</div>
             </div>
           </div>
         </div>
-
         <div id="help-glossary" class="help-tab-content">
           <div class="glossary">
-            <div class="gl-item"><span class="gl-term">NOI</span><span class="gl-def">Net Operating Income — rental revenue minus operating expenses. Does not include interest, G&A, or depreciation.</span></div>
-            <div class="gl-item"><span class="gl-term">GPR</span><span class="gl-def">Gross Potential Rent — what you'd collect if every property was 100% occupied.</span></div>
-            <div class="gl-item"><span class="gl-term">Cap Rate</span><span class="gl-def">Capitalization Rate — NOI divided by property value. Rising cap rates compress values; falling cap rates inflate them.</span></div>
-            <div class="gl-item"><span class="gl-term">Tranche</span><span class="gl-def">One individual debt issuance with its own amount, interest rate, and maturity date. You can have up to 10 tranches.</span></div>
-            <div class="gl-item"><span class="gl-term">Maturity</span><span class="gl-def">When a debt tranche comes due and must be repaid or refinanced. Clustering maturities creates refinancing risk.</span></div>
-            <div class="gl-item"><span class="gl-term">Spread</span><span class="gl-def">The extra interest you pay above the base rate, based on your credit rating. BBB = +1.6%, CCC = +6.0%.</span></div>
-            <div class="gl-item"><span class="gl-term">LTV</span><span class="gl-def">Loan-to-Value — same as debt/assets in this game. Standard real estate leverage measure.</span></div>
-            <div class="gl-item"><span class="gl-term">Occupancy</span><span class="gl-def">Percentage of leasable space that is currently leased and paying rent. 100% is impossible to sustain; 90%+ is healthy.</span></div>
-            <div class="gl-item"><span class="gl-term">G&A</span><span class="gl-def">General & Administrative expense — head office costs. Grows with portfolio size.</span></div>
-            <div class="gl-item"><span class="gl-term">Depreciation</span><span class="gl-def">Non-cash accounting charge that reduces net income but not cash flow. This is why net income is misleading for REITs.</span></div>
-            <div class="gl-item"><span class="gl-term">FFO</span><span class="gl-def">Funds From Operations — adds depreciation back to net income to show true cash earnings.</span></div>
-            <div class="gl-item"><span class="gl-term">AFFO</span><span class="gl-def">Adjusted FFO — subtracts normalized maintenance capex from FFO for a more conservative cash flow view.</span></div>
+            <div class="gl-item"><span class="gl-term">Gross Margin</span><span class="gl-def">Profit on each vehicle sale before operating expenses.</span></div>
+            <div class="gl-item"><span class="gl-term">Floor Plan</span><span class="gl-def">Debt used to finance inventory.</span></div>
+            <div class="gl-item"><span class="gl-term">Auction</span><span class="gl-def">Wholesale vehicles. Lower prices, as-is condition.</span></div>
           </div>
         </div>
-
-        <div id="help-cfa" class="help-tab-content">
-          <h3>Why REITs Use FFO, Not Net Income</h3>
-          <p>Depreciation is a massive non-cash charge. A building might depreciate $5M on paper this quarter while actually appreciating in value. Net income subtracts this, making it look terrible. FFO adds it back to show actual cash generation. This is directly tested in CFA Level 1 and 2.</p>
-
-          <h3>Cap Rate Mathematics</h3>
-          <p><strong>Property Value = NOI ÷ Cap Rate</strong>. If your property generates $5M NOI and the market cap rate is 5%, it's worth $100M. If the Fed hikes rates and cap rates rise to 6%, that same property is now worth only $83M — a $17M loss with no change in your tenants or income. This is the core valuation risk in REIT investing.</p>
-
-          <h3>The Dividend Commitment</h3>
-          <p>REITs must distribute 90% of taxable income as dividends by law. This means they cannot retain earnings to fund growth — they must constantly access capital markets (debt or equity) to acquire properties. This is why leverage and capital markets access are existential for REITs, not optional tools.</p>
-
-          <h3>The Credit Spread Cycle</h3>
-          <p>More debt → higher debt/assets → lower credit rating → wider spread → higher interest cost → lower coverage ratio → lower credit rating → wider spread... This is the leverage spiral that destroys REITs in downturns. Maintaining investment grade (BBB or above) is critical because many institutional investors cannot hold sub-investment grade debt.</p>
-
-          <h3>NAV Premium vs Discount</h3>
-          <p>If your share price is above NAV per share, you trade at a premium — issuing equity raises cash above asset value, which is accretive. If you trade at a discount to NAV, issuing equity destroys value. This dynamic drives REIT capital allocation decisions and is a CFA Level 2 topic.</p>
-
-          <h3>Dividend Signaling</h3>
-          <p>In this game, cutting the dividend immediately drops your share price significantly. This mirrors real markets — a dividend cut signals management distress and loss of confidence in cash flows. The share price reaction is often larger than the mathematical impact of the cut itself, because it changes investor expectations.</p>
+        <div id="help-strategy" class="help-tab-content">
+          <h3>Budget Strategy</h3>
+          <p>Start by buying cheap used cars at auctions, repair them well, sell at 15-20% margin.</p>
         </div>
-
       </div>
     </div>
   </div>
 
-  <!-- HEADER -->
-  <div id="header">
+  <div id="header" class="hidden">
     <div class="header-top">
-      <span class="header-company" id="hdr-company">REIT Simulator</span>
+      <span class="header-company" id="hdr-company">Auto Dealership</span>
       <div class="header-stats">
         <div class="hdr-stat"><span class="hdr-stat-label">Period</span><span class="hdr-stat-value" id="hdr-period">—</span></div>
-        <div class="hdr-stat"><span class="hdr-stat-label">Share Price</span><span class="hdr-stat-value text-blue" id="hdr-price">—</span></div>
-        <div class="hdr-stat"><span class="hdr-stat-label">Market Cap</span><span class="hdr-stat-value" id="hdr-marketcap">—</span></div>
-        <div class="hdr-stat"><span class="hdr-stat-label">Rating</span><span class="hdr-stat-value text-yellow" id="hdr-rating">—</span></div>
-        <div class="hdr-stat"><span class="hdr-stat-label">Cycle</span><span class="hdr-stat-value" id="hdr-cycle">—</span></div>
-        <div class="hdr-stat"><span class="hdr-stat-label">Base Rate</span><span class="hdr-stat-value" id="hdr-rate">—</span></div>
-        <div class="hdr-stat"><span class="hdr-stat-label">Borrow At</span><span class="hdr-stat-value text-red" id="hdr-borrow">—</span></div>
+        <div class="hdr-stat"><span class="hdr-stat-label">Cash</span><span class="hdr-stat-value text-blue" id="hdr-cash">—</span></div>
+        <div class="hdr-stat"><span class="hdr-stat-label">Inventory Value</span><span class="hdr-stat-value" id="hdr-inv-value">—</span></div>
+        <div class="hdr-stat"><span class="hdr-stat-label">Net Worth</span><span class="hdr-stat-value text-green" id="hdr-networth">—</span></div>
+        <div class="hdr-stat"><span class="hdr-stat-label">Debt</span><span class="hdr-stat-value text-red" id="hdr-debt">—</span></div>
+        <div class="hdr-stat"><span class="hdr-stat-label">Debt Ratio</span><span class="hdr-stat-value text-yellow" id="hdr-debt-ratio">—</span></div>
+        <div class="hdr-stat"><span class="hdr-stat-label">Credit Score</span><span class="hdr-stat-value" id="hdr-credit">—</span></div>
         <button id="btn-help" class="btn btn-secondary btn-sm">F1 Help</button>
       </div>
     </div>
-    <div class="board-pressure-wrap" style="display:none">
-      <span id="board-pressure-label">Board: NEUTRAL</span>
-      <div class="pressure-track"><div id="board-pressure-bar" style="width:0%"></div></div>
-    </div>
   </div>
 
-  <!-- MAIN -->
-  <div id="main">
+  <div id="main" class="hidden">
     <div id="sidebar">
-      <button id="btn-advance-quarter">▶ Advance Quarter</button>
-
+      <button id="btn-advance-month">▶ Advance Month</button>
       <div class="panel">
-        <div class="panel-header"><span class="panel-title">Income Statement</span><span class="text-muted" style="font-size:11px">Quarterly $M</span></div>
+        <div class="panel-header"><span class="panel-title">Monthly P&L</span></div>
         <div class="panel-body">
           <table class="pnl-table">
-            <tr><td>Gross Potential Rent</td><td id="pnl-gpr">—</td></tr>
-            <tr><td class="pnl-indent">Vacancy Loss</td><td id="pnl-vacancy" class="text-red">—</td></tr>
-            <tr><td class="pnl-indent">Operating Expenses</td><td id="pnl-opex" class="text-muted">—</td></tr>
-            <tr class="pnl-divider pnl-subtotal"><td>Net Operating Income</td><td id="pnl-noi">—</td></tr>
-            <tr><td class="pnl-indent">G&amp;A Expense</td><td id="pnl-ga" class="text-muted">—</td></tr>
+            <tr><td>Vehicle Sales Revenue</td><td id="pnl-revenue">—</td></tr>
+            <tr><td class="pnl-indent">Cost of Goods Sold</td><td id="pnl-cogs" class="text-red">—</td></tr>
+            <tr class="pnl-divider pnl-subtotal"><td>Gross Profit</td><td id="pnl-gross">—</td></tr>
+            <tr><td class="pnl-indent">Payroll</td><td id="pnl-payroll" class="text-muted">—</td></tr>
+            <tr><td class="pnl-indent">Lot Fees</td><td id="pnl-lot-fees" class="text-muted">—</td></tr>
+            <tr><td class="pnl-indent">Utilities</td><td id="pnl-utilities" class="text-muted">—</td></tr>
+            <tr><td class="pnl-indent">Insurance</td><td id="pnl-insurance" class="text-muted">—</td></tr>
+            <tr class="pnl-divider pnl-subtotal"><td>Operating Expenses</td><td id="pnl-opex" class="text-muted">—</td></tr>
             <tr><td class="pnl-indent">Interest Expense</td><td id="pnl-interest" class="text-red">—</td></tr>
-            <tr><td class="pnl-indent">Depreciation</td><td id="pnl-depr" class="text-muted">—</td></tr>
-            <tr><td class="pnl-indent">Unusual Items</td><td id="pnl-unusual">—</td></tr>
-            <tr class="pnl-divider pnl-subtotal"><td>Net Income (GAAP)</td><td id="pnl-netincome">—</td></tr>
-            <tr class="pnl-divider"><td><strong>FFO</strong></td><td id="pnl-ffo" class="text-green"><strong>—</strong></td></tr>
-            <tr><td><strong>AFFO</strong></td><td id="pnl-affo"><strong>—</strong></td></tr>
-            <tr class="pnl-divider"><td class="pnl-indent">Preferred Dividends</td><td id="pnl-prefdiv" class="text-muted">—</td></tr>
-            <tr><td class="pnl-indent">Dividends Paid</td><td id="pnl-divpaid" class="text-muted">—</td></tr>
-            <tr class="pnl-total"><td>Retained Cash</td><td id="pnl-retained">—</td></tr>
+            <tr class="pnl-total"><td><strong>Net Income</strong></td><td id="pnl-netincome"><strong>—</strong></td></tr>
           </table>
         </div>
       </div>
-
       <div class="panel">
         <div class="panel-header"><span class="panel-title">Balance Sheet</span></div>
         <div class="panel-body">
           <div class="bs-grid">
-            <div class="bs-item"><span class="bs-label">Cash</span><span class="bs-value" id="bs-cash">—</span></div>
-            <div class="bs-item"><span class="bs-label">Total Assets</span><span class="bs-value" id="bs-assets">—</span></div>
-            <div class="bs-item"><span class="bs-label">Total Debt</span><span class="bs-value text-red" id="bs-debt">—</span></div>
-            <div class="bs-item"><span class="bs-label">Preferred Equity</span><span class="bs-value" id="bs-preferred">—</span></div>
-            <div class="bs-item"><span class="bs-label">Common Equity</span><span class="bs-value text-green" id="bs-equity">—</span></div>
-            <div class="bs-item"><span class="bs-label">Shares Out</span><span class="bs-value" id="bs-shares">—</span></div>
-            <div class="bs-item"><span class="bs-label">Div/Share (Q)</span><span class="bs-value" id="bs-divps">—</span></div>
+            <div class="bs-item"><span class="bs-label">Cash on Hand</span><span class="bs-value" id="bs-cash">—</span></div>
+            <div class="bs-item"><span class="bs-label">Inventory Value</span><span class="bs-value" id="bs-inventory">—</span></div>
+            <div class="bs-item"><span class="bs-label">Total Assets</span><span class="bs-value text-green" id="bs-assets">—</span></div>
+            <div class="bs-item"><span class="bs-label">Debt Outstanding</span><span class="bs-value text-red" id="bs-debt">—</span></div>
+            <div class="bs-item"><span class="bs-label">Owner's Equity</span><span class="bs-value" id="bs-equity">—</span></div>
           </div>
         </div>
       </div>
-
       <div class="panel">
-        <div class="panel-header"><span class="panel-title">Key Ratios</span></div>
+        <div class="panel-header"><span class="panel-title">Key Metrics</span></div>
         <div class="panel-body">
           <div class="ratios-grid">
-            <div class="ratio-row"><span class="ratio-label">FFO/Share</span><span class="ratio-value" id="ratio-ffo-ps">—</span></div>
-            <div class="ratio-row"><span class="ratio-label">AFFO/Share</span><span class="ratio-value" id="ratio-affo-ps">—</span></div>
-            <div class="ratio-row"><span class="ratio-label">Div Coverage</span><span class="ratio-value" id="ratio-div-cov">—</span></div>
-            <div class="ratio-row"><span class="ratio-label">Payout Ratio</span><span class="ratio-value" id="ratio-payout">—</span></div>
-            <div class="ratio-row"><span class="ratio-label">Debt/Assets</span><span class="ratio-value" id="ratio-d2a">—</span></div>
-            <div class="ratio-row"><span class="ratio-label">Debt/EBITDA</span><span class="ratio-value" id="ratio-d2e">—</span></div>
-            <div class="ratio-row"><span class="ratio-label">Int. Coverage</span><span class="ratio-value" id="ratio-int-cov">—</span></div>
-            <div class="ratio-row"><span class="ratio-label">Occupancy</span><span class="ratio-value" id="ratio-occ">—</span></div>
-            <div class="ratio-row"><span class="ratio-label">NOI Margin</span><span class="ratio-value" id="ratio-noi-margin">—</span></div>
-            <div class="ratio-row"><span class="ratio-label">Cap Rate</span><span class="ratio-value" id="ratio-cap-rate">—</span></div>
-            <div class="ratio-row"><span class="ratio-label">NAV/Share</span><span class="ratio-value" id="ratio-nav">—</span></div>
-            <div class="ratio-row"><span class="ratio-label">P/FFO</span><span class="ratio-value" id="ratio-pffo">—</span></div>
-            <div class="ratio-row"><span class="ratio-label">P/AFFO</span><span class="ratio-value" id="ratio-paffo">—</span></div>
-            <div class="ratio-row"><span class="ratio-label">Div Yield</span><span class="ratio-value" id="ratio-div-yield">—</span></div>
+            <div class="ratio-row"><span class="ratio-label">Gross Margin %</span><span class="ratio-value" id="ratio-margin">—</span></div>
+            <div class="ratio-row"><span class="ratio-label">Operating Margin %</span><span class="ratio-value" id="ratio-op-margin">—</span></div>
+            <div class="ratio-row"><span class="ratio-label">Debt-to-Assets</span><span class="ratio-value" id="ratio-d2a">—</span></div>
+            <div class="ratio-row"><span class="ratio-label">ROI %</span><span class="ratio-value" id="ratio-roi">—</span></div>
+            <div class="ratio-row"><span class="ratio-label">Vehicles in Lot</span><span class="ratio-value" id="ratio-inventory-count">—</span></div>
+            <div class="ratio-row"><span class="ratio-label">Vehicles Sold (MTD)</span><span class="ratio-value" id="ratio-vehicles-sold">—</span></div>
           </div>
         </div>
       </div>
-
-      <!-- MARKET CONDITIONS PANEL -->
       <div class="panel">
-        <div class="panel-header">
-          <span class="panel-title">📊 Market Conditions</span>
-        </div>
+        <div class="panel-header"><span class="panel-title">📊 Market Conditions</span></div>
         <div class="panel-body">
-          <div class="market-panel">
-            <img src="assets/board/jenkins.png" class="jenkins-portrait" alt="Jenkins">
-            <div class="market-conditions" id="market-conditions-list">
-              <p class="text-muted" style="font-size:11px">Loading market data...</p>
-            </div>
+          <div id="market-conditions-list">
+            <p class="text-muted" style="font-size:11px">Loading market data...</p>
           </div>
         </div>
       </div>
-
-      <!-- BOARD ATTITUDES PANEL -->
       <div class="panel">
-        <div class="panel-header">
-          <span class="panel-title">👥 Board Attitudes</span>
-          <span class="text-muted" style="font-size:10px">Next meeting: Q4</span>
-        </div>
+        <div class="panel-header"><span class="panel-title">🏦 Lender Status</span></div>
         <div class="panel-body">
-          <div class="board-attitudes" id="board-attitudes-list">
-            <p class="text-muted" style="font-size:11px">Start game to see board.</p>
+          <div id="lender-status-list">
+            <p class="text-muted" style="font-size:11px">Start game to see lender status.</p>
           </div>
-          <div class="ba-capital">
-            💡 Political Capital: <span id="ba-capital-display">—</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- BOARD GOALS PANEL -->
-      <div class="panel" id="goals-panel">
-        <div class="panel-header">
-          <span class="panel-title">🎯 Board Goals</span>
-          <span class="text-muted" style="font-size:11px" id="goals-year-label">Year 1</span>
-        </div>
-        <div class="panel-body" id="goals-list">
-          <p class="text-muted" style="font-size:12px">Goals set after Year 1.</p>
         </div>
       </div>
     </div>
 
     <div id="content">
-      <div id="earnings-report" class="panel">
-        <div class="panel-header"><span class="panel-title">CFO Earnings Report</span></div>
-        <div class="panel-body"><p class="text-muted">Press <strong>Advance Quarter</strong> to begin.</p></div>
+      <div id="monthly-report" class="panel">
+        <div class="panel-header"><span class="panel-title">Monthly Summary Report</span></div>
+        <div class="panel-body"><p class="text-muted">Press Advance Month to begin.</p></div>
       </div>
-
       <div id="news-terminal" class="panel">
-        <div class="panel-header">
-          <span class="panel-title">📟 Market Wire</span>
-          <span class="news-live">● LIVE</span>
-        </div>
+        <div class="panel-header"><span class="panel-title">📟 Market News</span><span class="news-live">● LIVE</span></div>
         <div class="panel-body">
           <div id="news-feed" class="news-feed"><p class="text-muted" style="font-size:11px">Awaiting market open…</p></div>
         </div>
       </div>
-
       <div class="section-tabs">
         <div class="section-tab-bar">
-          <button class="section-tab-btn active" onclick="switchTab('tab-portfolio', this)">Portfolio</button>
-          <button class="section-tab-btn" onclick="switchTab('tab-market', this)">Property Market</button>
-          <button class="section-tab-btn" onclick="switchTab('tab-debt', this)">Debt</button>
-          <button class="section-tab-btn tab-emphasis" onclick="switchTab('tab-capital', this)">💰 Capital Actions</button>
+          <button class="section-tab-btn active" onclick="switchTab('tab-inventory', this)">Inventory</button>
+          <button class="section-tab-btn" onclick="switchTab('tab-auctions', this)">Auctions</button>
+          <button class="section-tab-btn" onclick="switchTab('tab-private', this)">Private Market</button>
           <button class="section-tab-btn" onclick="switchTab('tab-staff', this)">Staff</button>
+          <button class="section-tab-btn" onclick="switchTab('tab-debt', this)">Debt</button>
+          <button class="section-tab-btn tab-emphasis" onclick="switchTab('tab-operations', this)">⚙️ Operations</button>
         </div>
-        <div id="tab-portfolio" class="section-tab-content active">
-          <div class="scroll-list" id="portfolio-list"><p class="text-muted">Start a game to see your portfolio.</p></div>
+        <div id="tab-inventory" class="section-tab-content active">
+          <span class="panel-title">Current Inventory</span>
+          <div class="scroll-list" id="inventory-list"><p class="text-muted">Your lot is empty. Buy vehicles from auctions or private sellers.</p></div>
+        </div>
+        <div id="tab-auctions" class="section-tab-content">
+          <span class="panel-title">Auction Market</span>
+          <div class="scroll-list" id="auction-list"><p class="text-muted">Loading auction inventory...</p></div>
+        </div>
+        <div id="tab-private" class="section-tab-content">
+          <span class="panel-title">Private Sellers</span>
+          <div class="scroll-list" id="private-list"><p class="text-muted">Loading private inventory...</p></div>
         </div>
         <div id="tab-staff" class="section-tab-content">
-          <div style="margin-bottom:12px;">
-            <span class="panel-title">Your Team</span>
-            <p class="text-muted" style="font-size:11px;margin-top:4px;">Each hire unlocks a function. Salaries are paid inside G&amp;A every quarter. Skill is revealed after 2-4 quarters. Firing a hire removes their unlock.</p>
-          </div>
+          <span class="panel-title">Your Team</span>
           <div class="scroll-list" id="staff-roster" style="margin-bottom:16px;"></div>
           <div id="talent-market-header">
-            <div class="panel-title" style="margin-bottom:8px;">Talent Market</div>
-            <p class="text-muted" style="font-size:11px;margin-bottom:8px;">Available candidates this year. Higher salary often — but not always — signals higher skill.</p>
+            <div class="panel-title" style="margin-bottom:8px;">Hire New Staff</div>
           </div>
           <div class="scroll-list" id="talent-market"></div>
         </div>
-        <div id="tab-market" class="section-tab-content">
-          <div class="scroll-list" id="market-list"><p class="text-muted">Start a game to see the market.</p></div>
-        </div>
         <div id="tab-debt" class="section-tab-content">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-            <span class="panel-title">Outstanding Debt</span>
-            <span id="debt-tranche-count" class="text-muted">0/10 tranches</span>
+          <span class="panel-title">Debt Management</span>
+          <div class="scroll-list" id="debt-list"><p class="text-muted">No debt outstanding.</p></div>
+          <div style="margin-top:16px;">
+            <div class="panel-title" style="margin-bottom:8px;">Get Financing</div>
+            <div class="action-group">
+              <div class="action-meta" id="action-borrow-rate">Available: —</div>
+              <div class="input-row input-row-lg" style="margin-bottom:6px;">
+                <span class="input-prefix">$</span>
+                <input type="number" id="input-debt-amount" placeholder="e.g. 50000" min="1000" step="1000">
+                <span class="input-suffix">floor plan</span>
+              </div>
+              <button class="btn btn-primary" id="btn-request-loan">Request Financing</button>
+            </div>
           </div>
-          <div class="scroll-list" id="debt-tranches-list"><p class="text-muted">No debt outstanding.</p></div>
         </div>
-        <div id="tab-capital" class="section-tab-content">
+        <div id="tab-operations" class="section-tab-content">
           <div class="actions-grid">
-            <div class="action-group action-group-debt">
-              <div class="action-group-title">🏦 Issue Debt <span style="color:var(--text-muted);font-weight:600;">— borrow to buy property</span></div>
-              <div class="action-meta" id="action-borrow-rate">Current rate: —</div>
-              <div class="action-meta" id="action-borrow-capacity" style="color:var(--accent);">Capacity: —</div>
-              <div class="input-row input-row-lg" style="margin-bottom:6px;">
+            <div class="action-group">
+              <div class="action-group-title">🎯 Pricing Strategy</div>
+              <div class="input-row input-row-lg">
+                <span class="input-prefix">+</span>
+                <input type="number" id="input-markup" placeholder="e.g. 15" min="5" max="50" step="1">
+                <span class="input-suffix">% markup</span>
+              </div>
+              <button class="btn btn-secondary btn-sm">Apply to All</button>
+            </div>
+            <div class="action-group">
+              <div class="action-group-title">📢 Marketing Budget</div>
+              <div class="input-row input-row-lg">
                 <span class="input-prefix">$</span>
-                <input type="number" id="input-debt-amount" placeholder="e.g. 50" min="1" step="5">
-                <span class="input-suffix">million</span>
+                <input type="number" id="input-marketing" placeholder="e.g. 5000" min="0" step="500">
+                <span class="input-suffix">this month</span>
               </div>
-              <div class="input-row">
-                <select id="input-debt-years" style="flex:1;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px;font-size:13px;">
-                  <option value="1">1 year</option>
-                  <option value="2">2 years</option>
-                  <option value="3">3 years</option>
-                  <option value="5" selected>5 years</option>
-                  <option value="7">7 years</option>
-                  <option value="10">10 years</option>
-                </select>
-                <button class="btn btn-primary" id="btn-issue-debt">Issue Debt</button>
-              </div>
-            </div>
-            <div class="action-group">
-              <div class="action-group-title">💵 Set Quarterly Dividend <span style="color:var(--text-muted);font-weight:600;">— the board watches this</span></div>
-              <div class="dividend-current" id="action-div-current">Current: —</div>
-              <div class="input-row input-row-lg" style="margin-bottom:6px;">
-                <span class="input-prefix">$</span>
-                <input type="number" id="input-dividend" placeholder="new amount per share" min="0" step="0.01">
-                <span class="input-suffix">/share</span>
-                <button class="btn btn-primary btn-sm" id="btn-set-dividend">Set</button>
-              </div>
-              <div class="dividend-quick-row">
-                <span class="dividend-quick-label">Quick raise:</span>
-                <button class="btn btn-quick" id="btn-div-10">+10%</button>
-                <button class="btn btn-quick" id="btn-div-20">+20%</button>
-                <button class="btn btn-quick" id="btn-div-50">+50%</button>
-              </div>
-            </div>
-            <div class="action-group">
-              <div class="action-group-title">📈 Issue Equity <span style="color:var(--text-muted);font-weight:600;">— raise cash, dilutes shares</span></div>
-              <div class="action-meta" id="action-shares-out">Shares outstanding: —</div>
-              <div class="input-row input-row-lg"><input type="number" id="input-equity-shares" placeholder="e.g. 2" min="0.1" step="0.5"><span class="input-suffix">M shares</span><button class="btn btn-primary btn-sm" id="btn-issue-equity">Issue</button></div>
-              <div class="action-meta text-muted" style="margin-top:5px;">Issued at 5% discount. Dilutive.</div>
-            </div>
-            <div class="action-group">
-              <div class="action-group-title">🔁 Share Buyback <span style="color:var(--text-muted);font-weight:600;">— spend cash, fewer shares</span></div>
-              <div class="action-meta" id="action-cash-avail">Cash available: —</div>
-              <div class="input-row input-row-lg"><input type="number" id="input-buyback-shares" placeholder="e.g. 1" min="0.1" step="0.5"><span class="input-suffix">M shares</span><button class="btn btn-primary btn-sm" id="btn-buyback">Buy Back</button></div>
-            </div>
-            <div class="action-group">
-              <div class="action-group-title">📉 Retire Debt Early <span style="color:var(--text-muted);font-weight:600;">— pay off a loan</span></div>
-              <div class="action-meta text-muted">Pick a tranche in the Debt tab to retire it.</div>
-              <div class="action-meta text-yellow" id="action-debt-cooldown"></div>
-            </div>
-            <div class="action-group" id="preferred-redeem-group" style="display:none;">
-              <div class="action-group-title">Preferred Stock</div>
-              <div class="action-meta" id="action-preferred-info">—</div>
-              <div class="input-row"><button class="btn btn-secondary btn-sm" id="btn-redeem-preferred">Redeem Preferred at Par</button></div>
-              <div class="action-meta" style="margin-top:6px;">Redeeming buys back the preferred shares at par value and ends the preferred dividend.</div>
+              <button class="btn btn-primary btn-sm">Spend Now</button>
             </div>
           </div>
         </div>
       </div>
-
       <div class="charts-grid">
-        <div class="chart-wrap chart-wide"><canvas id="chart-debt-maturity"></canvas></div>
-        <div class="chart-wrap"><canvas id="chart-ffo-trend"></canvas></div>
-        <div class="chart-wrap"><canvas id="chart-leverage"></canvas></div>
-        <div class="chart-wrap"><canvas id="chart-noi"></canvas></div>
-        <div class="chart-wrap"><canvas id="chart-portfolio"></canvas></div>
-        <div class="chart-wrap"><canvas id="chart-share-price"></canvas></div>
+        <div class="chart-wrap chart-wide"><canvas id="chart-monthly-revenue"></canvas></div>
+        <div class="chart-wrap"><canvas id="chart-inventory-trend"></canvas></div>
+        <div class="chart-wrap"><canvas id="chart-margin"></canvas></div>
+        <div class="chart-wrap"><canvas id="chart-debt"></canvas></div>
+        <div class="chart-wrap"><canvas id="chart-networth"></canvas></div>
+        <div class="chart-wrap"><canvas id="chart-cash-flow"></canvas></div>
       </div>
     </div>
   </div>
 </div>
 
-<!-- BOARD MEETING OVERLAY -->
-<div id="board-meeting-overlay" class="hidden">
-  <div class="bm-container">
-    <div class="bm-room" style="background-image:url('assets/board/boardroom2.png')">
-      <div class="bm-room-title">BOARD OF DIRECTORS — <span id="bm-year-label"></span></div>
-      <div id="bm-directors-row" class="bm-directors-row"></div>
-    </div>
-    <div class="bm-dialogue">
-      <div class="bm-speaker-info">
-        <span id="bm-speaker-name" class="bm-speaker-name"></span>
-        <span id="bm-speaker-title" class="bm-speaker-title"></span>
-        <span id="bm-mandate-counter" class="bm-mandate-counter"></span>
-      </div>
-      <div class="bm-speech-box">
-        <p id="bm-speech-text" class="bm-speech-text"></p>
-      </div>
-      <div id="bm-response-buttons" class="bm-response-buttons"></div>
-      <div class="bm-footer">
-        <span id="bm-capital-display" class="bm-capital"></span>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- MODAL -->
-<div id="modal-overlay" class="hidden">
-  <div class="modal-box">
-    <div id="modal-title"></div>
-    <div id="modal-body"></div>
-    <div id="modal-actions"></div>
-  </div>
-</div>
-
-<!-- TOAST -->
-<div id="toast-container"></div>
-
-<!-- SCRIPTS -->
 <script src="js/state.js"></script>
-<script src="js/properties.js"></script>
+<script src="js/vehicles.js"></script>
 <script src="js/market.js"></script>
-<script src="js/events.js"></script>
-<script src="js/board.js"></script>
 <script src="js/staff.js"></script>
-<script src="js/decisions.js"></script>
 <script src="js/financials.js"></script>
+<script src="js/events.js"></script>
+<script src="js/debt.js"></script>
 <script src="js/charts.js"></script>
 <script src="js/leaderboard.js"></script>
 <script src="js/news.js"></script>
