@@ -146,12 +146,11 @@ window.Decisions = (function() {
       choices: [
         {
           label:  "💰 Buy with cash — $" + price + "M",
-          detail: "Immediate acquisition at 35% discount.\n" +
-                  "Chen +1.0 | Cash depletes $" + price + "M.\n" +
-                  "COST TYPE: Cash ($" + price + "M immediate)",
+          detail: "Immediate acquisition at 35% discount. Uses your cash on hand.\n" +
+                  "COST TYPE: Cash ($" + price + "M)",
           costType: "cash",
           check: function() { return GameState.balance.cash >= parseFloat(price); },
-          checkMsg: "Insufficient cash.",
+          checkMsg: "Not enough cash — try financing it with debt instead.",
           outcome: function() {
             GameState.balance.cash = fmt(GameState.balance.cash - parseFloat(price));
             prop.purchasePrice = parseFloat(price);
@@ -164,43 +163,43 @@ window.Decisions = (function() {
           }
         },
         {
-          label:  "📉 Buy but reduce dividend to fund it",
-          detail: "Acquire property. Cut dividend 15% to preserve cash.\n" +
-                  "Williams -0.5 | Chen +1.0.\n" +
-                  "COST TYPE: Income (permanent dividend reduction)",
-          costType: "income",
-          check: function() { return GameState.balance.cash >= parseFloat(price) * 0.3; },
-          checkMsg: "Need at least 30% of purchase price in cash.",
+          label:  "🏦 Finance with debt — borrow $" + price + "M",
+          detail: "Take a loan to fund the purchase (subject to your borrowing limits). A CFO lets you exceed the property-backed cap.\n" +
+                  "COST TYPE: New debt + interest",
+          costType: "none",
           outcome: function() {
-            var partCash = fmt(parseFloat(price) * 0.3);
-            GameState.balance.cash = fmt(GameState.balance.cash - partCash);
-            var newDiv = fmt(GameState.company.dividendPerShare * 0.85, 2);
-            Financials.setDividend(newDiv);
+            // Try secured first; if that fails and a CFO exists, try unsecured.
+            var r = Financials.issueDebt(parseFloat(price), 7, false);
+            if (!r.success && typeof Staff !== "undefined" && Staff.hasRole("financial")) {
+              r = Financials.issueDebt(parseFloat(price), 7, true);
+            }
+            if (!r.success) {
+              return "Lenders wouldn't fund the full amount — you're at your borrowing ceiling. The deal fell through.";
+            }
+            // Debt issuance added the cash; now spend it on the property.
+            GameState.balance.cash = fmt(GameState.balance.cash - parseFloat(price));
             prop.purchasePrice = parseFloat(price);
             prop.quarterOwned  = 0;
             GameState.portfolio.push(prop);
             GameState.board.acquisitionsThisYear = (GameState.board.acquisitionsThisYear||0)+1;
             var ch = Board.getDirectorState("chen");
-            if (ch) ch.attitude = Math.min(10, ch.attitude+1.0);
-            var w = Board.getDirectorState("williams");
-            if (w) w.attitude = Math.max(0, w.attitude-0.5);
-            return prop.name + " acquired. Dividend cut to $" + newDiv + "/share to fund it.";
+            if (ch) ch.attitude = Math.min(10, ch.attitude+0.8);
+            return prop.name + " acquired with debt financing for $" + price + "M.";
           }
         },
         {
           label:  "💡 Spend 1 Political Capital — co-investor partner",
-          detail: "Use connections to bring in a silent co-investor.\n" +
-                  "You fund only 50% but get 70% of upside.\n" +
-                  "COST TYPE: 1 Political Capital",
+          detail: "Bring in a silent co-investor. You fund only 50% and own 70%.\n" +
+                  "COST TYPE: 1 Political Capital + half the cash",
           costType: "capital",
           cost: 1,
           check: function() { return GameState.balance.cash >= parseFloat(price) * 0.50; },
-          checkMsg: "Need at least 50% of purchase price in cash.",
+          checkMsg: "Need at least half the price ($" + fmt(parseFloat(price)*0.5,1) + "M) in cash for your share.",
           outcome: function() {
             var halfPrice = fmt(parseFloat(price) * 0.50);
             GameState.balance.cash = fmt(GameState.balance.cash - halfPrice);
             prop.purchasePrice = parseFloat(price);
-            prop.currentValue  = fmt(prop.currentValue * 0.70); // 70% ownership stake
+            prop.currentValue  = fmt(prop.currentValue * 0.70);
             prop.annualNOI     = fmt(prop.annualNOI * 0.70);
             prop.quarterOwned  = 0;
             GameState.portfolio.push(prop);
@@ -208,6 +207,14 @@ window.Decisions = (function() {
             var ch = Board.getDirectorState("chen");
             if (ch) ch.attitude = Math.min(10, ch.attitude+0.7);
             return prop.name + " acquired via co-investment. You own 70% for $" + halfPrice + "M.";
+          }
+        },
+        {
+          label:  "🚶 Pass on it",
+          detail: "Let the opportunity go. No cost.",
+          costType: "none",
+          outcome: function() {
+            return "You passed on " + prop.name + ". Another buyer will snap it up.";
           }
         }
       ]
