@@ -1,592 +1,2094 @@
-/* ============================================================
-   style.css — REIT Simulator Game
-   ============================================================ */
+// ============================================================
+// ui.js — Game interface, rendering, player actions
+// REIT Simulator Game
+// ============================================================
 
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+window.UI = (function() {
 
-:root {
-  --bg:        #0f172a;
-  --surface:   #1e293b;
-  --surface2:  #273449;
-  --border:    #334155;
-  --text:      #f1f5f9;
-  --text-muted:#94a3b8;
-  --green:     #22c55e;
-  --yellow:    #f59e0b;
-  --red:       #ef4444;
-  --blue:      #3b82f6;
-  --purple:    #8b5cf6;
-  --teal:      #14b8a6;
-  --orange:    #f97316;
-  --radius:    8px;
-  --radius-sm: 4px;
-  --shadow:    0 4px 24px rgba(0,0,0,0.4);
-}
+  function fmt(n, d) {
+    if (d === undefined) d = 2;
+    if (n === null || n === undefined || isNaN(n)) return "—";
+    return Number(n).toFixed(d);
+  }
+  function fmtM(n)   { return "$" + fmt(n, 1) + "M"; }
+  function fmtPct(n) { return fmt(n * 100, 1) + "%"; }
+  function fmtPS(n)  { return "$" + fmt(n, 2); }
+  function el(id)    { return document.getElementById(id); }
+  function setText(id, val) { var e = el(id); if (e) e.textContent = val; }
 
-html, body { height: 100%; background: var(--bg); color: var(--text); font-family: 'Inter','Segoe UI',system-ui,sans-serif; font-size: 14px; line-height: 1.5; overflow-x: hidden; }
+  // ----------------------------------------------------------
+  // MODAL
+  // ----------------------------------------------------------
+  function showModal(title, body, actions) {
+    if (!actions) actions = [];
+    var overlay = el("modal-overlay");
+    if (!overlay) return;
+    el("modal-title").textContent = title;
+    el("modal-body").innerHTML = body.replace(/\n/g, "<br>");
+    el("modal-actions").innerHTML = "";
+    actions.forEach(function(a) {
+      var btn = document.createElement("button");
+      btn.textContent = a.label;
+      btn.className = "btn " + (a.style || "btn-secondary");
+      btn.onclick = function() { a.onClick(); closeModal(); };
+      el("modal-actions").appendChild(btn);
+    });
+    var closeBtn = document.createElement("button");
+    closeBtn.textContent = "Close";
+    closeBtn.className = "btn btn-secondary";
+    closeBtn.onclick = closeModal;
+    el("modal-actions").appendChild(closeBtn);
+    overlay.classList.remove("hidden");
+  }
 
-.text-green  { color: var(--green)  !important; }
-.text-yellow { color: var(--yellow) !important; }
-.text-red    { color: var(--red)    !important; }
-.text-blue   { color: var(--blue)   !important; }
-.text-muted  { color: var(--text-muted) !important; }
+  function closeModal() {
+    var o = el("modal-overlay");
+    if (o) o.classList.add("hidden");
+  }
 
-/* BUTTONS */
-.btn { display:inline-flex; align-items:center; justify-content:center; padding:7px 14px; border-radius:var(--radius-sm); font-size:13px; font-weight:600; border:none; cursor:pointer; transition:opacity .15s,transform .1s; white-space:nowrap; }
-.btn:hover:not(:disabled) { opacity:.85; }
-.btn:active:not(:disabled) { transform:scale(.98); }
-.btn:disabled { opacity:.35; cursor:not-allowed; }
-.btn-primary   { background:var(--blue);    color:#fff; }
-.btn-danger    { background:var(--red);     color:#fff; }
-.btn-success   { background:var(--green);   color:#000; }
-.btn-secondary { background:var(--surface2);color:var(--text);border:1px solid var(--border); }
-.btn-sm  { padding:4px 10px; font-size:12px; }
-.btn-lg  { padding:12px 28px; font-size:16px; }
+  // ----------------------------------------------------------
+  // JENKINS TUTORIAL — Year 1 quarterly guidance (optional)
+  // ----------------------------------------------------------
+  var TUTORIAL_SCRIPT = {
+    "1-1": [
+      {
+        title: "Jenkins — Step 1: Borrow",
+        body: "Welcome aboard, boss. Let's get to work — first we need cash to grow.<br><br>" +
+              "Open <strong>💰 Capital Actions → Issue Debt</strong>. Issue <strong>$50M</strong> and choose a <strong>10-year</strong> term — rates are low right now, so locking in long is to our advantage."
+      },
+      {
+        title: "Jenkins — Step 2: Raise a Little Equity",
+        body: "While you're in <strong>Capital Actions</strong>, raise a bit more by selling shares. Under <strong>Issue Equity</strong>, issue about <strong>2M shares</strong>.<br><br>" +
+              "But don't make a habit of it — selling shares dilutes the owners, and <strong>Director Petrova</strong> hates dilution. Use it sparingly."
+      }
+    ],
+    "1-2": [
+      {
+        title: "Jenkins — Step 3: Buy a Building",
+        body: "Now put that cash to work. Open the <strong>Property Market</strong> tab and buy a property.<br><br>" +
+              "Check the <strong>cap rate</strong> — higher means more income for the price. Just know the cheapest, highest-yielding ones are usually the riskiest. Buy one or two, then hit <strong>Advance Quarter</strong>."
+      }
+    ],
+    "1-3": [
+      {
+        title: "Jenkins — Step 4: Hire a CFO",
+        body: "You're running a real company now — build a team. Open the <strong>Staff</strong> tab and hire a <strong>CFO</strong>.<br><br>" +
+              "A CFO unlocks <strong>unsecured loans</strong> — borrowing beyond what our properties alone allow, a lifeline when money's tight. Later you can hire others: an Asset Manager to lift occupancy, an Acquisitions Lead for better deals. Each hire earns their keep."
+      }
+    ],
+    "1-4": [
+      {
+        title: "Jenkins — The Board",
+        body: "Last thing, boss. From next year the <strong>board votes</strong> on whether you keep your job. Five directors, each wants one thing — and <strong>Chairman Williams</strong> matters most. He wants a <strong>rising dividend</strong> every year.<br><br>" +
+              "Strong results earn <strong>political capital</strong> you can spend to win board fights or handle tough events. Keep them happy and survive 15 years — that's the whole game."
+      }
+    ],
+  };
 
-/* LAYOUT */
-#app { display:flex; flex-direction:column; min-height:100vh; }
+  function maybeShowTutorial() {
+    if (!GameState._tutorialEnabled) return false;
+    if (GameState.meta.year !== 1) return false;
+    var key = GameState.meta.year + "-" + GameState.meta.quarter;
+    var entry = TUTORIAL_SCRIPT[key];
+    if (!entry) return false;
+    if (GameState._tutorialShown && GameState._tutorialShown[key]) return false;
+    GameState._tutorialShown = GameState._tutorialShown || {};
+    GameState._tutorialShown[key] = true;
+    var steps = Array.isArray(entry) ? entry : [entry];
+    showJenkinsSequence(steps, 0);
+    return true;
+  }
 
-/* HEADER */
-#header { background:var(--surface); border-bottom:1px solid var(--border); padding:12px 20px; position:sticky; top:0; z-index:100; }
-.header-top { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
-.header-company { font-size:18px; font-weight:700; }
-.header-stats { display:flex; gap:16px; flex-wrap:wrap; align-items:center; }
-.hdr-stat { display:flex; flex-direction:column; align-items:center; }
-.hdr-stat-label { font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.5px; }
-.hdr-stat-value { font-size:15px; font-weight:600; font-family:monospace; }
-.board-pressure-wrap { margin-top:8px; display:flex; align-items:center; gap:10px; }
-#board-pressure-label { font-size:11px; color:var(--text-muted); min-width:280px; }
-.pressure-track { flex:1; height:6px; background:var(--surface2); border-radius:3px; overflow:hidden; max-width:300px; }
-#board-pressure-bar { height:100%; border-radius:3px; transition:width .5s ease,background .5s ease; }
+  // Show a chain of Jenkins popups one after another (each "Got it" advances).
+  function showJenkinsSequence(steps, i) {
+    if (i >= steps.length) return;
+    var step = steps[i];
+    var moreLabel = (i < steps.length - 1) ? "Next" : "Got it";
+    showJenkinsPopup(step.title, step.body, moreLabel, function() {
+      showJenkinsSequence(steps, i + 1);
+    });
+  }
 
-/* MAIN */
-#main { flex:1; display:grid; grid-template-columns:320px 1fr; gap:16px; max-width:1600px; width:100%; margin:0 auto; padding:16px; }
-#sidebar { display:flex; flex-direction:column; gap:14px; }
-#content { display:flex; flex-direction:column; gap:14px; }
+  // Jenkins portrait popup (tutorial + advisories)
+  function showJenkinsPopup(title, body, btnLabel, onClose) {
+    var overlay = el("modal-overlay");
+    if (!overlay) return;
+    el("modal-title").textContent = title;
+    el("modal-body").innerHTML =
+      '<div style="display:flex;gap:12px;align-items:flex-start;">' +
+        '<img src="assets/board/jenkins.png" style="width:64px;height:64px;border-radius:8px;flex-shrink:0;image-rendering:pixelated;" alt="Jenkins">' +
+        '<div style="font-size:13px;line-height:1.6;">' + body + '</div>' +
+      '</div>';
+    el("modal-actions").innerHTML = "";
+    var btn = document.createElement("button");
+    btn.textContent = btnLabel || "Got it";
+    btn.className = "btn btn-primary";
+    btn.onclick = function() {
+      closeModal();
+      if (typeof onClose === "function") setTimeout(onClose, 250);
+    };
+    el("modal-actions").appendChild(btn);
+    overlay.classList.remove("hidden");
+  }
 
-/* PANELS */
-.panel { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; }
-.panel-header { display:flex; align-items:center; justify-content:space-between; padding:10px 14px; border-bottom:1px solid var(--border); background:var(--surface2); }
-.panel-title { font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.8px; color:var(--text-muted); }
-.panel-body { padding:12px 14px; }
+  // ----------------------------------------------------------
+  // TOAST
+  // ----------------------------------------------------------
+  function showToast(message, type) {
+    if (!type) type = "info";
+    var container = el("toast-container");
+    if (!container) return;
+    var toast = document.createElement("div");
+    toast.className = "toast toast-" + type;
+    toast.textContent = message;
+    container.appendChild(toast);
+    setTimeout(function() { toast.classList.add("toast-visible"); }, 10);
+    setTimeout(function() {
+      toast.classList.remove("toast-visible");
+      setTimeout(function() { if (toast.parentNode) toast.remove(); }, 400);
+    }, 3500);
+  }
 
-/* P&L */
-.pnl-table { width:100%; border-collapse:collapse; font-family:monospace; font-size:13px; }
-.pnl-table tr td { padding:3px 0; }
-.pnl-table td:last-child { text-align:right; font-weight:600; }
-.pnl-divider td { border-top:1px solid var(--border); padding-top:5px; }
-.pnl-subtotal td { font-weight:700; }
-.pnl-total td { font-weight:700; font-size:14px; border-top:2px solid var(--border); padding-top:6px; }
-.pnl-indent { padding-left:14px !important; color:var(--text-muted); }
+  // ----------------------------------------------------------
+  // RENDER FUNCTIONS
+  // ----------------------------------------------------------
+  function renderHeader() {
+    setText("hdr-company",   GameState.company.name);
+    setText("hdr-period",    GameState.currentPeriodLabel());
+    setText("hdr-price",     fmtPS(GameState.company.sharePrice));
+    setText("hdr-marketcap", fmtM(GameState.company.marketCap));
+    setText("hdr-rating",    GameState.credit.rating);
+    setText("hdr-cycle",     GameState.market.cycle.charAt(0).toUpperCase() + GameState.market.cycle.slice(1));
+    setText("hdr-rate",      fmt(GameState.market.baseInterestRate, 2) + "%");
+    setText("hdr-borrow",    fmt(GameState.market.baseInterestRate + GameState.credit.spread, 2) + "%");
+    var pct = GameState.board.pressurePoints / GameState.board.maxPressure;
+    var bar = el("board-pressure-bar");
+    var lbl = el("board-pressure-label");
+    if (bar) {
+      bar.style.width = Math.min(100, pct * 100) + "%";
+      bar.style.background = pct > 0.75 ? "#ef4444" : pct > 0.50 ? "#f59e0b" : "#22c55e";
+    }
+    if (lbl) {
+      var tag = GameState.meta.tutorialYear ? " [ORIENTATION — Safe]" : "";
+      lbl.textContent = "Board: " + GameState.board.mood.toUpperCase() + tag + " — " + GameState.board.pressurePoints + "/" + GameState.board.maxPressure + " pressure points";
+    }
+  }
 
-/* RATIOS */
-.ratios-grid { display:grid; grid-template-columns:1fr 1fr; gap:4px 12px; }
-.ratio-row { display:flex; justify-content:space-between; align-items:center; padding:3px 0; border-bottom:1px solid rgba(51,65,85,.4); }
-.ratio-label { font-size:11px; color:var(--text-muted); }
-.ratio-value { font-family:monospace; font-size:13px; font-weight:600; }
+  function renderPnL() {
+    var p = GameState.pnl;
+    setText("pnl-gpr",       fmtM(p.grossPotentialRent));
+    setText("pnl-vacancy",   "(" + fmtM(p.vacancyLoss) + ")");
+    setText("pnl-opex",      "(" + fmtM(p.operatingExpenses) + ")");
+    setText("pnl-noi",       fmtM(p.noi));
+    setText("pnl-ga",        "(" + fmtM(p.gAndA) + ")");
+    setText("pnl-interest",  "(" + fmtM(p.interestExpense) + ")");
+    setText("pnl-depr",      "(" + fmtM(p.depreciation) + ")");
+    setText("pnl-unusual",   fmtM(p.unusualItems));
+    setText("pnl-netincome", fmtM(p.netIncome));
+    setText("pnl-ffo",       fmtM(p.ffo));
+    setText("pnl-affo",      fmtM(p.affo));
+    setText("pnl-prefdiv",   p.preferredDiv > 0 ? "(" + fmtM(p.preferredDiv) + ")" : "—");
+    setText("pnl-divpaid",   "(" + fmtM(p.dividendsPaid) + ")");
+    setText("pnl-retained",  fmtM(p.retainedCash));
+    var retEl = el("pnl-retained");
+    if (retEl) retEl.className = p.retainedCash >= 0 ? "text-green" : "text-red";
+    var niEl = el("pnl-netincome");
+    if (niEl) niEl.className = p.netIncome >= 0 ? "text-green" : "text-yellow";
+  }
 
-/* BALANCE SHEET */
-.bs-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
-.bs-item { display:flex; flex-direction:column; }
-.bs-label { font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.4px; }
-.bs-value { font-family:monospace; font-size:15px; font-weight:700; }
+  function renderRatios() {
+    var r = GameState.ratios;
+    function sr(id, val, good, bad) {
+      var e = el(id);
+      if (!e) return;
+      e.textContent = val;
+      if (good !== undefined) e.className = good ? "text-green" : bad ? "text-red" : "text-yellow";
+    }
+    sr("ratio-ffo-ps",     fmtPS(r.ffoPerShare));
+    sr("ratio-affo-ps",    fmtPS(r.affoPerShare));
+    sr("ratio-div-cov",    r.dividendCoverage === null ? "N/A" : fmt(r.dividendCoverage, 2) + "x",  r.dividendCoverage !== null && r.dividendCoverage >= 1.2,    r.dividendCoverage !== null && r.dividendCoverage < 1.0);
+    sr("ratio-payout",     r.payoutRatio === null ? "N/A" : fmtPct(r.payoutRatio),             r.payoutRatio !== null && r.payoutRatio < 0.85,         r.payoutRatio !== null && r.payoutRatio > 1.0);
+    sr("ratio-d2a",        r.debtToAssets === null ? "N/A" : fmtPct(r.debtToAssets),            r.debtToAssets !== null && r.debtToAssets < 0.40,        r.debtToAssets !== null && r.debtToAssets > 0.60);
+    sr("ratio-d2e",        r.debtToEbitda === null ? "N/A" : fmt(r.debtToEbitda, 1) + "x",      r.debtToEbitda !== null && r.debtToEbitda < 5,           r.debtToEbitda !== null && r.debtToEbitda > 8);
+    sr("ratio-int-cov",    r.interestCoverage >= 99 ? "N/A" : fmt(r.interestCoverage, 1) + "x",  r.interestCoverage >= 2.5,    r.interestCoverage < 1.5);
+    sr("ratio-occ",        fmtPct(r.occupancyPortfolio),      r.occupancyPortfolio >= 0.92, r.occupancyPortfolio < 0.80);
+    sr("ratio-noi-margin", fmtPct(r.noiMargin),               r.noiMargin >= 0.45,          r.noiMargin < 0.30);
+    sr("ratio-cap-rate",   fmt(r.impliedCapRate, 2) + "%");
+    sr("ratio-nav",        fmtPS(r.navPerShare));
+    sr("ratio-pffo",       r.pToFFO === null ? "N/A" : fmt(r.pToFFO, 1) + "x");
+    sr("ratio-paffo",      r.pToAFFO === null ? "N/A" : fmt(r.pToAFFO, 1) + "x");
+    sr("ratio-div-yield",  fmt(r.dividendYield, 2) + "%",     r.dividendYield > 4,          r.dividendYield < 2);
+  }
 
-/* DEBT */
-.tranche-row { display:flex; align-items:center; justify-content:space-between; padding:8px 10px; border-radius:var(--radius-sm); margin-bottom:6px; border-left:3px solid transparent; }
-.tranche-green  { background:rgba(34,197,94,.08);  border-color:var(--green); }
-.tranche-yellow { background:rgba(245,158,11,.08); border-color:var(--yellow); }
-.tranche-red    { background:rgba(239,68,68,.08);  border-color:var(--red); }
-.tranche-info { display:flex; flex-direction:column; }
-.tranche-label { font-size:12px; font-weight:600; }
-.tranche-meta { font-size:11px; color:var(--text-muted); font-family:monospace; }
+  function renderBalanceSheet() {
+    var b = GameState.balance;
+    setText("bs-cash",   fmtM(b.cash));
+    setText("bs-assets", fmtM(b.totalAssets));
+    setText("bs-debt",   fmtM(b.totalDebt));
+    var prefEl = el("bs-preferred");
+    if (prefEl) {
+      var prefRow = prefEl.closest ? prefEl.closest(".bs-item") : null;
+      if ((b.preferredEquity || 0) > 0) {
+        setText("bs-preferred", fmtM(b.preferredEquity));
+        if (prefRow) prefRow.style.display = "";
+      } else {
+        if (prefRow) prefRow.style.display = "none";
+      }
+    }
+    setText("bs-equity", fmtM(b.totalEquity));
+    setText("bs-shares", fmt(GameState.company.sharesOutstanding, 1) + "M");
+    setText("bs-divps",  fmtPS(GameState.company.dividendPerShare));
+    var cashEl = el("bs-cash");
+    if (cashEl) {
+      if (b.cash < 0)  cashEl.className = "text-red";
+      else if (b.cash < 10) cashEl.className = "text-red";
+      else if (b.cash < 25) cashEl.className = "text-yellow";
+      else cashEl.className = "text-green";
+      // Show overdraft warning
+      if (b.cash < 0) {
+        cashEl.textContent = fmtM(b.cash) + " ⚠ OVERDRAFT";
+      }
+    }
+  }
 
-/* PROPERTIES */
-.property-card { background:var(--surface2); border:1px solid var(--border); border-radius:var(--radius-sm); padding:10px 12px; margin-bottom:8px; transition:border-color .2s; }
+  function renderDebtPanel() {
+    var container = el("debt-tranches-list");
+    if (!container) return;
+    if (GameState.debtTranches.length === 0) {
+      container.innerHTML = '<p class="text-muted">No debt outstanding.</p>';
+      return;
+    }
+    var html = "";
+    GameState.debtTranches.forEach(function(t) {
+      var u = t.quartersUntilMaturity <= 3 ? "tranche-red" : t.quartersUntilMaturity <= 7 ? "tranche-yellow" : "tranche-green";
+      html += '<div class="tranche-row ' + u + '">' +
+        '<div class="tranche-info">' +
+        '<span class="tranche-label">' + t.label + '</span>' +
+        '<span class="tranche-meta">' + t.quartersUntilMaturity + 'q · ' + t.rate + '% · $' + fmt(t.amount, 1) + 'M</span>' +
+        '</div><div class="tranche-actions">' +
+        '<button class="btn btn-sm btn-danger" onclick="UI.confirmRetireDebt(\'' + t.id + '\')">Call</button>' +
+        '</div></div>';
+    });
+    container.innerHTML = html;
+    var countEl = el("debt-tranche-count");
+    if (countEl) {
+      var c = GameState.debtTranches.length;
+      countEl.textContent = c + "/10 tranches";
+      countEl.className = c >= 9 ? "text-red" : c >= 7 ? "text-yellow" : "text-green";
+    }
+  }
 
-/* Celestial Heights under-construction card */
-.tower-construction {
-  border:2px dashed var(--orange);
-  background:linear-gradient(135deg, rgba(249,115,22,0.10), var(--surface2));
-}
-.tower-tag {
-  background:var(--orange);
-  color:#1a1a1a;
-  font-size:10px;
-  font-weight:800;
-  letter-spacing:1px;
-  padding:3px 10px;
-  border-radius:4px;
-  margin-left:auto;
-}
-.tower-drain {
-  color:var(--red);
-  font-size:14px;
-  margin:6px 0;
-  font-weight:600;
-}
-.property-card:hover { border-color:var(--blue); }
-.prop-unaffordable { opacity:.55; }
-.prop-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; }
-.prop-name { font-weight:600; font-size:13px; }
-.prop-tag { font-size:10px; padding:2px 7px; border-radius:10px; font-weight:600; text-transform:capitalize; }
-.tag-office      { background:rgba(59,130,246,.2);  color:#93c5fd; }
-.tag-industrial  { background:rgba(245,158,11,.2);  color:#fcd34d; }
-.tag-multifamily { background:rgba(34,197,94,.2);   color:#86efac; }
-.tag-retail      { background:rgba(239,68,68,.2);   color:#fca5a5; }
-.prop-stats { display:grid; grid-template-columns:1fr 1fr; gap:3px 12px; margin-bottom:8px; font-size:12px; color:var(--text-muted); }
-.prop-stats strong { color:var(--text); }
-.prop-actions { display:flex; justify-content:flex-end; }
+  // BOARD ATTITUDES PANEL
+  // NEWS TERMINAL (legacy element removed — feed now merged into the quarter report)
+  function renderNews() {
+    var feed = el("news-feed");
+    if (!feed) return; // panel removed; actions now render inside the quarter report
+    var items = (typeof News !== "undefined" && News.getFeed) ? News.getFeed() : [];
+    if (items.length === 0) {
+      feed.innerHTML = '<p class="text-muted" style="font-size:11px">No headlines yet.</p>';
+      return;
+    }
+    var catColor = {
+      capital:"news-capital", debt:"news-debt", dividend:"news-dividend",
+      rating:"news-rating", market:"news-market", board:"news-board",
+      property:"news-property", staff:"news-staff", ambient:"news-ambient"
+    };
+    var html = "";
+    items.slice(0, 30).forEach(function(it) {
+      var cls = catColor[it.category] || "news-market";
+      html += '<div class="news-item">' +
+        '<span class="news-period">Y' + it.year + 'Q' + it.quarter + '</span>' +
+        '<span class="news-dot ' + cls + '">●</span>' +
+        '<span class="news-text">' + it.text + '</span>' +
+        '</div>';
+    });
+    feed.innerHTML = html;
+  }
 
-/* CHARTS */
-.charts-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
-.chart-wrap { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:14px; }
-.chart-wrap canvas { display:block; width:100%; height:200px; }
-.chart-wrap.chart-wide { grid-column:span 2; }
+  // STAFF ROSTER + TALENT MARKET
+  function renderStaff() {
+    var roster = el("staff-roster");
+    var market = el("talent-market");
+    if (!roster || !market) return;
 
-/* EARNINGS REPORT */
-#earnings-report { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:16px 18px; }
-.report-header h3 { font-size:16px; font-weight:700; margin-bottom:10px; }
-.report-body p { color:var(--text-muted); line-height:1.7; margin-bottom:12px; font-size:13px; }
-.events-list { display:flex; flex-direction:column; gap:8px; margin-bottom:12px; }
-.event-item { background:var(--surface2); border-radius:var(--radius-sm); padding:10px 12px; border-left:3px solid var(--yellow); }
-.event-item strong { display:block; margin-bottom:4px; font-size:13px; }
-.event-item p { font-size:12px; color:var(--text-muted); margin-bottom:4px; }
-.event-impact { font-size:11px; font-family:monospace; color:var(--orange); font-weight:600; }
-.pressure-changes { display:flex; flex-direction:column; gap:4px; margin-top:8px; }
-.pressure-item { padding:5px 10px; border-radius:var(--radius-sm); font-size:12px; }
-.pressure-bad  { background:rgba(239,68,68,.1);  color:var(--red); }
-.pressure-good { background:rgba(34,197,94,.1);  color:var(--green); }
-.pressure-warn { background:rgba(245,158,11,.1); color:var(--yellow); }
-.goals-panel { background:var(--surface2); border-radius:var(--radius-sm); padding:10px 12px; margin-top:10px; border-left:3px solid var(--blue); }
-.goals-title { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--text-muted); margin-bottom:6px; }
-.goal-item { font-size:12px; color:var(--text-muted); padding:2px 0; }
+    // Roster of hired staff — court-style cards with portrait
+    var rh = "";
+    GameState.staff.forEach(function(s) {
+      var traitClass = Staff.traitColor(s);
+      var traitTxt   = Staff.traitLabel(s);
+      var traitDesc  = Staff.traitDesc(s);
+      rh += '<div class="staff-row">' +
+        '<img class="staff-portrait" src="assets/staff/' + (s.portrait || "port1.png") + '" alt="' + s.name + '">' +
+        '<div class="staff-info">' +
+          '<div class="staff-name-row"><span class="staff-name">' + s.name + '</span><span class="staff-stars">' + (s.stars || "") + '</span></div>' +
+          '<div class="staff-title">' + s.title + '</div>' +
+          '<div class="staff-trait ' + traitClass + '">' + traitTxt + (traitDesc ? ' — <span class="text-muted">' + traitDesc + '</span>' : '') + '</div>' +
+        '</div>' +
+        '<div class="staff-right">' +
+          '<div class="staff-cost">$' + fmt(s.salary, 2) + 'M/q</div>' +
+          '<button class="btn btn-sm btn-danger" onclick="UI.fireStaff(\'' + s.roleId + '\')">Fire</button>' +
+        '</div>' +
+        '</div>';
+    });
 
-/* CAPITAL ACTIONS */
-.actions-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; padding:14px; }
-.action-group { background:var(--surface2); border-radius:var(--radius-sm); padding:12px; }
-.action-group-title { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--text-muted); margin-bottom:8px; }
+    // Chief Placemaking Officer — Williams' affiliate, cannot be fired
+    if (GameState.placemaking && GameState.placemaking.active) {
+      var pmTrait = GameState.placemaking.traitActive
+        ? '<div class="staff-trait text-red">"Synergy Initiatives" — <span class="text-muted">inflates G&amp;A by 10%</span></div>'
+        : '<div class="staff-trait text-muted">Assessing impact… (vague)</div>';
+      rh += '<div class="staff-row" style="border-left:2px solid #b45309;">' +
+        '<img class="staff-portrait" src="assets/staff/port16.png" alt="Reginald Thorne-Whitley">' +
+        '<div class="staff-info">' +
+          '<div class="staff-name-row"><span class="staff-name">Reginald Thorne-Whitley</span></div>' +
+          '<div class="staff-title">Chief Placemaking Officer</div>' +
+          pmTrait +
+        '</div>' +
+        '<div class="staff-right">' +
+          '<div class="staff-cost">$' + fmt(GameState.placemaking.cost, 2) + 'M/q</div>' +
+          '<span class="text-muted" style="font-size:10px;font-style:italic;">Cannot be fired</span>' +
+        '</div>' +
+        '</div>';
+      // Janice Ling — Owner Relations (Y8), also unfireable
+      if (GameState.placemaking.ownerRelations) {
+        rh += '<div class="staff-row" style="border-left:2px solid #b45309;">' +
+          '<img class="staff-portrait" src="assets/staff/port17.png" alt="Janice Ling">' +
+          '<div class="staff-info">' +
+            '<div class="staff-name-row"><span class="staff-name">Janice Ling</span></div>' +
+            '<div class="staff-title">Head of Owner Relations</div>' +
+            '<div class="staff-trait text-muted">Builds "stakeholder bridges." Unclear what that means.</div>' +
+          '</div>' +
+          '<div class="staff-right">' +
+            '<div class="staff-cost">$' + fmt(GameState.placemaking.ownerRelationsCost, 2) + 'M/q</div>' +
+            '<span class="text-muted" style="font-size:10px;font-style:italic;">Cannot be fired</span>' +
+          '</div>' +
+          '</div>';
+      }
+    }
 
-/* Debt group keeps a subtle blue highlight; dividend matches the rest */
-.action-group-debt { border:1px solid var(--blue); }
+    if (rh === "") {
+      roster.innerHTML = '<p class="text-muted" style="font-size:12px">No staff hired yet. Browse the talent market below.</p>';
+    } else {
+      roster.innerHTML = rh;
+    }
 
-/* Input unit labels so the player always knows what to type */
-.input-prefix, .input-suffix { color:var(--text-muted); font-size:14px; font-weight:600; white-space:nowrap; }
-.input-prefix { margin-right:-2px; }
-.input-row-lg input { font-size:16px !important; padding:10px 10px !important; font-weight:600; }
-.input-row-lg { background:var(--bg); border:1px solid var(--border); border-radius:var(--radius-sm); padding:2px 8px; }
-.input-row-lg input { background:transparent !important; border:none !important; }
+    // Talent market — grouped by role, 3 candidates each
+    var tm = GameState._talentMarket || [];
+    var header = el("talent-market-header");
+    if (tm.length === 0) {
+      if (header) header.style.display = "none";
+      var allFilled = Object.keys(Staff.ROLES).every(function(r) { return Staff.isRoleFilled(r); });
+      market.innerHTML = allFilled
+        ? '<p class="text-muted" style="font-size:12px">✓ Your executive team is complete — every role is filled. Fire someone to open a search, or new candidates appear next year for any vacancy.</p>'
+        : '<p class="text-muted" style="font-size:12px">No candidates available. New ones appear next year.</p>';
+      return;
+    }
+    if (header) header.style.display = "";
+    // Group candidates by role, preserving global index for hire()
+    var byRole = {};
+    tm.forEach(function(c, i) {
+      (byRole[c.roleId] = byRole[c.roleId] || []).push({ c: c, i: i });
+    });
+    var mh = "";
+    Object.keys(byRole).forEach(function(roleId) {
+      var role = Staff.ROLES[roleId];
+      mh += '<div class="talent-role-header">' + role.title + ' <span class="text-muted">— ' + role.unlocks + '</span></div>';
+      byRole[roleId].forEach(function(entry) {
+        var c = entry.c, i = entry.i;
+        mh += '<div class="candidate-card">' +
+          '<img class="candidate-portrait" src="assets/staff/' + (c.portrait || "port1.png") + '" alt="' + c.name + '">' +
+          '<div class="candidate-body">' +
+            '<div class="candidate-head">' +
+              '<span class="candidate-title">' + c.name + ' <span class="staff-stars">' + (c.stars || "") + '</span></span>' +
+              '<span class="candidate-salary">$' + fmt(c.salary, 2) + 'M/q</span>' +
+            '</div>' +
+            '<div class="candidate-hint">"' + c.hint + '"</div>' +
+            '<button class="btn btn-sm btn-primary" onclick="UI.hireStaff(' + i + ')">Hire — $' + fmt(c.salary,2) + 'M/q</button>' +
+          '</div>' +
+          '</div>';
+      });
+    });
+    market.innerHTML = mh;
+  }
 
-/* Current dividend — shown prominently like a headline figure */
-.dividend-current { font-size:18px; font-weight:700; color:var(--text); margin-bottom:8px; }
+  function hireStaff(marketIndex) {
+    var tm = GameState._talentMarket || [];
+    var candidate = tm[marketIndex];
+    if (!candidate) return;
+    var r = Staff.hire(candidate);
+    showToast(r.message, r.success ? "success" : "error");
+    if (r.success) renderAll();
+  }
 
-/* Dividend quick-raise — small, muted, secondary */
-.dividend-quick-row { display:flex; gap:6px; align-items:center; margin-top:6px; }
-.dividend-quick-label { font-size:11px; color:var(--text-muted); margin-right:2px; }
-.btn-quick {
-  padding:4px 10px;
-  font-size:11px;
-  font-weight:600;
-  background:var(--surface);
-  color:var(--text-muted);
-  border:1px solid var(--border);
-  border-radius:var(--radius-sm);
-  cursor:pointer;
-  transition:all .15s;
-}
-.btn-quick:hover { background:var(--surface2); color:var(--text); border-color:var(--blue); }
-.action-meta { font-size:11px; color:var(--text-muted); margin-bottom:8px; font-family:monospace; }
-.input-row { display:flex; gap:6px; align-items:center; }
-input[type="number"],input[type="text"] { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-sm); color:var(--text); padding:6px 10px; font-size:13px; font-family:monospace; width:100%; outline:none; transition:border-color .2s; }
-input:focus { border-color:var(--blue); }
-input::placeholder { color:var(--text-muted); }
+  function fireStaff(roleId) {
+    var s = Staff.getStaff(roleId);
+    if (!s) return;
+    showModal("Dismiss " + s.name + "?",
+      "Role: " + s.title + "\n" +
+      "Severance: $" + fmt(s.salary, 2) + "M (one quarter)\n\n" +
+      "WARNING: Firing removes all functions this role unlocks. " +
+      "Any in-progress benefits will stop.",
+      [{ label: "Confirm Dismissal", style: "btn-danger", onClick: function() {
+        var r = Staff.fire(roleId);
+        showToast(r.message, r.success ? "success" : "error");
+        if (r.success) renderAll();
+      }}]);
+  }
 
-/* TABS */
-.section-tabs { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; }
-.section-tab-bar { display:flex; gap:4px; border-bottom:2px solid var(--border); background:var(--surface2); padding:6px 6px 0 6px; flex-wrap:wrap; }
-.section-tab-btn {
-  padding:12px 20px;
-  border:1px solid var(--border);
-  border-bottom:none;
-  background:var(--bg);
-  color:var(--text-muted);
-  font-size:13px;
-  font-weight:600;
-  cursor:pointer;
-  border-radius:8px 8px 0 0;
-  transition:all .15s;
-  position:relative;
-  top:2px;
-}
-.section-tab-btn:hover { background:var(--surface); color:var(--text); top:0; }
-.section-tab-btn.active {
-  color:#fff;
-  background:var(--blue);
-  border-color:var(--blue);
-  top:0;
-}
-/* Capital Actions tab stands out — it's the most important */
-.section-tab-btn.tab-emphasis {
-  background:linear-gradient(135deg, var(--surface), var(--surface2));
-  border-color:var(--yellow);
-  color:var(--yellow);
-}
-.section-tab-btn.tab-emphasis.active {
-  background:var(--yellow);
-  color:#1a1a1a;
-  border-color:var(--yellow);
-}
-.section-tab-content { display:none; padding:14px; }
-.section-tab-content.active { display:block; }
-.scroll-list { max-height:420px; overflow-y:auto; padding-right:4px; }
-.scroll-list::-webkit-scrollbar { width:4px; }
-.scroll-list::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
+  function renderBoardAttitudes() {
+    var container = el("board-attitudes-list");
+    var capEl     = el("ba-capital-display");
+    if (!container) return;
 
-/* ADVANCE BUTTON */
-#btn-advance-quarter { width:100%; padding:14px; font-size:15px; font-weight:700; background:linear-gradient(135deg,#1d4ed8,#3b82f6); color:#fff; border-radius:var(--radius); border:none; cursor:pointer; letter-spacing:.3px; box-shadow:0 4px 14px rgba(59,130,246,.3); transition:box-shadow .2s,transform .1s; }
-#btn-advance-quarter:hover { box-shadow:0 6px 20px rgba(59,130,246,.45); }
-#btn-advance-quarter:active { transform:scale(.99); }
+    var directors = GameState.board.directors;
+    if (!directors || directors.length === 0) {
+      container.innerHTML = '<p class="text-muted" style="font-size:11px">Start game to see board.</p>';
+      return;
+    }
 
-/* MODAL */
-#modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.7); z-index:1000; display:flex; align-items:center; justify-content:center; padding:20px; backdrop-filter:blur(4px); }
-#modal-overlay.hidden { display:none; }
-.modal-box { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:24px; max-width:480px; width:100%; box-shadow:var(--shadow); }
-#modal-title { font-size:17px; font-weight:700; margin-bottom:14px; }
-#modal-body { font-size:13px; color:var(--text-muted); line-height:1.7; margin-bottom:18px; font-family:monospace; }
-#modal-actions { display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap; }
+    var names = { williams:"Williams", chen:"Chen", okafor:"Okafor", petrova:"Petrova", hassan:"Hassan" };
+    var focus = {
+      williams:"Dividends",
+      chen:"Growth & FFO",
+      okafor:"Leverage & Risk",
+      petrova:"Share Price",
+      hassan:"Occupancy"
+    };
+    var html = "";
+    directors.forEach(function(d) {
+      var att      = Math.round(d.attitude * 10) / 10;
+      var pct      = (d.attitude / 10) * 100;
+      var color    = d.attitude < 3 ? "#ef4444" : d.attitude >= 7 ? "#22c55e" : "#f59e0b";
+      var hostile  = d.attitude < 3 ? " 🔴" : "";
+      html += '<div class="ba-row">' +
+        '<span class="ba-name">' + (names[d.id] || d.id) + hostile +
+          '<span class="ba-focus">' + (focus[d.id] || "") + '</span>' +
+        '</span>' +
+        '<div class="ba-bar"><div class="ba-bar-fill" style="width:' + pct + '%;background:' + color + '"></div></div>' +
+        '<span class="ba-score" style="color:' + color + '">' + fmt(att, 1) + '</span>' +
+        '</div>';
+    });
+    container.innerHTML = html;
 
-/* TOAST */
-#toast-container { position:fixed; bottom:24px; right:24px; z-index:2000; display:flex; flex-direction:column; gap:8px; pointer-events:none; }
-.toast { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-sm); padding:10px 16px; font-size:13px; max-width:340px; opacity:0; transform:translateX(20px); transition:opacity .3s,transform .3s; box-shadow:var(--shadow); }
-.toast-visible { opacity:1; transform:translateX(0); }
-.toast-success { border-color:var(--green);  color:var(--green); }
-.toast-error   { border-color:var(--red);    color:var(--red); }
-.toast-warning { border-color:var(--yellow); color:var(--yellow); }
-.toast-info    { border-color:var(--blue);   color:var(--blue); }
+    if (capEl) {
+      var cap = GameState.board.politicalCapital || 0;
+      var max = GameState.board.maxCapital || 5;
+      var dots = "";
+      for (var i = 0; i < max; i++) dots += i < cap ? "●" : "○";
+      capEl.textContent = dots + " (" + cap + "/" + max + ")";
+    }
+  }
 
-/* START SCREEN */
-#start-overlay { position:fixed; inset:0; background:var(--bg); z-index:500; display:flex; align-items:center; justify-content:center; overflow-y:auto; padding:20px; }
-#start-overlay.hidden { display:none; }
-.start-inner { display:flex; flex-direction:column; align-items:center; gap:14px; max-width:960px; width:100%; }
-.start-logo { font-size:36px; font-weight:900; letter-spacing:-1px; background:linear-gradient(135deg,#3b82f6,#14b8a6); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
-.start-subtitle { color:var(--text-muted); font-size:14px; text-align:center; max-width:480px; margin:0; }
-.start-setup { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:16px 22px; width:100%; max-width:480px; display:flex; flex-direction:column; gap:12px; }
-.setup-row { display:flex; flex-direction:column; gap:6px; }
-.setup-row label { font-size:12px; font-weight:600; color:var(--text-muted); text-transform:uppercase; letter-spacing:.5px; }
-.reit-name-row { display:flex; align-items:center; gap:8px; }
-.reit-suffix { font-weight:700; color:var(--blue); font-size:15px; white-space:nowrap; }
-.start-cols { display:grid; grid-template-columns:1fr 1fr; gap:16px; width:100%; }
-.start-rules { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:18px 20px; }
-.start-rules h3 { font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.6px; color:var(--text-muted); margin-bottom:10px; }
-.start-rules ul { list-style:none; display:flex; flex-direction:column; gap:6px; }
-.start-rules li { font-size:12px; color:var(--text-muted); padding-left:14px; position:relative; }
-.start-rules li::before { content:"▸"; position:absolute; left:0; color:var(--blue); }
-.start-leaderboard { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:18px 20px; overflow:hidden; }
-.start-leaderboard h3 { font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.6px; color:var(--text-muted); margin-bottom:10px; }
+  // Jenkins maturity warning: fires when a tranche matures within 2 quarters
+  // and current cash can't cover it.
+  function getJenkinsMaturityWarning() {
+    if (!GameState.debtTranches || GameState.debtTranches.length === 0) return null;
+    var soon = GameState.debtTranches.filter(function(t) {
+      return t.quartersUntilMaturity > 0 && t.quartersUntilMaturity <= 2;
+    });
+    if (soon.length === 0) return null;
+    var totalDue = soon.reduce(function(sum, t) { return sum + t.amount; }, 0);
+    if (GameState.balance.cash >= totalDue) return null;
+    var shortfall = fmt(totalDue - GameState.balance.cash);
+    var q = soon[0].quartersUntilMaturity;
+    return "$" + fmt(totalDue) + "M of debt matures within " + q + " quarter" + (q === 1 ? "" : "s") +
+           " and we're $" + shortfall + "M short. Issue debt now while our rating holds, or sell an asset before we're forced to at fire-sale prices.";
+  }
 
-/* LEADERBOARD TABLE */
-.lb-table { width:100%; border-collapse:collapse; font-size:11px; }
-.lb-table th { text-align:left; padding:4px 6px; color:var(--text-muted); font-size:10px; text-transform:uppercase; border-bottom:1px solid var(--border); }
-.lb-table td { padding:5px 6px; border-bottom:1px solid rgba(51,65,85,.3); }
-.lb-date { white-space:nowrap; font-variant-numeric:tabular-nums; }
-.lb-quarters, .lb-ffo, .lb-rating, .lb-score, .lb-grade { white-space:nowrap; }
-.lb-name, .lb-reit { max-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.lb-row { cursor:pointer; transition:background .15s; }
-.lb-row:hover { background:var(--surface2); }
-.lb-gold   td { color:#fbbf24; }
-.lb-silver td { color:#94a3b8; }
-.lb-bronze td { color:#b45309; }
-.lb-score  { font-family:monospace; font-weight:700; }
-.lb-grade  { font-weight:700; font-family:monospace; }
-.grade-S   { color:#a855f7; }
-.grade-A   { color:var(--green); }
-.grade-B   { color:var(--teal); }
-.grade-C   { color:var(--yellow); }
-.grade-D   { color:var(--orange); }
-.grade-F   { color:var(--red); }
-.lb-loading,.lb-empty { color:var(--text-muted); font-size:12px; padding:8px 0; }
+  // MARKET CONDITIONS PANEL
+  function renderMarketConditions() {
+    var container = el("market-conditions-list");
+    if (!container) return;
 
-/* GAME OVER */
-#gameover-overlay { position:fixed; inset:0; background:rgba(0,0,0,.92); z-index:500; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:20px; padding:40px; backdrop-filter:blur(8px); overflow-y:auto; }
-#gameover-overlay.hidden { display:none; }
-.gameover-title { font-size:36px; font-weight:900; color:var(--red); }
-.gameover-subtitle { font-size:16px; color:var(--text-muted); }
-.gameover-letter { background:var(--surface); border:1px solid var(--red); border-radius:var(--radius); padding:20px 24px; max-width:560px; width:100%; font-size:13px; color:var(--text-muted); line-height:1.7; font-family:monospace; }
-.gameover-stats { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; max-width:560px; width:100%; }
-.go-stat { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-sm); padding:12px; text-align:center; }
-.go-stat-label { font-size:10px; color:var(--text-muted); text-transform:uppercase; }
-.go-stat-value { font-size:18px; font-weight:700; font-family:monospace; margin-top:4px; }
+    var capRates  = GameState.market.capRates;
+    // Use stored baseline or current rates as baseline if no history
+    var baselines = GameState.market.baselineCapRates || {
+      office: 6.1, industrial: 5.0, multifamily: 5.5, retail: 6.6
+    };
+    var sectors   = ["office", "industrial", "multifamily", "retail"];
+    var labels    = { office:"Office", industrial:"Industrial", multifamily:"Multifamily", retail:"Retail" };
 
-/* ANNUAL REPORT */
-#annual-report-overlay { position:fixed; inset:0; background:rgba(0,0,0,.88); z-index:400; display:flex; align-items:flex-start; justify-content:center; padding:20px; overflow-y:auto; backdrop-filter:blur(6px); }
-#annual-report-overlay.hidden { display:none; }
-.annual-report-box { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); max-width:800px; width:100%; padding:28px; margin:auto; }
-.ar-header { text-align:center; margin-bottom:24px; padding-bottom:20px; border-bottom:1px solid var(--border); }
-.ar-logo { font-size:24px; font-weight:900; background:linear-gradient(135deg,#3b82f6,#14b8a6); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
-.ar-year { font-size:14px; color:var(--text-muted); margin-top:4px; }
-.ar-badge { display:inline-block; margin-top:8px; padding:4px 12px; background:rgba(59,130,246,.15); border:1px solid var(--blue); border-radius:12px; font-size:11px; color:var(--blue); font-weight:600; }
-.ar-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:20px; }
-.ar-section { background:var(--surface2); border-radius:var(--radius-sm); padding:14px; }
-.ar-section-title { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.6px; color:var(--text-muted); margin-bottom:10px; }
-.ar-row { display:flex; justify-content:space-between; align-items:center; padding:4px 0; border-bottom:1px solid rgba(51,65,85,.3); font-size:13px; }
-.ar-row span:first-child { color:var(--text-muted); }
-.ar-row span:last-child { font-family:monospace; font-weight:600; }
-.ar-goal { font-size:12px; padding:3px 0; color:var(--text-muted); }
-.ar-goal-met { color:var(--green); }
-.ar-goal-missed { color:var(--red); }
-.ar-event { font-size:12px; color:var(--text-muted); padding:2px 0; }
-.ar-board-letter { background:var(--surface2); border-radius:var(--radius-sm); padding:16px; margin-bottom:16px; border-left:3px solid var(--blue); }
-.ar-board-letter p { font-size:13px; color:var(--text-muted); line-height:1.7; margin-bottom:8px; }
-.ar-pressure-note { font-size:12px; color:var(--yellow) !important; }
-.ar-footer { text-align:center; padding-top:16px; border-top:1px solid var(--border); }
+    var html = "";
 
-/* HELP OVERLAY */
-#help-overlay { position:fixed; inset:0; background:rgba(0,0,0,.8); z-index:600; display:flex; align-items:center; justify-content:center; padding:20px; backdrop-filter:blur(4px); }
-#help-overlay.hidden { display:none; }
-.help-box { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); max-width:760px; width:100%; max-height:85vh; display:flex; flex-direction:column; box-shadow:var(--shadow); }
-.help-header { display:flex; align-items:center; justify-content:space-between; padding:14px 18px; border-bottom:1px solid var(--border); background:var(--surface2); border-radius:var(--radius) var(--radius) 0 0; }
-.help-title { font-size:15px; font-weight:700; }
-.help-hint { font-size:11px; color:var(--text-muted); font-weight:400; margin-left:8px; }
-.help-tab-bar { display:flex; border-bottom:1px solid var(--border); background:var(--surface2); }
-.help-tab-btn { padding:8px 16px; border:none; background:transparent; color:var(--text-muted); font-size:12px; font-weight:600; cursor:pointer; border-bottom:2px solid transparent; transition:color .15s,border-color .15s; }
-.help-tab-btn.active { color:var(--text); border-bottom-color:var(--blue); }
-.help-body { flex:1; overflow-y:auto; padding:18px; }
-.help-tab-content { display:none; }
-.help-tab-content.active { display:block; }
-.help-tab-content h3 { font-size:13px; font-weight:700; color:var(--text); margin:16px 0 6px; }
-.help-tab-content h3:first-child { margin-top:0; }
-.help-tab-content p { font-size:13px; color:var(--text-muted); line-height:1.7; margin-bottom:10px; }
-.help-tab-content ol { padding-left:20px; color:var(--text-muted); font-size:13px; line-height:1.8; }
+    // Jenkins advisory — maturity shortfall warning (1-2 quarters out)
+    var jenkinsWarning = getJenkinsMaturityWarning();
+    if (jenkinsWarning) {
+      html += '<div class="jenkins-warning">⚠ <strong>Jenkins:</strong> ' + jenkinsWarning + '</div>';
+    }
 
-/* RATIO EXPLANATIONS */
-.ratio-explain { display:flex; flex-direction:column; gap:14px; }
-.re-item { background:var(--surface2); border-radius:var(--radius-sm); padding:12px 14px; border-left:3px solid var(--blue); }
-.re-name { font-size:13px; font-weight:700; margin-bottom:4px; }
-.re-formula { font-family:monospace; font-size:12px; color:var(--teal); margin-bottom:6px; }
-.re-desc { font-size:12px; color:var(--text-muted); line-height:1.6; }
+    sectors.forEach(function(s) {
+      // Average cap rate across locations for this sector
+      var avg = (capRates[s].tier1 + capRates[s].tier2 + capRates[s].suburban) / 3;
+      avg = Math.round(avg * 100) / 100;
+      var base = baselines[s];
+      var diff = avg - base;
 
-/* GLOSSARY */
-.glossary { display:flex; flex-direction:column; gap:8px; }
-.gl-item { display:grid; grid-template-columns:100px 1fr; gap:12px; padding:6px 0; border-bottom:1px solid rgba(51,65,85,.3); font-size:12px; }
-.gl-term { font-weight:700; color:var(--blue); font-family:monospace; }
-.gl-def  { color:var(--text-muted); line-height:1.5; }
+      var icon, signal;
+      if (diff > 1.5)       { icon = "🔴"; signal = "Distressed — buy opportunity"; }
+      else if (diff > 0.5)  { icon = "🟡"; signal = "Weakening — values falling"; }
+      else if (diff > -0.5) { icon = "🔵"; signal = "Stable"; }
+      else                   { icon = "🟢"; signal = "Booming — values rising"; }
 
-/* RESPONSIVE */
-@media (max-width:1100px) {
-  #main { grid-template-columns:1fr; }
-  .charts-grid { grid-template-columns:1fr; }
-  .chart-wrap.chart-wide { grid-column:span 1; }
-  .actions-grid { grid-template-columns:1fr; }
-  .start-cols { grid-template-columns:1fr; }
-  .ar-grid { grid-template-columns:1fr; }
-}
-@media (max-width:640px) {
-  #main { padding:10px; gap:10px; }
-  .gameover-stats { grid-template-columns:1fr 1fr; }
-  .ratios-grid { grid-template-columns:1fr; }
-  .header-stats { gap:10px; }
-}
+      var arrow = diff > 0.1 ? "↑" : diff < -0.1 ? "↓" : "≈";
+      var rateColor = diff > 0.5 ? "text-red" : diff < -0.5 ? "text-green" : "";
 
-/* GOALS PANEL */
-.goal-row { display:flex; align-items:center; gap:6px; padding:5px 0; border-bottom:1px solid rgba(51,65,85,.3); font-size:12px; }
-.goal-icon { font-size:13px; min-width:18px; }
-.goal-metric { flex:1; color:var(--text-muted); }
-.goal-target { font-family:monospace; font-weight:700; font-size:11px; white-space:nowrap; }
+      html += '<div class="mc-row">' +
+        '<span class="mc-icon">' + icon + '</span>' +
+        '<span class="mc-sector">' + labels[s] + '</span>' +
+        '<span class="mc-rate ' + rateColor + '">' + fmt(avg, 1) + '% ' + arrow + '</span>' +
+        '<span class="mc-signal">' + signal + '</span>' +
+        '</div>';
+    });
+    container.innerHTML = html;
+  }
 
-/* VERSION + CREDIT */
-.start-version { font-size:12px; color:#94a3b8; letter-spacing:0.5px; margin-top:0; font-weight:600; }
+  // Board Goals panel — shows the current year's active mandates with live
+  // met/unmet indicators, driven by the real mandate system.
+  function renderGoalsPanel() {
+    var container = el("goals-list");
+    var yearLabel = el("goals-year-label");
+    if (!container) return;
 
-/* PROPERTY INDICATORS */
-.prop-indicator { font-size:16px; margin-right:6px; cursor:help; }
+    var mandates = GameState.board.activeMandates || [];
+    if (mandates.length === 0) {
+      container.innerHTML = '<p class="text-muted" style="font-size:12px">The board sets your targets at the first annual meeting (end of Year 1).</p>';
+      if (yearLabel) yearLabel.textContent = "Board Goals";
+      return;
+    }
+    if (yearLabel) yearLabel.textContent = "Year " + GameState.meta.year + " Board Mandates";
 
-/* ============================================================
-   BOARD MEETING OVERLAY
-   ============================================================ */
-#board-meeting-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.95); z-index:800; display:flex; align-items:center; justify-content:center; }
-#board-meeting-overlay.hidden { display:none; }
+    var r = GameState.ratios;
+    var co = GameState.company;
+    var b = GameState.board;
+    var curPortfolio = GameState.portfolio.reduce(function(s, p) { return s + p.currentValue; }, 0);
+    var worstOcc = GameState.portfolio.length > 0
+      ? Math.min.apply(null, GameState.portfolio.map(function(p) { return p.occupancy; })) : 1;
 
-.bm-container { width:min(701px,98vw); display:flex; flex-direction:column; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; box-shadow:0 0 40px rgba(0,0,0,0.8); max-height:95vh; overflow-y:auto; }
+    // Live current value for each metric (mirrors evaluateMandates)
+    function liveValue(metric) {
+      switch (metric) {
+        case "dividendGrowthPct":   return b.startYearDividend > 0 ? (co.dividendPerShare - b.startYearDividend) / b.startYearDividend * 100 : 0;
+        case "noDividendCut":       return co.dividendPerShare >= (b.startYearDividend || 0) ? 1 : 0;
+        case "acquisitionsThisYear":return b.acquisitionsThisYear || 0;
+        case "ffoGrowthPct":        return GameState._lastFFOGrowthPct || 0;
+        case "portfolioGrowthPct":  return (b.startYearPortfolio > 0) ? (curPortfolio - b.startYearPortfolio) / b.startYearPortfolio * 100 : 0;
+        case "debtToAssets":        return (r.debtToAssets || 0) * 100;
+        case "interestCoverage":    return r.interestCoverage >= 99 ? 99 : r.interestCoverage;
+        case "noOverdraft":         return b.noOverdraftBroken ? 0 : 1;
+        case "noDebtIncrease":      return GameState.balance.totalDebt <= (b.startYearDebt || GameState.balance.totalDebt) + 0.5 ? 1 : 0;
+        case "sharePriceHeld":      return co.sharePrice >= (b.startYearSharePrice || co.sharePrice) ? 1 : 0;
+        case "sharePriceGrowthPct": return (b.startYearSharePrice > 0) ? (co.sharePrice - b.startYearSharePrice) / b.startYearSharePrice * 100 : 0;
+        case "noEquityIssued":      return b.noEquityBroken ? 0 : 1;
+        case "occupancyPortfolio":  return (r.occupancyPortfolio || 0) * 100;
+        case "worstOccupancy":      return worstOcc * 100;
+        case "leaseUpsThisYear":    return b.leaseUpsThisYear || 0;
+        default: return 0;
+      }
+    }
 
-/* Room with background image */
-.bm-room { background-size:cover; background-position:center center; height:402px; max-height:402px; position:relative; display:flex; flex-direction:column; justify-content:flex-end; padding:12px; overflow:hidden; }
-.bm-room::after { content:""; position:absolute; inset:0; background:linear-gradient(to bottom, transparent 40%, rgba(0,0,0,0.75) 100%); pointer-events:none; }
-.bm-room-title { position:absolute; top:10px; left:0; right:0; text-align:center; font-size:13px; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:rgba(255,255,255,0.8); z-index:1; text-shadow:0 1px 4px rgba(0,0,0,0.8); }
+    var html = "";
+    mandates.forEach(function(m) {
+      if (m.response === "reject") {
+        html += '<div class="goal-row"><span class="goal-icon">⊘</span><span class="goal-metric">' + dirShort(m.directorId) + ': ' + m.text + '</span><span class="goal-target text-muted">declined</span></div>';
+        return;
+      }
+      var val = liveValue(m.metric);
+      var pct = (["debtToAssets","interestCoverage","noOverdraft","noDebtIncrease","sharePriceHeld","noEquityIssued"].indexOf(m.metric) === -1);
+      var met;
+      if (m.higher) met = val >= (m.metric === "occupancyPortfolio" || m.metric === "worstOccupancy" || m.metric === "debtToAssets" ? m.target * 100 : m.target);
+      else          met = val <= (m.metric === "debtToAssets" ? m.target * 100 : m.target);
+      // boolean metrics
+      if (["noOverdraft","noDebtIncrease","sharePriceHeld","noEquityIssued","noDividendCut"].indexOf(m.metric) !== -1) met = val >= 1;
 
-/* Directors row */
-.bm-directors-row { display:flex; justify-content:space-around; align-items:flex-end; position:relative; z-index:2; gap:4px; padding:0 8px; }
-.bm-director { display:flex; flex-direction:column; align-items:center; gap:3px; opacity:0.55; transition:opacity 0.3s, transform 0.3s; }
-.bm-director-active { opacity:1 !important; transform:scale(1.05); }
-.bm-portrait-wrap { width:110px; height:130px; overflow:hidden; border-radius:4px 4px 0 0; }
-.bm-portrait { width:110px; height:130px; background-size:440px 130px; background-repeat:no-repeat; background-position:0% 0%; transition:background-position 0.3s; }
-.bm-dir-name { font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:rgba(255,255,255,0.8); text-shadow:0 1px 3px rgba(0,0,0,0.9); }
-.bm-dir-stars { font-size:10px; font-family:monospace; font-weight:700; text-shadow:0 1px 3px rgba(0,0,0,0.9); }
+      var icon = met ? "✅" : "⏳";
+      var color = met ? "text-green" : "text-muted";
+      html += '<div class="goal-row">' +
+        '<span class="goal-icon">' + icon + '</span>' +
+        '<span class="goal-metric ' + color + '" style="font-size:11px;">' + dirShort(m.directorId) + ': ' + m.text + '</span>' +
+        '</div>';
+    });
+    container.innerHTML = html;
+  }
 
-/* Dialogue area */
-.bm-dialogue { padding:16px 20px; display:flex; flex-direction:column; gap:12px; min-height:200px; }
-.bm-speaker-info { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
-.bm-speaker-name { font-size:14px; font-weight:700; color:var(--text); }
-.bm-speaker-title { font-size:11px; color:var(--text-muted); }
-.bm-mandate-counter { margin-left:auto; font-size:11px; color:var(--text-muted); font-family:monospace; }
-.bm-speech-box { background:var(--surface2); border-radius:var(--radius-sm); padding:14px 16px; border-left:3px solid var(--blue); min-height:80px; }
-.bm-speech-text { font-size:13px; color:var(--text); line-height:1.7; font-style:italic; }
+  function dirShort(id) {
+    var names = { williams: "Williams", chen: "Chen", okafor: "Okafor", petrova: "Petrova", hassan: "Hassan" };
+    return names[id] || id;
+  }
 
-/* Response buttons */
-.bm-response-buttons { display:flex; gap:8px; flex-wrap:wrap; }
-.bm-btn { flex:1; min-width:140px; font-size:12px; padding:8px 12px; }
-.bm-cost { font-size:10px; color:rgba(255,255,255,0.6); display:block; }
+  function getPropertyIndicator(p) {
+    if (p.underConstruction) {
+      var label = p.constructionType === "renovation" ? "Renovating" : "Repositioning";
+      return { icon: "🔨", tip: label + " — " + p.constructionQuartersLeft + " quarter(s) remaining" };
+    }
+    if (p.occupancy < 0.70)  return { icon: "🔴", tip: "Critical — occupancy below 70%" };
+    if (p.occupancy < 0.80)  return { icon: "🟡", tip: "Needs attention — below 80%" };
+    if (p.occupancy < 0.90)  return { icon: "🔵", tip: "Stable — 80-90% occupied" };
+    return { icon: "🟢", tip: "Performing well — above 90%" };
+  }
 
-/* Footer */
-.bm-footer { display:flex; align-items:center; justify-content:space-between; }
-.bm-capital { font-size:12px; color:var(--yellow); font-family:monospace; font-weight:600; }
+  function renderPortfolio() {
+    var container = el("portfolio-list");
+    if (!container) return;
+    if (GameState.portfolio.length === 0) {
+      container.innerHTML = '<p class="text-muted">No properties owned. Buy from the market.</p>';
+      return;
+    }
+    var html = "";
+    GameState.portfolio.forEach(function(p) {
+      // Celestial Heights — special "under construction" card showing the drain
+      if (p._tower && p.underConstruction) {
+        var pmk = GameState.placemaking || {};
+        var qLeft = pmk.towerQuarters || 0;
+        var spend = pmk.towerSpend || 0;
+        html += '<div class="property-card tower-construction">' +
+          '<div class="prop-header">' +
+          '<span class="prop-name">🏗️ ' + p.name + '</span>' +
+          '<span class="tower-tag">UNDER CONSTRUCTION</span></div>' +
+          '<div class="tower-drain">Cash outflow: <strong>−' + fmtM(spend) + ' / quarter</strong></div>' +
+          '<div class="prop-stats">' +
+          '<span>Status: <strong class="text-yellow">Building</strong></span>' +
+          '<span>Time left: <strong>' + qLeft + ' quarters</strong></span>' +
+          '<span>Income: <strong class="text-muted">none yet</strong></span>' +
+          '</div>' +
+          '<div class="action-meta text-muted" style="margin-top:6px;">The board\'s vanity supertall. Earns nothing until complete — then becomes a trophy asset. You cannot stop construction.</div>' +
+          '</div>';
+        return;
+      }
+      var oc = p.occupancy >= 0.90 ? "text-green" : p.occupancy >= 0.80 ? "text-yellow" : "text-red";
+      var gl = p.purchasePrice ? fmt(p.currentValue - p.purchasePrice, 1) : 0;
+      var gc = gl >= 0 ? "text-green" : "text-red";
+      // Lease Up button — requires Asset Manager, grey/disabled if used this year
+      var leaseUpBtn = "";
+      if (p.occupancy < 0.90 && !p.underConstruction && Staff.hasRole("asset")) {
+        var usedThisYear = p.leaseUpYear === GameState.meta.year;
+        leaseUpBtn = usedThisYear
+          ? '<button class="btn btn-sm btn-secondary" disabled style="opacity:0.4;cursor:not-allowed" title="Already leased up this year — available Year ' + (GameState.meta.year + 1) + '">✓ Leased Up</button>'
+          : '<button class="btn btn-sm btn-primary" onclick="UI.leaseUp(\'' + p.id + '\')">Lease Up</button>';
+      }
 
-/* Vote */
-.bm-vote-header { font-size:14px; font-weight:700; text-transform:uppercase; letter-spacing:0.8px; margin-bottom:12px; color:var(--text); }
-.bm-vote-box { background:var(--surface2); border-radius:var(--radius-sm); padding:14px; margin-top:10px; }
-.bm-vote-grid { display:grid; grid-template-columns:repeat(5,1fr); gap:8px; margin-bottom:10px; }
-.bm-vote-item { text-align:center; }
-.bm-vote-name { font-size:10px; color:var(--text-muted); margin-bottom:2px; }
-.bm-vote-att { font-size:11px; font-family:monospace; color:var(--text); }
-.bm-vote-result { font-size:11px; font-weight:700; }
-.bm-vote-summary { font-size:12px; color:var(--text-muted); text-align:center; font-family:monospace; }
+      // Upgrade buttons
+      var upgradeHTML = "";
+      if (p.underConstruction) {
+        var constructionLabel = p.constructionType === "renovation" ? "🔨 Renovating" : "🔄 Repositioning";
+        upgradeHTML = '<span class="upgrade-badge">' + constructionLabel + ' — ' + p.constructionQuartersLeft + 'q left</span>';
+      } else {
+        var canRen = Properties.canRenovate(p);
+        var canRepo = Properties.canReposition(p);
+        if (canRen.ok) {
+          var renCost = fmt(p.currentValue * 0.10, 1);
+          upgradeHTML += '<button class="btn btn-sm btn-upgrade" onclick="UI.confirmRenovate(\'' + p.id + '\')">🔨 Renovate $' + renCost + 'M</button>';
+        } else if (p.renovated) {
+          upgradeHTML += '<span class="upgrade-badge upgrade-done">✓ Renovated</span>';
+        }
+        if (canRepo.ok) {
+          var repoCost = fmt(p.currentValue * 0.15, 1);
+          upgradeHTML += '<button class="btn btn-sm btn-upgrade-repo" onclick="UI.confirmReposition(\'' + p.id + '\')">🔄 Reposition $' + repoCost + 'M</button>';
+        } else if (p.repositioned) {
+          upgradeHTML += '<span class="upgrade-badge upgrade-done">✓ Repositioned</span>';
+        }
+      }
+      var indicator = getPropertyIndicator(p);
+      html += '<div class="property-card">' +
+        '<div class="prop-header">' +
+        '<span class="prop-indicator" title="' + indicator.tip + '">' + indicator.icon + '</span>' +
+        '<span class="prop-name">' + p.name + '</span>' +
+        '<span class="prop-tag tag-' + p.sector + '">' + p.sector + ' · ' + p.location + '</span></div>' +
+        '<div class="prop-stats">' +
+        '<span>Value: <strong>' + fmtM(p.currentValue) + '</strong></span>' +
+        '<span>NOI: <strong>' + fmtM(p.annualNOI) + '/yr</strong></span>' +
+        '<span>Occ: <strong class="' + oc + '">' + fmtPct(p.occupancy) + '</strong></span>' +
+        '<span>G/L: <strong class="' + gc + '">' + (gl >= 0 ? "+" : "") + gl + 'M</strong></span>' +
+        '</div><div class="prop-actions">' +
+        leaseUpBtn +
+        upgradeHTML +
+        '<button class="btn btn-sm btn-danger" onclick="UI.confirmSellProperty(\'' + p.id + '\')">Sell</button>' +
+        '</div></div>';
+    });
+    container.innerHTML = html;
+  }
 
-/* BOARD ATTITUDES PANEL */
-.board-attitudes { display:flex; flex-direction:column; gap:4px; }
-.ba-row { display:flex; align-items:center; justify-content:space-between; padding:4px 0; border-bottom:1px solid rgba(51,65,85,.3); }
-.ba-name { font-size:11px; color:var(--text); min-width:96px; display:flex; flex-direction:column; line-height:1.3; }
-.ba-focus { font-size:9px; color:var(--text-muted); font-weight:400; }
-.ba-score { font-family:monospace; font-size:12px; font-weight:700; }
-.ba-bar { flex:1; height:4px; background:var(--surface2); border-radius:2px; margin:0 8px; overflow:hidden; }
-.ba-bar-fill { height:100%; border-radius:2px; transition:width .4s; }
-.ba-capital { display:flex; align-items:center; gap:6px; padding-top:6px; font-size:11px; color:var(--yellow); font-family:monospace; }
+  function renderPropertyMarket() {
+    var container = el("market-list");
+    if (!container) return;
+    var html = "";
+    GameState.propertyMarket.forEach(function(p) {
+      // Actual cap rate of THIS property = NOI ÷ asking price (not the generic
+      // sector market rate). This is what makes a mega-deal visibly attractive.
+      var cr = p.askingPrice > 0 ? Math.round((p.annualNOI / p.askingPrice) * 1000) / 10 : 0;
+      var ca = GameState.balance.cash >= p.askingPrice;
+      var megaTag = p.isMega
+        ? '<div class="mega-flag">★ Off-market mega-asset · ' + (p.megaCapRate ? p.megaCapRate + '% cap rate · ' : '') + 'single tenant: ' + (p.megaTenant || "anchor") + '</div>'
+        : '';
+      html += '<div class="property-card ' + (ca ? "" : "prop-unaffordable") + (p.isMega ? " prop-mega" : "") + '">' +
+        '<div class="prop-header"><span class="prop-name">' + p.name + '</span>' +
+        '<span class="prop-tag tag-' + p.sector + '">' + p.sector + ' · ' + p.location + '</span></div>' +
+        megaTag +
+        '<div class="prop-stats">' +
+        '<span>Ask: <strong>' + fmtM(p.askingPrice) + '</strong></span>' +
+        '<span>NOI: <strong>' + fmtM(p.annualNOI) + '/yr</strong></span>' +
+        '<span>Occ: <strong>' + fmtPct(p.occupancy) + '</strong></span>' +
+        '<span>Cap: <strong>' + cr + '%</strong></span>' +
+        '</div><div class="prop-actions">' +
+        '<button class="btn btn-sm btn-primary" onclick="UI.confirmBuyProperty(\'' + p.id + '\')" ' +
+        (ca ? "" : 'disabled') + '>Buy ' + fmtM(p.askingPrice) + '</button>' +
+        '</div></div>';
+    });
+    container.innerHTML = html;
+  }
 
-/* MARKET CONDITIONS PANEL */
-.market-panel { display:flex; gap:10px; align-items:flex-start; }
-.jenkins-portrait { width:64px; height:84px; object-fit:cover; object-position:center top; border-radius:var(--radius-sm); flex-shrink:0; }
-.market-conditions { flex:1; display:flex; flex-direction:column; gap:4px; }
-.mc-row { display:flex; align-items:center; gap:6px; font-size:11px; padding:2px 0; }
-.mc-icon { font-size:13px; width:18px; }
-.mc-sector { color:var(--text-muted); min-width:80px; }
-.mc-rate { font-family:monospace; font-weight:700; font-size:11px; }
-.mc-signal { font-size:10px; color:var(--text-muted); }
+  function renderEarningsReport(report) {
+    if (!report) return;
+    var container = el("earnings-report");
+    if (!container) return;
 
-/* COPYRIGHT */
-.start-copyright { font-size:10px; color:var(--text-muted); opacity:0.5; letter-spacing:0.3px; }
+    var y = GameState.meta.year, q = GameState.meta.quarter;
 
-/* DECISION EVENTS */
-.decision-header { font-size:15px; font-weight:700; color:var(--text); margin-bottom:10px; }
-.decision-body { font-size:12px; color:var(--text-muted); line-height:1.6; margin-bottom:14px; }
-.decision-choices { display:flex; flex-direction:column; gap:8px; }
-.decision-choice { background:var(--surface2); border:1px solid var(--border); border-radius:var(--radius-sm); padding:10px 12px; cursor:pointer; transition:border-color .2s; }
-.decision-choice:hover { border-color:var(--blue); }
-.choice-label { font-size:13px; font-weight:600; color:var(--text); display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:4px; }
-.choice-detail { font-size:11px; color:var(--text-muted); line-height:1.6; }
-.cost-badge { font-size:10px; font-weight:700; padding:2px 6px; border-radius:10px; }
-.cost-cash    { background:rgba(239,68,68,.2);  color:#ef4444; }
-.cost-income  { background:rgba(245,158,11,.2); color:#f59e0b; }
-.cost-capital { background:rgba(99,102,241,.2); color:#818cf8; }
-.decision-capital { font-size:11px; color:var(--yellow); font-family:monospace; margin-top:10px; padding-top:8px; border-top:1px solid var(--border); }
+    // ---- EVENTS (loud — the things that happened TO you) ----
+    var eventsHTML = "";
+    if (report.firedEvents && report.firedEvents.length > 0) {
+      report.firedEvents.forEach(function(e) {
+        // tone: harmful = bad (red), explicit good keywords = good (green), else neutral
+        var tone = "neutral";
+        if (e.harmful) tone = "bad";
+        else if (/Boom|Windfall|Signed|Approval|Surge|Prestige|Shortage Windfall|Rate Cut|relief/i.test(e.headline + " " + (e.impact||""))) tone = "good";
+        else if (/Fed|Rate|Cycle|Regulation/i.test(e.headline)) tone = "neutral";
+        eventsHTML +=
+          '<div class="feed-event feed-' + tone + '">' +
+          '<div class="feed-event-head">' + e.headline + '</div>' +
+          (e.impact ? '<div class="feed-event-impact">' + e.impact + '</div>' : '') +
+          '</div>';
+      });
+    }
 
-/* PROPERTY UPGRADES */
-.btn-upgrade      { background:rgba(99,102,241,.15); color:#818cf8; border:1px solid rgba(99,102,241,.3); }
-.btn-upgrade:hover{ background:rgba(99,102,241,.25); }
-.btn-upgrade-repo { background:rgba(245,158,11,.15); color:#f59e0b; border:1px solid rgba(245,158,11,.3); }
-.btn-upgrade-repo:hover { background:rgba(245,158,11,.25); }
-.upgrade-badge    { font-size:10px; color:var(--text-muted); font-style:italic; padding:2px 6px; background:var(--surface2); border-radius:10px; }
-.upgrade-done     { color:#22c55e; }
+    // ---- YOUR ACTIONS (quiet — you already know you did these) ----
+    var actionsHTML = "";
+    var feed = (typeof News !== "undefined" && News.getFeed) ? News.getFeed() : [];
+    var thisQ = feed.filter(function(it) {
+      return it.year === y && it.quarter === q &&
+        (it.category === "capital" || it.category === "debt" || it.category === "dividend" || it.category === "staff" || it.category === "property");
+    });
+    if (thisQ.length > 0) {
+      actionsHTML = '<div class="feed-actions">';
+      thisQ.slice(0, 6).forEach(function(it) {
+        actionsHTML += '<div class="feed-action-line">· ' + it.text + '</div>';
+      });
+      actionsHTML += '</div>';
+    }
 
-/* STAFF SYSTEM */
-.staff-row { display:flex; align-items:center; gap:10px; background:var(--surface2); border:1px solid var(--border); border-radius:var(--radius-sm); padding:8px 10px; margin-bottom:8px; }
-.staff-portrait { width:48px; height:48px; border-radius:6px; object-fit:cover; flex-shrink:0; image-rendering:pixelated; }
-.staff-info { flex:1; min-width:0; }
-.staff-name-row { display:flex; align-items:center; gap:6px; }
-.staff-name { font-size:13px; font-weight:700; color:var(--text); }
-.staff-stars { font-size:12px; color:#fbbf24; letter-spacing:1px; }
-.staff-title { font-size:11px; color:var(--text-muted); }
-.staff-trait { font-size:11px; margin-top:2px; }
-.staff-right { display:flex; flex-direction:column; align-items:flex-end; gap:4px; }
-.staff-cost { font-size:12px; font-family:monospace; color:var(--yellow); }
-.candidate-card { display:flex; gap:10px; background:var(--surface2); border:1px solid var(--border); border-radius:var(--radius-sm); padding:10px 12px; margin-bottom:8px; }
-.candidate-portrait { width:64px; height:64px; border-radius:6px; object-fit:cover; flex-shrink:0; image-rendering:pixelated; }
-.candidate-body { flex:1; min-width:0; }
-.candidate-head { display:flex; justify-content:space-between; align-items:center; }
-.candidate-title { font-size:13px; font-weight:700; color:var(--text); }
-.candidate-salary { font-size:12px; font-family:monospace; color:var(--yellow); }
-.candidate-name { font-size:12px; color:var(--text); margin:2px 0; }
-.candidate-unlock { font-size:11px; color:#818cf8; margin:4px 0; }
-.candidate-hint { font-size:11px; color:var(--text-muted); font-style:italic; margin-bottom:8px; }
+    // ---- BOTTOM LINE (loud — the punchline) ----
+    var rc = (report.retainedCash !== undefined) ? report.retainedCash
+           : (GameState.pnl ? GameState.pnl.retainedCash : 0);
+    var rcGood = rc >= 0;
+    var verdict = rcGood ? "gained ground" : "lost ground";
+    var bottomHTML =
+      '<div class="feed-bottom ' + (rcGood ? "feed-good" : "feed-bad") + '">' +
+        '<span class="feed-bottom-label">Retained Cash this quarter</span>' +
+        '<span class="feed-bottom-num">' + (rc >= 0 ? "+" : "") + fmtM(rc) + ' ' + (rcGood ? "▲" : "▼") + '</span>' +
+        '<span class="feed-bottom-verdict">' + verdict + '</span>' +
+      '</div>' +
+      '<div class="feed-bottom-detail">Rental income ' + fmtM(report.netRentalIncome !== undefined ? report.netRentalIncome : (GameState.pnl ? GameState.pnl.noi : 0)) +
+        ' · interest ' + fmtM(-(GameState.pnl ? GameState.pnl.interestExpense : 0)) +
+        ' · dividends ' + fmtM(-(GameState.pnl ? GameState.pnl.dividendsPaid : 0)) +
+        (GameState.pnl && GameState.pnl.unusualItems ? ' · one-offs ' + fmtM(GameState.pnl.unusualItems) : '') +
+        '</div>';
 
-/* MEGA PROPERTY */
-.prop-mega { border-color:#fbbf24; box-shadow:0 0 0 1px rgba(251,191,36,.3); }
-.mega-flag { font-size:11px; color:#fbbf24; margin:4px 0; font-weight:600; }
+    container.innerHTML =
+      '<div class="panel-header"><span class="panel-title">📋 Quarter Report — Year ' + y + ', Q' + q + '</span></div>' +
+      '<div class="panel-body feed-body">' +
+        (eventsHTML || '<div class="feed-quiet-note">A quiet quarter — no major events.</div>') +
+        bottomHTML +
+        actionsHTML +
+      '</div>';
+  }
 
-.talent-role-header { font-size:12px; font-weight:700; color:var(--text); margin:14px 0 6px; padding-bottom:3px; border-bottom:1px solid var(--border); }
-.talent-role-header .text-muted { font-weight:400; font-size:11px; }
+  // NEW: Updated to show term-adjusted rates
+  function renderCapitalActions() {
+    var baseRate = Market.getCurrentBorrowingRate();
+    var getRateStr = function(y) { return Financials.getCurrentBorrowingRateForTerm ? fmt(Financials.getCurrentBorrowingRateForTerm(y), 2) : fmt(baseRate, 2); };
+    setText("action-borrow-rate",
+      "1yr: " + getRateStr(1) + "% | " +
+      "3yr: " + getRateStr(3) + "% | " +
+      "5yr: " + getRateStr(5) + "% | " +
+      "7yr: " + getRateStr(7) + "% | " +
+      "10yr: " + getRateStr(10) + "%"
+    );
+    // Live borrowing capacity (80% LTV against portfolio)
+    var pv = GameState.portfolio.reduce(function(s, p) { return s + p.currentValue; }, 0);
+    var cd = GameState.debtTranches.reduce(function(s, t) { return s + t.amount; }, 0);
+    var cap = Math.max(0, Math.round((pv * 0.80 - cd) * 10) / 10);
+    var capEl = el("action-borrow-capacity");
+    if (capEl) setText("action-borrow-capacity", "Capacity: " + fmtM(cap) + " (80% LTV · current " + (pv > 0 ? Math.round(cd/pv*100) : 0) + "%)");
+    // Update dropdown to show rates next to each option
+    var sel = el("input-debt-years");
+    if (sel) {
+      [[1,"1yr"],[2,"2yr"],[3,"3yr"],[5,"5yr"],[7,"7yr"],[10,"10yr"]].forEach(function(t, i) {
+        if (sel.options[i]) {
+          sel.options[i].text = t[1] + " — " + getRateStr(t[0]) + "%";
+        }
+      });
+    }
+    setText("action-div-current", "$" + fmt(GameState.company.dividendPerShare, 2) + " /share each quarter");
+    var equityUsedThisYear = GameState.company.equityIssuanceYear === GameState.meta.year;
+    var debtCooldown = GameState.company.debtIssuanceQuarter > 0 ?
+      Math.max(0, 2 - (GameState.meta.totalQuarters - GameState.company.debtIssuanceQuarter)) : 0;
+    setText("action-shares-out", "Shares: " + fmt(GameState.company.sharesOutstanding, 1) + "M" +
+      (equityUsedThisYear ? " ⚠ Equity used this year — available Year " + (GameState.meta.year + 1) : ""));
+    setText("action-debt-cooldown", debtCooldown > 0 ?
+      "⚠ Debt on cooldown — available in " + debtCooldown + " quarter(s)" : "");
+    setText("action-cash-avail",  "Cash available: " + fmtM(GameState.balance.cash));
+    // Preferred stock redeem card — only when preferred is outstanding
+    var prefGroup = el("preferred-redeem-group");
+    if (prefGroup) {
+      var pref = GameState.preferred;
+      if (pref && pref.issued && pref.outstanding > 0) {
+        prefGroup.style.display = "";
+        setText("action-preferred-info",
+          fmtM(pref.outstanding) + " outstanding · " + (pref.dividendRate*100) + "% preferred dividend (" +
+          fmtM(pref.outstanding * pref.dividendRate / 4) + "/q)");
+      } else {
+        prefGroup.style.display = "none";
+      }
+    }
+  }
 
-.jenkins-warning { background:rgba(245,158,11,.12); border:1px solid rgba(245,158,11,.35); border-radius:var(--radius-sm); padding:8px 10px; font-size:11px; color:#fbbf24; line-height:1.5; margin-bottom:10px; }
-.jenkins-warning strong { color:#f59e0b; }
+  function renderAll(report) {
+    renderHeader();
+    renderPnL();
+    renderRatios();
+    renderBalanceSheet();
+    renderDebtPanel();
+    renderGoalsPanel();
+    renderBoardAttitudes();
+    renderMarketConditions();
+    renderStaff();
+    renderNews();
+    renderPortfolio();
+    renderPropertyMarket();
+    renderCapitalActions();
+    if (report) renderEarningsReport(report);
+    Charts.renderAll();
+  }
 
-/* NEWS TERMINAL */
-#news-terminal .panel-header { display:flex; justify-content:space-between; align-items:center; }
-.news-live { font-size:10px; color:#22c55e; font-family:monospace; letter-spacing:1px; animation:newsblink 2s infinite; }
-@keyframes newsblink { 0%,100%{opacity:1;} 50%{opacity:0.4;} }
-.news-feed { max-height:220px; overflow-y:auto; font-family:'SF Mono',Menlo,monospace; }
-.news-item { display:flex; gap:8px; align-items:baseline; padding:5px 0; border-bottom:1px solid rgba(51,65,85,.25); font-size:11.5px; line-height:1.4; }
-.news-period { color:var(--text-muted); font-size:10px; flex-shrink:0; min-width:38px; }
-.news-dot { font-size:9px; flex-shrink:0; }
-.news-text { color:var(--text); }
-.news-capital  { color:#f59e0b; }
-.news-debt     { color:#ef4444; }
-.news-dividend { color:#22c55e; }
-.news-rating   { color:#a78bfa; }
-.news-market   { color:#38bdf8; }
-.news-board    { color:#fbbf24; }
-.news-property { color:#2dd4bf; }
-.news-staff    { color:#818cf8; }
-.news-ambient  { color:#64748b; }
+  // ----------------------------------------------------------
+  // ANNUAL REPORT
+  // ----------------------------------------------------------
+  function showAnnualReport(snapshot) {
+    if (!snapshot) return;
+    var overlay = el("annual-report-overlay");
+    var content = el("annual-report-content");
+    if (!overlay || !content) return;
+    var isY1 = snapshot.year === 1;
+    function arw(a, b) { return a < b ? '<span class="text-green">▲</span>' : a > b ? '<span class="text-red">▼</span>' : "→"; }
+    var ratingOrder = ["CCC","B","BB","BBB","A","AA","AAA"];
+    var si = ratingOrder.indexOf(snapshot.startRating);
+    var ei = ratingOrder.indexOf(snapshot.endRating);
+    var ra = ei > si ? '<span class="text-green">▲</span>' : ei < si ? '<span class="text-red">▼</span>' : "→";
+    var goalsHTML = "";
+    if (snapshot.boardAssessment && snapshot.boardAssessment.goalResults) {
+      goalsHTML = '<div class="ar-section"><div class="ar-section-title">Goal Performance</div>';
+      snapshot.boardAssessment.goalResults.forEach(function(g) {
+        goalsHTML += '<div class="ar-goal ' + (g.met ? "ar-goal-met" : "ar-goal-missed") + '">' + (g.met ? "✅" : "❌") + ' ' + g.metric + ': ' + g.target + '</div>';
+      });
+      goalsHTML += '</div>';
+    }
+    var ngHTML = "";
+    if (snapshot.nextYearGoals && snapshot.nextYearGoals.length > 0) {
+      ngHTML = '<div class="ar-section"><div class="ar-section-title">Year ' + (snapshot.year + 1) + ' Board Targets</div>';
+      snapshot.nextYearGoals.forEach(function(g) { ngHTML += '<div class="ar-goal">▸ ' + g.metric + ': ' + g.target + '</div>'; });
+      ngHTML += '</div>';
+    }
+    var evHTML = "";
+    if (snapshot.yearEvents && snapshot.yearEvents.length > 0) {
+      evHTML = '<div class="ar-section"><div class="ar-section-title">Key Events</div>';
+      snapshot.yearEvents.forEach(function(e) { evHTML += '<div class="ar-event">▸ ' + e.headline + '</div>'; });
+      evHTML += '</div>';
+    }
+    var sp = snapshot.boardAssessment ? (snapshot.boardAssessment.startingPressure || 0) : 0;
+    var pnote = isY1 ? '<p class="ar-pressure-note">Starting Year 2 with <strong>' + sp + ' pressure point(s)</strong> on record.</p>' : "";
+    content.innerHTML =
+      '<div class="ar-header">' +
+      '<div class="ar-logo">' + GameState.company.name + '</div>' +
+      '<div class="ar-year">Annual Report — Year ' + snapshot.year + '</div>' +
+      (isY1 ? '<div class="ar-badge">Orientation Year Complete</div>' : '') +
+      '</div>' +
+      '<div class="ar-grid">' +
+      '<div class="ar-section"><div class="ar-section-title">Share Performance</div>' +
+      '<div class="ar-row"><span>Share Price</span><span>' + arw(snapshot.endPrice, snapshot.startPrice) + ' $' + snapshot.startPrice + ' → $' + snapshot.endPrice + ' (' + (snapshot.priceChg >= 0 ? "+" : "") + snapshot.priceChg + '%)</span></div></div>' +
+      '<div class="ar-section"><div class="ar-section-title">Full Year Financials</div>' +
+      '<div class="ar-row"><span>Total Revenue</span><span>' + fmtM(snapshot.totalRevenue) + '</span></div>' +
+      '<div class="ar-row"><span>Total NOI</span><span>' + fmtM(snapshot.totalNOI) + '</span></div>' +
+      '<div class="ar-row"><span>Total FFO</span><span class="text-green">' + fmtM(snapshot.totalFFO) + '</span></div>' +
+      '<div class="ar-row"><span>Dividends Paid</span><span>' + fmtM(snapshot.totalDividends) + '</span></div>' +
+      '<div class="ar-row"><span>Avg Coverage</span><span class="' + (snapshot.avgCoverage >= 1.0 ? "text-green" : "text-red") + '">' + fmt(snapshot.avgCoverage, 2) + 'x</span></div>' +
+      '</div>' +
+      '<div class="ar-section"><div class="ar-section-title">Balance Sheet</div>' +
+      '<div class="ar-row"><span>Total Assets</span><span>' + arw(snapshot.endAssets, snapshot.startAssets) + ' ' + fmtM(snapshot.startAssets) + ' → ' + fmtM(snapshot.endAssets) + '</span></div>' +
+      '<div class="ar-row"><span>Total Debt</span><span>' + fmtM(snapshot.startDebt) + ' → ' + fmtM(snapshot.endDebt) + '</span></div>' +
+      '<div class="ar-row"><span>Credit Rating</span><span>' + ra + ' ' + snapshot.startRating + ' → ' + snapshot.endRating + '</span></div>' +
+      '</div>' +
+      '<div class="ar-section"><div class="ar-section-title">Portfolio</div>' +
+      '<div class="ar-row"><span>Properties</span><span>' + snapshot.startProps + ' → ' + snapshot.endProps + '</span></div>' +
+      '<div class="ar-row"><span>Avg Occupancy</span><span class="' + (snapshot.avgOccupancy >= 0.85 ? "text-green" : "text-yellow") + '">' + fmtPct(snapshot.avgOccupancy) + '</span></div>' +
+      (snapshot.bestProp  ? '<div class="ar-row"><span>Best</span><span class="text-green">'  + snapshot.bestProp.name  + ' (' + snapshot.bestProp.occ  + '%)</span></div>' : '') +
+      (snapshot.worstProp ? '<div class="ar-row"><span>Worst</span><span class="text-red">'   + snapshot.worstProp.name + ' (' + snapshot.worstProp.occ + '%)</span></div>' : '') +
+      '</div>' +
+      evHTML + goalsHTML +
+      '</div>' +
+      '<div class="ar-board-letter"><div class="ar-section-title">Board Assessment</div>' +
+      '<p>' + (snapshot.boardAssessment ? (snapshot.boardAssessment.letter || "") : "") + '</p>' +
+      pnote + '</div>' +
+      ngHTML +
+      '<div class="ar-footer"><button class="btn btn-primary btn-lg" onclick="UI.closeAnnualReport()">Continue to Year ' + (snapshot.year + 1) + ' →</button></div>';
+    overlay.classList.remove("hidden");
+  }
 
-/* TUTORIAL TOGGLE */
-.tutorial-toggle-row { margin-top:4px; }
-.tutorial-toggle { display:flex; align-items:center; gap:8px; font-size:12px; color:var(--text-muted); cursor:pointer; }
-.tutorial-toggle input { width:16px; height:16px; cursor:pointer; }
+  function closeAnnualReport() {
+    var o = el("annual-report-overlay");
+    if (o) o.classList.add("hidden");
+    if (GameState.meta.gameOver) {
+      setTimeout(showGameOver, 400);
+    } else if (GameState._pendingBoardMeeting) {
+      GameState._pendingBoardMeeting = false;
+      setTimeout(showBoardMeeting, 400);
+    }
+  }
 
-.bm-dir-focus { font-size:8px; color:rgba(255,255,255,0.6); text-transform:uppercase; letter-spacing:0.3px; text-shadow:0 1px 2px rgba(0,0,0,0.9); margin-top:1px; }
+  // ----------------------------------------------------------
+  // HELP
+  // ----------------------------------------------------------
+  function showHelp() { var o = el("help-overlay"); if (o) o.classList.remove("hidden"); }
+  function closeHelp() { var o = el("help-overlay"); if (o) o.classList.add("hidden"); }
+  function switchHelpTab(tabId, btn) {
+    document.querySelectorAll(".help-tab-content").forEach(function(t) { t.classList.remove("active"); });
+    document.querySelectorAll(".help-tab-btn").forEach(function(b) { b.classList.remove("active"); });
+    var tab = document.getElementById(tabId);
+    if (tab) tab.classList.add("active");
+    if (btn) btn.classList.add("active");
+  }
 
-/* ===== UNIFIED QUARTER FEED ===== */
-.panel-feed { min-height:auto; }
-.feed-body { padding:14px 16px; }
+  // ----------------------------------------------------------
+  // PLAYER ACTIONS
+  // ----------------------------------------------------------
+  function confirmBuyProperty(propertyId) {
+    var prop = GameState.propertyMarket.find(function(p) { return p.id === propertyId; });
+    if (!prop) return;
+    showModal("Acquire " + prop.name,
+      "Sector: " + prop.sector + " | Location: " + prop.location + "\n" +
+      "Asking: " + fmtM(prop.askingPrice) + "  |  NOI: " + fmtM(prop.annualNOI) + "/yr\n" +
+      "Occupancy: " + fmtPct(prop.occupancy) + "  |  Cap Rate: " + GameState.market.capRates[prop.sector][prop.location] + "%\n\n" +
+      "Cash now: " + fmtM(GameState.balance.cash) + "  →  after: " + fmtM(GameState.balance.cash - prop.askingPrice),
+      [{ label: "Buy for " + fmtM(prop.askingPrice), style: "btn-primary", onClick: function() {
+        var r = Properties.buyProperty(propertyId);
+        showToast(r.message, r.success ? "success" : "error");
+        if (r.success) {
+          GameState.board.acquisitionsThisYear = (GameState.board.acquisitionsThisYear || 0) + 1;
+          renderAll();
+        }
+      }}]);
+  }
 
-/* EVENTS — loud, the things that happened TO you */
-.feed-event {
-  border-radius:6px;
-  padding:10px 12px;
-  margin-bottom:8px;
-  border-left:4px solid var(--border);
-  background:var(--surface2);
-}
-.feed-event-head { font-size:16px; font-weight:700; line-height:1.3; }
-.feed-event-impact { font-size:13px; margin-top:2px; opacity:0.85; }
-.feed-bad  { border-left-color:var(--red);    background:linear-gradient(90deg, rgba(239,68,68,0.12), var(--surface2)); }
-.feed-bad .feed-event-head { color:var(--red); }
-.feed-good { border-left-color:var(--green);  background:linear-gradient(90deg, rgba(34,197,94,0.12), var(--surface2)); }
-.feed-good .feed-event-head { color:var(--green); }
-.feed-neutral { border-left-color:var(--blue); background:linear-gradient(90deg, rgba(59,130,246,0.10), var(--surface2)); }
-.feed-neutral .feed-event-head { color:var(--text); }
+  function confirmSellProperty(propertyId) {
+    var prop = GameState.portfolio.find(function(p) { return p.id === propertyId; });
+    if (!prop) return;
+    showModal("Sell " + prop.name,
+      "Current Value: " + fmtM(prop.currentValue) + "\nPurchase Price: " + fmtM(prop.purchasePrice) + "\nCycle: " + GameState.market.cycle + "\n\nConfirm sale?",
+      [{ label: "Confirm Sale", style: "btn-danger", onClick: function() {
+        var r = Properties.sellProperty(propertyId);
+        showToast(r.message, r.success ? "success" : "error");
+        if (r.success) renderAll();
+      }}]);
+  }
 
-/* BOTTOM LINE — the punchline */
-.feed-bottom {
-  display:flex; align-items:baseline; gap:10px; flex-wrap:wrap;
-  margin-top:12px; padding:12px; border-radius:6px;
-  border:1px solid var(--border);
-}
-.feed-bottom.feed-good { background:rgba(34,197,94,0.10); border-color:var(--green); }
-.feed-bottom.feed-bad  { background:rgba(239,68,68,0.10); border-color:var(--red); }
-.feed-bottom-label { font-size:12px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.5px; }
-.feed-bottom-num { font-size:22px; font-weight:800; }
-.feed-bottom.feed-good .feed-bottom-num { color:var(--green); }
-.feed-bottom.feed-bad  .feed-bottom-num { color:var(--red); }
-.feed-bottom-verdict { font-size:13px; color:var(--text-muted); font-style:italic; }
-.feed-bottom-detail { font-size:12px; color:var(--text-muted); margin:6px 2px 0; }
+  function confirmRetireDebt(trancheId) {
+    var info = Financials.getCallInfo(trancheId);
+    if (!info) return;
+    showModal("Call " + info.label + "?",
+      "Per the bond indenture, this tranche may be redeemed early by paying the outstanding principal plus a call premium.\n\n" +
+      "Principal: " + fmtM(info.principal) + "\n" +
+      "Call premium (2.5%): " + fmtM(info.premium) + "\n" +
+      "Total cost to call: " + fmtM(info.total) + "\n\n" +
+      "Available cash: " + fmtM(GameState.balance.cash) + "\n\n" +
+      "Calling retires the bond and eliminates its future interest. Proceed?",
+      [{ label: "Call Bond", style: "btn-danger", onClick: function() {
+        var r = Financials.retireDebt(trancheId);
+        showToast(r.message, r.success ? "success" : "error");
+        if (r.success) renderAll();
+      }}]);
+  }
 
-/* YOUR ACTIONS — quiet, dim, secondary */
-.feed-actions { margin-top:12px; padding-top:8px; border-top:1px dashed var(--border); }
-.feed-action-line { font-size:11px; color:var(--text-muted); opacity:0.7; line-height:1.6; }
-.feed-quiet-note { font-size:13px; color:var(--text-muted); font-style:italic; padding:6px 0; }
+  // NEW: Lease Up action
+  function confirmRenovate(propertyId) {
+    var prop = GameState.portfolio.find(function(p) { return p.id === propertyId; });
+    if (!prop) return;
+    var cost = fmt(prop.currentValue * 0.10, 1);
+    showModal("Renovate: " + prop.name,
+      "Cost: $" + cost + "M (10% of value)\n" +
+      "Duration: 1 quarter offline (zero NOI)\n" +
+      "Effect: NOI +15% permanently | Occupancy +" + fmt(Math.min(8, (0.97 - prop.occupancy) * 100), 0) + "% on completion\n\n" +
+      "Cash available: " + fmtM(GameState.balance.cash) + "\n" +
+      "Current NOI: " + fmtM(prop.annualNOI) + "/yr — After: " + fmtM(prop.annualNOI * 1.15) + "/yr\n\n" +
+      "Payback: ~2.5-3 years from NOI gain + value appreciation.",
+      [{ label: "Start Renovation — $" + cost + "M", style: "btn-primary", onClick: function() {
+        var r = Properties.startRenovation(propertyId);
+        showToast(r.message, r.success ? "success" : "error");
+        if (r.success) renderAll();
+      }}]);
+  }
+
+  function confirmReposition(propertyId) {
+    var prop = GameState.portfolio.find(function(p) { return p.id === propertyId; });
+    if (!prop) return;
+    var targets = Properties.getRepositionTargets(prop);
+    if (targets.length === 0) { showToast("No repositioning options available.", "error"); return; }
+    var cost = fmt(prop.currentValue * 0.15, 1);
+
+    var targetText = targets.map(function(t) {
+      var newCapRate = GameState.market.capRates[t][prop.location];
+      var newNOI = fmt(prop.currentValue * newCapRate / 100, 1);
+      return t + " (projected NOI: $" + newNOI + "M/yr @ " + newCapRate + "% cap rate)";
+    }).join("\n");
+
+    showModal("Reposition: " + prop.name,
+      "Current: " + prop.sector + " · " + prop.location + " | NOI: " + fmtM(prop.annualNOI) + "/yr\n\n" +
+      "Available targets:\n" + targetText + "\n\n" +
+      "Cost: $" + cost + "M (15% of value)\n" +
+      "Duration: 2 quarters offline\n" +
+      "Cash available: " + fmtM(GameState.balance.cash),
+      targets.map(function(t) {
+        return {
+          label: "Reposition to " + t.charAt(0).toUpperCase() + t.slice(1),
+          style: "btn-primary",
+          onClick: function() {
+            var r = Properties.startRepositioning(propertyId, t);
+            showToast(r.message, r.success ? "success" : "error");
+            if (r.success) renderAll();
+          }
+        };
+      })
+    );
+  }
+
+  function leaseUp(propertyId) {
+    var prop = GameState.portfolio.find(function(p) { return p.id === propertyId; });
+    if (!prop) return;
+    if (prop.occupancy >= 0.90) { showToast("Occupancy already above 90% — no lease up needed.", "info"); return; }
+    // Once per property per year
+    if (prop.leaseUpYear === GameState.meta.year) {
+      showToast("Already leased up " + prop.name + " this year. Wait until next year.", "error"); return;
+    }
+    var cost = Math.round(prop.annualNOI * 0.12 * 10) / 10;
+    var boost = prop.occupancy < 0.65 ? 0.08 : prop.occupancy < 0.75 ? 0.06 : prop.occupancy < 0.85 ? 0.05 : 0.03;
+    showModal("Lease Up: " + prop.name,
+      "Current occupancy: " + fmtPct(prop.occupancy) + "\n" +
+      "Expected boost: +" + fmt(boost * 100, 0) + "% immediately\n" +
+      "Cost: $" + cost + "M (12% of annual NOI)\n" +
+      "Cash available: " + fmtM(GameState.balance.cash) + "\n\n" +
+      "Covers broker commissions, tenant improvements and free rent periods.",
+      [{ label: "Lease Up — $" + cost + "M", style: "btn-primary", onClick: function() {
+        if (GameState.balance.cash < cost) { showToast("Insufficient cash.", "error"); return; }
+        GameState.balance.cash = Math.round((GameState.balance.cash - cost) * 100) / 100;
+        prop.occupancy = Math.min(0.97, Math.round((prop.occupancy + boost) * 1000) / 1000);
+        showToast(prop.name + " occupancy boosted to " + fmtPct(prop.occupancy), "success");
+        GameState.board.leaseUpsThisYear = (GameState.board.leaseUpsThisYear || 0) + 1;
+        prop.leaseUpYear = GameState.meta.year;
+        renderAll();
+      }}]);
+  }
+
+  function handleIssueDebt() {
+    var amtEl = el("input-debt-amount"), yrEl = el("input-debt-years");
+    var amount = amtEl ? parseFloat(amtEl.value) : NaN;
+    var years  = yrEl  ? parseInt(yrEl.value)    : NaN;
+    if (isNaN(amount) || amount <= 0)            { showToast("Enter a valid amount", "error"); return; }
+    if (isNaN(years) || years < 1 || years > 10) { showToast("Select a valid term.", "error"); return; }
+    var rate = Financials.getCurrentBorrowingRateForTerm ? Financials.getCurrentBorrowingRateForTerm(years) : Market.getCurrentBorrowingRate();
+    var portfolioValue = GameState.portfolio.reduce(function(s, p) { return s + p.currentValue; }, 0);
+    var currentDebt    = GameState.debtTranches.reduce(function(s, t) { return s + t.amount; }, 0);
+    var capacity       = Math.round((portfolioValue * 0.80 - currentDebt) * 10) / 10;
+    var ltv            = portfolioValue > 0 ? Math.round(currentDebt / portfolioValue * 100) : 0;
+    var hasCFO         = typeof Staff !== "undefined" && Staff.hasRole("financial");
+    var buttons = [{ label: "Issue Secured at " + fmt(rate, 2) + "%", style: "btn-primary", onClick: function() {
+        var r = Financials.issueDebt(amount, years, false);
+        showToast(r.message, r.success ? "success" : "error");
+        if (r.success) { if (amtEl) amtEl.value = ""; renderAll(); }
+      }}];
+    if (hasCFO) {
+      buttons.push({ label: "Issue Unsecured at " + fmt(rate + 1.5, 2) + "%", style: "btn-secondary", onClick: function() {
+        var r = Financials.issueDebt(amount, years, true);
+        showToast(r.message, r.success ? "success" : "error");
+        if (r.success) { if (amtEl) amtEl.value = ""; renderAll(); }
+      }});
+    }
+    showModal("Issue New Debt",
+      "Amount: " + fmtM(amount) + "  |  Term: " + years + " yrs  |  Secured rate: " + fmt(rate, 2) + "%\n" +
+      "Current LTV: " + ltv + "%  |  Secured capacity: " + fmtM(Math.max(0, capacity)) + " (80% LTV)\n" +
+      (hasCFO ? "Unsecured available (CFO): +1.5% rate, bypasses LTV, capped ~25% of portfolio." : "Hire a CFO to unlock unsecured corporate debt (bypasses the LTV ceiling)."),
+      buttons);
+  }
+
+  function handleIssueEquity() {
+    var sharesEl = el("input-equity-shares");
+    var shares = sharesEl ? parseFloat(sharesEl.value) : NaN;
+    if (isNaN(shares) || shares <= 0) { showToast("Enter valid shares", "error"); return; }
+    var ip = GameState.company.sharePrice * 0.95;
+    showModal("Issue Equity",
+      "Shares: " + fmt(shares, 1) + "M  |  Price: " + fmtPS(ip) + " (5% disc)\n" +
+      "Proceeds: " + fmtM(shares * ip) + "  |  Dilution: " + fmt(shares / GameState.company.sharesOutstanding * 100, 1) + "%",
+      [{ label: "Issue Shares", style: "btn-primary", onClick: function() {
+        var r = Financials.issueEquity(shares);
+        showToast(r.message, r.success ? "success" : "error");
+        if (r.success) { if (sharesEl) sharesEl.value = ""; renderAll(); }
+      }}]);
+  }
+
+  function handleBuyback() {
+    var sharesEl = el("input-buyback-shares");
+    var shares = sharesEl ? parseFloat(sharesEl.value) : NaN;
+    if (isNaN(shares) || shares <= 0) { showToast("Enter valid shares", "error"); return; }
+    var maxShares = fmt(GameState.company.sharesOutstanding * 0.05, 2);
+    var cost = shares * GameState.company.sharePrice;
+    var alreadyDone = GameState.company.lastBuybackYear === GameState.meta.year;
+    showModal("Share Buyback",
+      "Shares: " + fmt(shares, 1) + "M  |  Cost: " + fmtM(cost) + "\n" +
+      "Cash after: " + fmtM(GameState.balance.cash - cost) + "\n\n" +
+      "Limit: max 5% of float per year (" + maxShares + "M shares).\n" +
+      (alreadyDone ? "⚠ Already used this year — next available Year " + (GameState.meta.year + 1) + "." : "Available this year."),
+      [{ label: "Buy Back", style: "btn-primary", onClick: function() {
+        var r = Financials.buybackShares(shares);
+        showToast(r.message, r.success ? "success" : "error");
+        if (r.success) { if (sharesEl) sharesEl.value = ""; renderAll(); }
+      }}]);
+  }
+
+  function handleRedeemPreferred() {
+    var pref = GameState.preferred;
+    if (!pref || !pref.issued || pref.outstanding <= 0) { showToast("No preferred stock outstanding.", "error"); return; }
+    showModal("Redeem Preferred Stock",
+      "Outstanding: " + fmtM(pref.outstanding) + " (" + pref.shares + "M shares @ $" + pref.parValue + " par)\n" +
+      "Redemption cost (at par): " + fmtM(pref.outstanding) + "\n" +
+      "Cash after: " + fmtM(GameState.balance.cash - pref.outstanding) + "\n\n" +
+      "This buys back all preferred shares at par and ends the " + (pref.dividendRate*100) + "% preferred dividend. Proceed?",
+      [{ label: "Redeem at Par", style: "btn-primary", onClick: function() {
+        var r = Financials.redeemPreferred();
+        showToast(r.message, r.success ? "success" : "error");
+        if (r.success) renderAll();
+      }}]);
+  }
+
+  function handleSetDividend() {
+    var divEl = el("input-dividend");
+    var newDiv = divEl ? parseFloat(divEl.value) : NaN;
+    if (isNaN(newDiv) || newDiv < 0) { showToast("Enter valid dividend", "error"); return; }
+    var old   = GameState.company.dividendPerShare;
+    var isCut    = newDiv < old - 0.001;
+    var startDiv = GameState.board.startYearDividend || 0.10;
+    var minDiv   = GameState.meta.year <= 1 ? fmt(old, 2) : fmt(startDiv * 0.50, 2);
+    var floorNote = GameState.meta.year <= 1
+      ? "\n⚠ Year 1: dividend is locked — no cuts allowed."
+      : "\nFloor this year: $" + minDiv + "/share (50% of year-start $" + fmt(startDiv,2) + ")";
+    var warn = isCut
+      ? "WARNING: Cutting dividend causes share price drop and board pressure." + floorNote
+      : newDiv > old + 0.001 ? "Raising dividend signals confidence." : "No change.";
+    showModal("Set Quarterly Dividend",
+      "Current: " + fmtPS(old) + "  →  New: " + fmtPS(newDiv) + "\nQuarterly cost: " + fmtM(newDiv * GameState.company.sharesOutstanding) + "\n\n" + warn,
+      [{ label: isCut ? "Cut Dividend" : "Set Dividend", style: isCut ? "btn-danger" : "btn-primary", onClick: function() {
+        var r = Financials.setDividend(newDiv);
+        showToast(r.message, r.success ? "success" : "error");
+        if (r.success) { if (divEl) divEl.value = ""; renderAll(); }
+      }}]);
+  }
+
+  function handleDividendQuickRaise(pct) {
+    var old = GameState.company.dividendPerShare;
+    var newDiv = fmt(old * (1 + pct / 100), 4);
+    // Round to a clean cent
+    newDiv = Math.round(newDiv * 100) / 100;
+    if (newDiv <= old) newDiv = fmt(old + 0.01, 2); // ensure it actually rises
+    showModal("Raise Dividend +" + pct + "%",
+      "Current: " + fmtPS(old) + "  →  New: " + fmtPS(newDiv) + "\nQuarterly cost: " + fmtM(newDiv * GameState.company.sharesOutstanding) + "\n\nRaising the dividend pleases the board and signals confidence.",
+      [{ label: "Raise to " + fmtPS(newDiv), style: "btn-primary", onClick: function() {
+        var r = Financials.setDividend(newDiv);
+        showToast(r.message, r.success ? "success" : "error");
+        if (r.success) renderAll();
+      }}]);
+  }
+
+
+  var _boardMeetingState = {
+    mandates:       [],
+    currentIndex:   0,
+    voteResult:     null,
+    earnedCapital:  [],
+    mandateResults: [],
+    typingTimer:    null,
+  };
+
+  function showBoardMeeting() {
+    // Earn capital ONCE per board meeting (guard against re-entry inflating it)
+    var capital;
+    if (GameState.board._capitalEarnedYear !== GameState.meta.year) {
+      capital = Board.earnPoliticalCapital();
+      GameState.board._capitalEarnedYear = GameState.meta.year;
+      GameState.board._lastEarnedCapital = capital;
+    } else {
+      capital = GameState.board._lastEarnedCapital || [];
+    }
+    var mandates;
+    if (GameState.board._mandatesYear === GameState.meta.year && GameState.board._cachedMandates) {
+      mandates = GameState.board._cachedMandates;
+    } else {
+      mandates = Board.generateMandates();
+      GameState.board._mandatesYear = GameState.meta.year;
+      GameState.board._cachedMandates = mandates;
+    }
+    var mandateResults = Board.evaluateMandates();
+
+    _boardMeetingState.mandates       = mandates;
+    _boardMeetingState.currentIndex   = 0;
+    _boardMeetingState.earnedCapital  = capital;
+    _boardMeetingState.mandateResults = mandateResults;
+
+    var overlay = el("board-meeting-overlay");
+    if (overlay) overlay.classList.remove("hidden");
+
+    renderBoardMeetingHeader();
+    showCurrentMandate();
+  }
+
+  function renderBoardMeetingHeader() {
+    var dirs = Board.DIRECTORS;
+    var headerEl = el("bm-directors-row");
+    if (!headerEl) return;
+
+    headerEl.innerHTML = dirs.map(function(d) {
+      var ds   = Board.getDirectorState(d.id);
+      var att  = ds ? ds.attitude : 5;
+      var expr = Board.getExpression(att);
+      var stars = "";
+      for (var i = 0; i < 10; i++) {
+        stars += i < Math.round(att) ? "★" : "☆";
+      }
+      var isCurrent = _boardMeetingState.mandates[_boardMeetingState.currentIndex] &&
+        _boardMeetingState.mandates[_boardMeetingState.currentIndex].directorId === d.id;
+
+      return '<div class="bm-director ' + (isCurrent ? "bm-director-active" : "") + '" id="bm-dir-' + d.id + '">' +
+        '<div class="bm-portrait-wrap">' +
+        (function() {
+          var dims = { williams:{w:987,h:253}, chen:{w:949,h:263}, okafor:{w:938,h:266}, petrova:{w:950,h:262}, hassan:{w:949,h:263} };
+          var dim  = dims[d.id] || {w:949,h:263};
+          var containerH = 130;
+          var scale = containerH / dim.h;
+          var scaledW = Math.round(dim.w * scale);
+          var xPos = expr === "neutral" ? "0%" : expr === "happy" ? "33.33%" : expr === "angry" ? "66.66%" : "100%";
+          // If this director is the current speaker, force the speaking frame (4th)
+          if (isCurrent) xPos = "100%";
+          return '<div class="bm-portrait" id="bm-sprite-' + d.id + '" style="background-image:url(\'' + d.image + '\');background-size:' + scaledW + 'px ' + containerH + 'px;background-position:' + xPos + ' 0%;background-repeat:no-repeat;"></div>';
+        })() +
+        '</div>' +
+        '<div class="bm-dir-name">' + d.name.split(" ")[1] + '</div>' +
+        '<div class="bm-dir-focus">' + ({williams:"Dividends",chen:"Growth",okafor:"Leverage",petrova:"Share Price",hassan:"Occupancy"}[d.id] || "") + '</div>' +
+        '<div class="bm-dir-stars ' + (att < 3 ? "text-red" : att >= 7 ? "text-green" : "text-yellow") + '">' + fmt(att, 1) + '/10</div>' +
+        '</div>';
+    }).join("");
+  }
+
+  function showCurrentMandate() {
+    var mandates = _boardMeetingState.mandates;
+    var idx      = _boardMeetingState.currentIndex;
+
+    if (idx >= mandates.length) {
+      showBoardVote();
+      return;
+    }
+
+    var mandate = mandates[idx];
+    var director = Board.DIRECTORS.find(function(d) { return d.id === mandate.directorId; });
+    var ds       = Board.getDirectorState(mandate.directorId);
+    var attitude = ds ? ds.attitude : 5;
+
+    // Update header — highlight speaking director
+    renderBoardMeetingHeader();
+
+    // Set speaking director info
+    setText("bm-speaker-name", director ? director.name : "");
+    setText("bm-speaker-title", director ? director.title : "");
+    setText("bm-mandate-counter", "Mandate " + (idx + 1) + " of " + mandates.length);
+    setText("bm-capital-display", "Political Capital: " + GameState.board.politicalCapital + "/" + GameState.board.maxCapital);
+
+    // Clear previous state BEFORE typing the new speech
+    var voteBox = document.querySelector(".bm-vote-box");
+    if (voteBox) voteBox.remove();
+
+    // Generate and type speech
+    var speech = Board.generateSpeech(mandate.directorId, mandate, attitude);
+    typeText("bm-speech-text", speech);
+
+    // Update buttons
+    var btnArea = el("bm-response-buttons");
+    if (btnArea) {
+      btnArea.innerHTML = "";
+      var bmButtons = [
+      {r:"accept",    cls:"btn-primary",   label:"Accept",       icon:"Accept",    cost:""},
+      {r:"negotiate", cls:"btn-secondary",  label:"Negotiate Down",icon:"Negotiate", cost:" (1 capital)"},
+      {r:"doubledown",cls:"btn-secondary",  label:"Double Down",  icon:"Double",    cost:""},
+      {r:"reject",    cls:"btn-danger",     label:"Reject",       icon:"Reject",    cost:" (2 capital)"},
+    ];
+    var html = "";
+    bmButtons.forEach(function(b) {
+      var btn = document.createElement("button");
+      btn.className = "btn " + b.cls + " bm-btn";
+      btn.textContent = b.label + b.cost;
+      btn.setAttribute("data-response", b.r);
+      btn.onclick = function() { UI.boardResponse(b.r); };
+      btnArea.appendChild(btn);
+    });
+    }
+
+    // Update speaking director portrait to speaking expression
+    var portraitDiv = el("bm-sprite-" + mandate.directorId);
+    if (portraitDiv) portraitDiv.style.backgroundPosition = "100% 0%";
+  }
+
+  function boardResponse(response) {
+    var mandates = _boardMeetingState.mandates;
+    var idx      = _boardMeetingState.currentIndex;
+    if (idx >= mandates.length) return;
+
+    var mandate = mandates[idx];
+    var capital = GameState.board.politicalCapital;
+
+    // Check capital cost
+    if (response === "negotiate" && capital < 1) {
+      showToast("Insufficient political capital. Need 1.", "error"); return;
+    }
+    if (response === "reject" && capital < 2) {
+      showToast("Insufficient political capital. Need 2.", "error"); return;
+    }
+
+    // Spend capital
+    if (response === "negotiate") GameState.board.politicalCapital--;
+    if (response === "reject")    GameState.board.politicalCapital -= 2;
+
+    // Handle negotiate roll
+    if (response === "negotiate") {
+      var director = Board.DIRECTORS.find(function(d) { return d.id === mandate.directorId; });
+      var successRate = director ? director.negotiateSuccessRate : 0.5;
+      var success = Math.random() < successRate;
+
+      if (success) {
+        mandate.response = "negotiate";
+        mandate.target   = mandate.target * 0.55;
+        showToast("Negotiation successful! Target reduced by 45%.", "success");
+      } else {
+        var ds = Board.getDirectorState(mandate.directorId);
+        if (ds) ds.attitude = Math.max(0, ds.attitude - 0.5);
+        mandate.response = "accept"; // falls back to accept at original target
+        showToast("Negotiation failed. Director is not pleased. Target unchanged.", "error");
+      }
+    } else {
+      mandate.response = response;
+    }
+
+    // Show result feedback
+    var feedback = {
+      accept:     "You have accepted the mandate. Deliver on your promise.",
+      negotiate:  "",
+      doubledown: "Bold commitment. The director is watching closely.",
+      reject:     "Mandate rejected. The director is displeased but it is removed.",
+    };
+    if (feedback[response]) showToast(feedback[response], "info");
+
+    // Advance to next mandate
+    _boardMeetingState.currentIndex++;
+    setTimeout(function() {
+      showCurrentMandate();
+      renderBoardMeetingHeader();
+      setText("bm-capital-display", "Political Capital: " + GameState.board.politicalCapital + "/" + GameState.board.maxCapital);
+    }, 800);
+  }
+
+  function showBoardVote() {
+    var voteResult = Board.conductVote();
+    _boardMeetingState.voteResult = voteResult;
+
+    var btnArea = el("bm-response-buttons");
+    if (btnArea) btnArea.innerHTML = "";
+    var speechEl3 = el("bm-speech-text");
+    if (speechEl3) speechEl3.textContent = "";
+
+    // Show backroom deal option if any hostile and have capital
+    var hostileDirs = voteResult.votes.filter(function(v) { return v.hostile; });
+    var canDeal = hostileDirs.length > 0 && GameState.board.politicalCapital >= 3;
+
+    var voteHTML = '<div class="bm-vote-header">BOARD VOTE — Year ' + (GameState.meta.year - 1) + '</div>' +
+      '<div class="bm-vote-grid">' +
+      voteResult.votes.map(function(v) {
+        return '<div class="bm-vote-item">' +
+          '<div class="bm-vote-name">' + v.name + '</div>' +
+          '<div class="bm-vote-att">' + fmt(v.attitude, 1) + '/10</div>' +
+          '<div class="bm-vote-result ' + (v.hostile ? "text-red" : "text-green") + '">' +
+          (v.hostile ? "⚑ HOSTILE" : "✓ CONFIDENCE") +
+          (v.veto ? " (VETO)" : "") + '</div>' +
+          '</div>';
+      }).join("") +
+      '</div>' +
+      '<div class="bm-vote-summary">' +
+      'Confidence: ' + voteResult.confidenceCount + ' | Hostile: ' + voteResult.hostileCount +
+      (voteResult.williamsVeto ? ' | Williams VETO active — need 4 confidence' : ' | Need 3 confidence') +
+      '</div>';
+
+    typeText("bm-speech-text", voteResult.fired
+      ? "The motion to remove management has passed. " + voteResult.hostileCount + " directors have lost confidence."
+      : "Management retains the board's confidence. " + voteResult.confidenceCount + " votes in favour.");
+
+    var speechEl = el("bm-speech-text");
+    if (speechEl) speechEl.insertAdjacentHTML("afterend", '<div class="bm-vote-box">' + voteHTML + '</div>');
+
+    setText("bm-speaker-name", "BOARD VOTE");
+    setText("bm-speaker-title", voteResult.fired ? "Vote to remove — PASSED" : "Vote of confidence — PASSED");
+
+    // Backroom deal button
+    if (canDeal) {
+      if (btnArea) btnArea.innerHTML =
+        '<button class="btn btn-danger bm-btn" onclick="UI.backroomDeal()">' +
+        '🤝 Backroom Deal — Reset 1 hostile director to 3 (costs 3 capital)</button>' +
+        '<button class="btn btn-primary bm-btn" onclick="UI.closeBoardMeeting()">' +
+        (voteResult.fired ? "Accept Termination" : "Continue to Year " + GameState.meta.year) + '</button>';
+    } else {
+      if (btnArea) btnArea.innerHTML =
+        '<button class="btn btn-primary bm-btn" onclick="UI.closeBoardMeeting()">' +
+        (voteResult.fired ? "Accept Termination" : "Continue to Year " + GameState.meta.year) + '</button>';
+    }
+
+    renderBoardMeetingHeader();
+  }
+
+  function backroomDeal() {
+    var voteResult = _boardMeetingState.voteResult;
+    if (!voteResult) return;
+    if (GameState.board.politicalCapital < 3) { showToast("Need 3 political capital.", "error"); return; }
+
+    // Find most hostile director (lowest attitude)
+    var hostile = voteResult.votes.filter(function(v) { return v.hostile; });
+    if (hostile.length === 0) return;
+
+    hostile.sort(function(a, b) { return a.attitude - b.attitude; });
+    var target = hostile[0];
+    var ds = Board.getDirectorState(target.id);
+    if (ds) ds.attitude = 3;
+    target.hostile = false;
+    target.attitude = 3;
+
+    GameState.board.politicalCapital -= 3;
+    showToast("Backroom deal done. " + target.name + " reset to 3/10.", "success");
+
+    // Re-run vote
+    var newResult = Board.conductVote();
+    _boardMeetingState.voteResult = newResult;
+
+    var voteBox = document.querySelector(".bm-vote-box");
+    if (voteBox) voteBox.remove();
+
+    showBoardVote();
+  }
+
+  function closeBoardMeeting() {
+    var overlay = el("board-meeting-overlay");
+    if (overlay) overlay.classList.add("hidden");
+
+    var voteResult = _boardMeetingState.voteResult;
+    if (voteResult && voteResult.fired) {
+      GameState.meta.gameOver = true;
+      GameState.meta.gameOverReason = "The board voted " + voteResult.hostileCount + "-" + voteResult.confidenceCount +
+        " to remove you as CEO of " + GameState.company.name + " after Year " + (GameState.meta.year - 1) + ".";
+      setTimeout(function() {
+        showGameOver();
+        var scoreData = Leaderboard.calculateScore();
+        setTimeout(function() { Leaderboard.showSubmitScreen(scoreData); }, 800);
+      }, 400);
+    } else {
+      // Reset year tracking for new year
+      Board.resetYearTracking();
+      // Refresh the talent market with new candidates for unfilled roles
+      Staff.refreshTalentMarket();
+    }
+  }
+
+  function typeText(elementId, text) {
+    var e = el(elementId);
+    if (!e) return;
+    if (_boardMeetingState.typingTimer) clearInterval(_boardMeetingState.typingTimer);
+    e.textContent = "";
+    var i = 0;
+    _boardMeetingState.typingTimer = setInterval(function() {
+      if (i < text.length) {
+        e.textContent += text[i];
+        i++;
+      } else {
+        clearInterval(_boardMeetingState.typingTimer);
+      }
+    }, 18);
+  }
+
+  // ----------------------------------------------------------
+  // DECISION EVENT MODAL
+  // ----------------------------------------------------------
+  var _currentDecision = null;
+
+  function showDecisionEvent(evt) {
+    _currentDecision = evt;
+    var html = '<div class="decision-header">' + evt.headline + '</div>' +
+      '<div class="decision-body">' + evt.body.replace(/\n/g,"<br>") + '</div>' +
+      '<div class="decision-choices">';
+
+    evt.choices.forEach(function(c, i) {
+      var costBadge = c.costType === "capital"
+        ? '<span class="cost-badge cost-capital">💡 ' + (c.cost||1) + ' Capital</span>'
+        : c.costType === "cash"
+        ? '<span class="cost-badge cost-cash">💰 Cash</span>'
+        : '<span class="cost-badge cost-income">📉 Income</span>';
+
+      html += '<div class="decision-choice" onclick="UI.makeDecision(' + i + ')">' +
+        '<div class="choice-label">' + c.label + costBadge + '</div>' +
+        '<div class="choice-detail">' + c.detail.replace(/\n/g,"<br>") + '</div>' +
+        '</div>';
+    });
+
+    html += '</div>' +
+      '<div class="decision-capital">💡 Political Capital: ' +
+      (GameState.board.politicalCapital||0) + '/' + (GameState.board.maxCapital||5) + '</div>';
+
+    showModal(evt.headline, "", []);
+    var body = el("modal-body");
+    if (body) body.innerHTML = html;
+    var actions = el("modal-actions");
+    if (actions) actions.innerHTML = "";
+  }
+
+  function makeDecision(choiceIndex) {
+    if (!_currentDecision) return;
+    var result = Decisions.applyChoice(_currentDecision, choiceIndex);
+    if (!result.success) {
+      // Invalid choice (e.g. not enough capital) — keep the modal open,
+      // the player must choose a valid option. No free escape.
+      showToast(result.message, "error");
+      return;
+    }
+    _currentDecision = null;
+    closeModal();
+    showToast(result.message, "success");
+    // Now run the quarter
+    setTimeout(runQuarterAndReport, 400);
+  }
+
+  // ----------------------------------------------------------
+  // MACRO EVENT POPUP — shows before earnings report for major events
+  // ----------------------------------------------------------
+  function showMacroEventPopup(firedEvents, callback) {
+    var macroEvents = firedEvents.filter(function(e) { return e.isMacro === true; });
+    if (macroEvents.length === 0) { callback(); return; }
+    var body = macroEvents.map(function(e) {
+      return e.headline + "\n" + e.body + "\n\nImpact: " + e.impact;
+    }).join("\n\n─────────────────\n\n");
+    showModal("⚡ Major Market Event — " + GameState.currentPeriodLabel(), body,
+      [{ label: "Understood — Continue", style: "btn-primary", onClick: callback }]
+    );
+  }
+
+  // ----------------------------------------------------------
+  // ADVANCE QUARTER
+  // ----------------------------------------------------------
+  function advanceQuarter() {
+    if (GameState.meta.gameOver) { showGameOver(); return; }
+    if (GameState._pendingOffer) {
+      var offer = GameState._pendingOffer;
+      var portraitHTML = offer.alPortrait
+        ? '<div style="display:flex;gap:10px;align-items:center;margin-bottom:10px;"><img src="assets/staff/' + offer.alPortrait + '" style="width:52px;height:52px;border-radius:6px;image-rendering:pixelated;" alt="' + (offer.alName||"") + '"><div style="font-size:12px;color:var(--text-muted);font-style:italic;">' + (offer.alName||"Acquisitions") + ' sourced this buyer.</div></div>'
+        : '';
+      showModal("Offer Expiring: " + offer.propertyName,
+        portraitHTML + "Offer: " + fmtM(offer.offerPrice) + " (" + offer.premium + "% premium)\nExpires this quarter — accept or decline?",
+        [
+          { label: "Accept " + fmtM(offer.offerPrice), style: "btn-primary", onClick: function() {
+            var r = Properties.sellProperty(offer.propertyId);
+            if (r.success) {
+              GameState.balance.cash = Math.round((GameState.balance.cash - r.salePrice + offer.offerPrice) * 100) / 100;
+              showToast("Accepted: " + fmtM(offer.offerPrice), "success");
+            }
+            GameState._pendingOffer = null;
+            doAdvance();
+          }},
+          { label: "Decline", style: "btn-secondary", onClick: function() { GameState._pendingOffer = null; doAdvance(); }}
+        ]);
+      return;
+    }
+    doAdvance();
+  }
+
+  function doAdvance() {
+    // Check for decision event BEFORE quarter runs
+    var decisionEvt = Decisions.checkForEvent();
+    if (decisionEvt) {
+      showDecisionEvent(decisionEvt);
+      // Quarter will run after player closes modal via makeDecision
+      // Store pending advance
+      GameState._pendingAdvance = true;
+      return;
+    }
+    runQuarterAndReport();
+  }
+
+  function runQuarterAndReport() {
+    GameState._pendingAdvance = false;
+    var qr = Financials.runQuarter();
+    // Turn off tutorial BEFORE generating report
+    if (GameState.meta.year === 2 && GameState.meta.quarter === 1) {
+      GameState.meta.tutorialYear = false;
+    }
+    var br = Board.evaluateQuarter();
+    var rp = Board.generateEarningsReport(qr, br);
+    var justEndedYear = GameState.meta.quarter === 1 && GameState.meta.totalQuarters > 1;
+
+    // NEW: Show macro event popup if any fired, then continue
+    function continueAfterEvents() {
+      // Year-15 victory (or any win) overrides the normal year-end flow.
+      if (GameState.meta.gameOver && GameState.meta.gameWon) {
+        renderAll(rp);
+        var sdWin = Leaderboard.calculateScore();
+        setTimeout(function() {
+          showGameOver();
+          setTimeout(function() { Leaderboard.showSubmitScreen(sdWin); }, 1200);
+        }, 800);
+        return;
+      }
+      if (justEndedYear) {
+        var snap = Board.generateAnnualReport();
+        renderAll(rp);
+        if (GameState.meta.year === 2) {
+          // Just ended Year 1 — safe year, show annual report only
+          setTimeout(function() { showAnnualReport(snap); }, 600);
+        } else {
+          // Ended Year 2+ — show annual report, then board meeting
+          GameState._pendingBoardMeeting = true;
+          setTimeout(function() { showAnnualReport(snap); }, 600);
+        }
+      } else {
+        renderAll(rp);
+      }
+      var re = el("earnings-report");
+      if (re) re.scrollIntoView({ behavior: "smooth", block: "start" });
+      if (GameState.meta.gameOver && !justEndedYear) {
+        var sd = Leaderboard.calculateScore();
+        setTimeout(function() {
+          showGameOver();
+          setTimeout(function() { Leaderboard.showSubmitScreen(sd); }, 800);
+        }, 1200);
+      }
+      if (qr.marketResult && qr.marketResult.cycleResult && qr.marketResult.cycleResult.cycleChanged) {
+        var cy = qr.marketResult.cycleResult;
+        setTimeout(function() { showToast("Market shift: " + cy.label, "warning"); }, 800);
+      }
+
+      // Acquisitions Lead mega-property find announcement
+      if (GameState._pendingMegaFind) {
+        var mf = GameState._pendingMegaFind;
+        GameState._pendingMegaFind = null;
+        var mfPortrait = mf.alPortrait
+          ? '<div style="display:flex;gap:10px;align-items:center;margin-bottom:10px;"><img src="assets/staff/' + mf.alPortrait + '" style="width:52px;height:52px;border-radius:6px;image-rendering:pixelated;" alt="' + (mf.alName||"") + '"><div style="font-size:12px;color:var(--text-muted);font-style:italic;">' + (mf.alName||"Acquisitions") + '</div></div>'
+          : '';
+        setTimeout(function() {
+          showModal("★ Off-Market Opportunity",
+            mfPortrait +
+            '"Boss, I\'ve sourced something off-market — ' + mf.propName + ', a ' + mf.sector +
+            ' asset with a ' + mf.tenant + ' on a long lease. These don\'t come up often. ' +
+            'It\'s in the Property Market now, asking ' + fmtM(mf.price) + '. Worth a look before someone else takes it."',
+            [{ label: "View the Market", style: "btn-primary", onClick: function() {
+              closeModal();
+              var btn = document.querySelector('.section-tab-btn[onclick*="tab-market"]');
+              if (btn) switchTab('tab-market', btn);
+            }},
+             { label: "Later", style: "btn-secondary", onClick: closeModal }]
+          );
+        }, 1000);
+      }
+
+      // Jenkins Year-1 tutorial (queued after other popups)
+      setTimeout(function() {
+        if (el("modal-overlay") && !el("modal-overlay").classList.contains("hidden")) return; // don't stack
+        // Chief Placemaking Officer events take priority
+        if (GameState._placemakingJustJoined) {
+          GameState._placemakingJustJoined = false;
+          showJenkinsPopup("Jenkins — A New Colleague",
+            "Boss, awkward news. Chairman Williams has installed his associate <strong>Reginald Thorne-Whitley</strong> as our new <strong>Chief Placemaking Officer</strong> — something about 'activating synergies in the built environment.' " +
+            "Nobody's quite sure what he does. He costs us <strong>$0.85M a quarter</strong>, and... we can't let him go. Board's orders. Best smile and bear it.");
+          return;
+        }
+        if (GameState._placemakingTraitJustFired) {
+          GameState._placemakingTraitJustFired = false;
+          showJenkinsPopup("Jenkins — Placemaking 'Initiatives'",
+            "Boss, our Chief Placemaking Officer has launched his 'holistic tenant-experience reimagining program.' " +
+            "Translation: it does nothing measurable and it's inflating our G&A by about <strong>10%</strong> from here on. I did try to talk him out of it.");
+          return;
+        }
+        if (GameState._ownerRelationsJustFired) {
+          GameState._ownerRelationsJustFired = false;
+          showJenkinsPopup("Jenkins — A New Department",
+            "Boss, more news from upstairs. The Placemaking Officer has spun up an entire <strong>Owner Relations Department</strong>, headed by his hire <strong>Janice Ling</strong>. " +
+            "What it does is anyone's guess, but it's adding <strong>$0.4M a quarter</strong> to our overhead. The org chart grows ever stranger.");
+          return;
+        }
+        if (GameState._esgJustFired) {
+          GameState._esgJustFired = false;
+          showJenkinsPopup("Jenkins — ESG Conversion Program",
+            "Boss, the nephew's latest crusade: a portfolio-wide <strong>ESG conversion program</strong> — green retrofits, wellness lobbies, 'biophilic' nonsense. " +
+            "It's raising our operating expenses by about <strong>5%</strong> across every property. The board applauded. Of course they did.");
+          return;
+        }
+        if (GameState._towerJustStarted) {
+          GameState._towerJustStarted = false;
+          var towerSp = GameState.placemaking ? fmt(GameState.placemaking.towerSpend) : 0;
+          showJenkinsPopup("Jenkins — 'Celestial Heights'",
+            "Boss, brace yourself. The board — egged on by you-know-who — has approved a signature supertall trophy tower: <strong>Celestial Heights</strong>. " +
+            "'A legacy landmark for the firm.' It commits us to roughly <strong>$" + towerSp + "M every quarter for three years</strong>, earns nothing while it's built, and we can't stop without writing off everything. " +
+            "This is exactly how empires fall, boss. Survive it and you're immortal.");
+          return;
+        }
+        if (GameState._towerOverrunJustFired) {
+          GameState._towerOverrunJustFired = false;
+          showJenkinsPopup("Jenkins — Cost Overrun",
+            "Boss, Celestial Heights is over budget — naturally. Steel prices, redesigns, the architect's ego. " +
+            "Our committed quarterly spend just jumped <strong>35%</strong>. The hole gets deeper.");
+          return;
+        }
+        if (GameState._towerJustFinished) {
+          GameState._towerJustFinished = false;
+          showJenkinsPopup("Jenkins — It's Finished",
+            "Boss... Celestial Heights is complete. We survived it — I genuinely didn't think we would. " +
+            "The drain is over. Whatever comes next, you've earned your place in this firm's history.");
+          return;
+        }
+        // Year-10 legacy easter egg takes priority
+        if (GameState._legacyRenameMsg) {
+          var nm = GameState._legacyRenameMsg;
+          GameState._legacyRenameMsg = null;
+          showJenkinsPopup("Jenkins — A Lasting Legacy",
+            "Boss... ten years at the helm. No one expected you to last this long. " +
+            "The board voted to rename one of our properties <strong>" + nm + "</strong> in your honor. " +
+            "They're already whispering your name in the same breath as the greats. Enjoy it — then back to work.");
+          return;
+        }
+        if (maybeShowTutorial()) return;
+        // Q4 dividend-target reminder (every year), then board warning
+        if (maybeShowDividendReminder()) return;
+        // Q4 board warning (max once/year): if a director is angry before the vote
+        maybeShowBoardWarning();
+      }, 1200);
+    }
+
+    showMacroEventPopup(qr.firedEvents, continueAfterEvents);
+  }
+
+  // Jenkins warns before the annual meeting if a director is turning hostile.
+  // Max once per year, only in Q4 (the meeting is imminent).
+  function maybeShowBoardWarning() {
+    if (GameState.meta.quarter !== 4) return;
+    if (GameState.meta.year < 2) return; // no vote after Year 1
+    if (GameState._boardWarnYear === GameState.meta.year) return;
+
+    var directors = GameState.board.directors; // array of {id, attitude}
+    if (!directors || !directors.length) return;
+
+    // Find the angriest director below the danger threshold
+    var worst = null;
+    directors.forEach(function(d) {
+      if (d.attitude < 3.8 && (!worst || d.attitude < worst.attitude)) worst = d;
+    });
+    if (!worst) return;
+
+    GameState._boardWarnYear = GameState.meta.year;
+
+    // Look up display info from the static directory
+    var info = (Board.DIRECTORS || []).find(function(x) { return x.id === worst.id; }) || {};
+    var dirName = info.name || "A director";
+
+    var body;
+    if (worst.id === "williams") {
+      var startDiv = GameState.board.startYearDividend || GameState.company.dividendPerShare;
+      var reqGrowth = GameState.board.williamsTargetGrowth || 0.10;
+      var target = fmt(startDiv * (1 + reqGrowth), 2);
+      body = "Boss, remember our promise to <strong>Chairman Williams</strong> — we pledged to lift the dividend about <strong>" + Math.round(reqGrowth*100) + "%</strong> this year, to <strong>$" + target + "/share</strong>. " +
+             "We're not there yet and he's losing patience. Raise it to that level before the vote and he'll come around — otherwise he may turn on us.";
+    } else {
+      body = "Boss, <strong>" + dirName + "</strong> is unhappy heading into the annual vote (watching " + (info.watches || "performance") + "). " +
+             "We've this quarter to improve things — address their concern, or spend political capital to smooth it over before the meeting.";
+    }
+    showJenkinsPopup("Jenkins — Board Warning", body);
+  }
+
+  // Q4 reminder of Williams' dividend target — fires every year in Q4 (Y2+)
+  // even if he's not yet hostile, so the player always knows the number to hit.
+  function maybeShowDividendReminder() {
+    if (GameState.meta.quarter !== 4 || GameState.meta.year < 2) return false;
+    if (GameState._divReminderYear === GameState.meta.year) return false;
+    var w = Board.getDirectorState ? Board.getDirectorState("williams") : null;
+    if (!w) return false;
+    GameState._divReminderYear = GameState.meta.year;
+    var startDiv = GameState.board.startYearDividend || GameState.company.dividendPerShare;
+    var reqGrowth = GameState.board.williamsTargetGrowth || 0.10;
+    var target = fmt(startDiv * (1 + reqGrowth), 2);
+    var actual = GameState.company.dividendPerShare;
+    if (actual >= target - 0.001) return false; // already met — no nag
+    showJenkinsPopup("Jenkins — Dividend Promise",
+      "Boss, you remember we promised Chairman Williams a <strong>" + Math.round(reqGrowth*100) + "%</strong> dividend hike this year — that means <strong>$" + target + "/share</strong>. " +
+      "We're at $" + fmt(actual, 2) + " right now. We should really deliver this before year-end, or he'll take it personally at the vote.");
+    return true;
+  }
+
+  // ----------------------------------------------------------
+  // GAME OVER
+  // ----------------------------------------------------------
+  function showGameOver() {
+    var o = el("gameover-overlay");
+    if (!o) return;
+    var won = GameState.meta.gameWon;
+    var titleEl = el("gameover-title");
+    var videoSlot = el("gameover-video-slot");
+
+    if (won) {
+      if (titleEl) { setText("gameover-title", "DIVINE STATUS"); titleEl.style.color = "#fbbf24"; }
+      // Build the victory video fresh and play it — only exists on a win.
+      if (videoSlot) {
+        videoSlot.innerHTML = '<video id="gameover-video" width="480" playsinline controls autoplay ' +
+          'style="max-width:90%;border-radius:8px;margin:0 auto 16px;display:block;">' +
+          '<source src="assets/victory.mp4" type="video/mp4"></video>';
+        var v = el("gameover-video");
+        if (v) { try { v.currentTime = 0; v.play().catch(function(){}); } catch (e) {} }
+      }
+    } else {
+      if (titleEl) { setText("gameover-title", "YOU'RE FIRED"); titleEl.style.color = ""; }
+      // No video on a firing — remove it from the DOM entirely.
+      if (videoSlot) videoSlot.innerHTML = "";
+    }
+
+    setText("gameover-reason",   GameState.meta.gameOverReason);
+    setText("gameover-quarters", "Survived " + GameState.meta.totalQuarters + " quarters (" + GameState.meta.year + " years)");
+    setText("gameover-ffo",      fmtPS(GameState.ratios.ffoPerShare));
+    setText("gameover-occ",      fmtPct(GameState.ratios.occupancyPortfolio));
+    setText("gameover-d2a",      fmtPct(GameState.ratios.debtToAssets));
+    setText("gameover-props",    GameState.portfolio.length + " properties");
+    var btn = el("btn-new-game");
+    if (btn) btn.textContent = won ? "Play Again" : "Try Again";
+    o.classList.remove("hidden");
+  }
+
+  // ----------------------------------------------------------
+  // NEW GAME
+  // ----------------------------------------------------------
+  function newGame() {
+    var ni = el("input-player-name");
+    var ri = el("input-reit-name");
+    var tut = el("input-tutorial");
+    var playerName = (ni && ni.value.trim()) ? ni.value.trim() : "CEO";
+    var reitName   = (ri && ri.value.trim()) ? ri.value.trim() : "My";
+
+    GameState.player.name     = playerName;
+    GameState.player.reitName = reitName;
+    GameState.company.name    = reitName + " REIT";
+
+    // Tutorial mode — Jenkins Year-1 guidance (default on)
+    GameState._tutorialEnabled = tut ? tut.checked : true;
+    GameState._tutorialShown   = {};
+
+    GameState.meta.quarter        = 1;
+    GameState.meta.year           = 1;
+    GameState.meta.totalQuarters  = 0;
+    GameState.meta.gameOver       = false;
+    GameState.meta.gameOverReason = "";
+    GameState.meta.gameWon = false;
+    GameState.meta.started        = true;
+    GameState.meta.tutorialYear   = true;
+
+    GameState.company.sharePrice          = 10.00;
+    GameState.company.sharesOutstanding   = 10;
+    GameState.company.marketCap           = 100;
+    GameState.company.dividendPerShare    = 0.05;
+    GameState.company.dividendHistory     = [];
+    GameState.company.dividendCutQuarters = 0;
+    GameState.company.equityIssuanceCount    = 0;
+    GameState.company.equityIssuanceYear     = 0;
+    GameState.company.equitySuppressQuarters = 0;
+    GameState.company.debtIssuanceQuarter    = 0;
+    GameState.board.acquisitionsThisYear     = 0;
+    GameState.board.leaseUpsThisYear         = 0;
+    GameState.board.noOverdraftBroken        = false;
+    GameState.board.noEquityBroken           = false;
+    GameState.board.politicalCapital         = 2;
+    GameState.board._capitalEarnedYear = 0;
+    GameState.board._lastEarnedCapital = [];
+    GameState.board._mandatesYear = 0;
+    GameState.board._cachedMandates = null;
+    GameState.board.activeMandates           = [];
+    Decisions.init();
+    GameState._lastTenantDistressYear = 0;
+    GameState.balance.cash                = 30;
+
+    GameState.debtTranches = [
+      { id: "d001", amount: 35, rate: 5.0, maturityQuarter: 2, maturityYear: 4, quartersUntilMaturity: 13, label: "5.0% Sr Notes due Y4Q2" },
+      { id: "d002", amount: 35, rate: 5.5, maturityQuarter: 4, maturityYear: 6, quartersUntilMaturity: 23, label: "5.5% Sr Notes due Y6Q4" },
+    ];
+
+    GameState.history         = [];
+    GameState.eventLog        = [];
+    GameState.annualSnapshots = [];
+    GameState._pendingOffer   = null;
+    GameState._pendingMegaFind = null;
+    GameState._lastMegaRollYear = 0;
+    GameState._lastBuyerFindYear = 0;
+    GameState.preferred = { outstanding:0, shares:0, parValue:25, dividendRate:0.05, issued:false };
+    GameState.balance.preferredEquity = 0;
+    GameState._preferredOffered = false;
+    GameState._privatePlacementUsed = false;
+    GameState._gaSurcharge = 0;
+    GameState._recurringPenalties = [];
+    GameState._eventLastFired = {};
+    GameState._lastDecisionQuarter = 0;
+    GameState._negEventCooldown = 0;
+    GameState._legacyRenamed = false;
+    GameState._legacyRenameMsg = null;
+    GameState.placemaking = { active:false, cost:0.85, traitActive:false, ownerRelations:false, ownerRelationsCost:0.40, esgActive:false, towerActive:false, towerQuarters:0, towerSpend:0, towerOverrun:false, towerTotalSpent:0, _towerDone:false };
+    GameState._placemakingJustJoined = false;
+    GameState._placemakingTraitJustFired = false;
+    GameState._ownerRelationsJustFired = false;
+    GameState._esgJustFired = false;
+    GameState._towerJustStarted = false;
+    GameState._towerOverrunJustFired = false;
+    GameState._towerJustFinished = false;
+    GameState._divReminderYear = 0;
+
+    Market.init();
+    // Store baseline cap rates for market conditions indicator
+    GameState.market.baselineCapRates = {
+      office:      (GameState.market.capRates.office.tier1 + GameState.market.capRates.office.tier2 + GameState.market.capRates.office.suburban) / 3,
+      industrial:  (GameState.market.capRates.industrial.tier1 + GameState.market.capRates.industrial.tier2 + GameState.market.capRates.industrial.suburban) / 3,
+      multifamily: (GameState.market.capRates.multifamily.tier1 + GameState.market.capRates.multifamily.tier2 + GameState.market.capRates.multifamily.suburban) / 3,
+      retail:      (GameState.market.capRates.retail.tier1 + GameState.market.capRates.retail.tier2 + GameState.market.capRates.retail.suburban) / 3,
+    };
+    Properties.init();
+    Board.init();
+    Staff.init();
+    if (typeof News !== "undefined") News.init();
+    Events.init();
+    Financials.init();
+    Charts.init();
+
+    var overlayIds = ["gameover-overlay", "start-overlay", "annual-report-overlay", "help-overlay"];
+    overlayIds.forEach(function(id) {
+      var o = el(id); if (o) o.classList.add("hidden");
+    });
+
+    renderAll();
+    Leaderboard.renderLeaderboard("leaderboard-container");
+    setTimeout(function() {
+      showModal(
+        "Letter from the Board of Directors",
+        "Dear " + playerName + ",\n\n" +
+        "The Board is pleased to appoint you Chief Executive Officer of " + reitName + " REIT. Your mandate is simple to state and hard to achieve: lead this company for fifteen years. Survive that long and you retire a legend.\n\n" +
+        "YEAR 1 — ORIENTATION\n" +
+        "You cannot be fired this year. Use it to learn the controls.\n\n" +
+        "HOW THE BUSINESS WORKS\n" +
+        "▸ DEBT — Borrow to grow. You can take secured loans against your properties; a REIT that hoards cash is just a savings account.\n" +
+        "▸ PROPERTIES — Acquire buildings that yield more than your borrowing costs. That spread is how you make money.\n" +
+        "▸ DIVIDENDS — Pay shareholders from your cash flow, and raise the dividend as you grow. The board cares about this.\n" +
+        "▸ BOARD MEETINGS — Each year the directors vote on your future. Keep enough of them content or you're out. Each one cares about something different.\n" +
+        "▸ STAFF — Hire department heads to unlock capabilities: an Acquisitions Lead finds better deals, a CFO opens new financing, an Asset Manager improves occupancy, and more.\n\n" +
+        "Press F1 anytime for help on the financial ratios and mechanics.\n\n" +
+        "Lead well, " + playerName + ". The board does not reward caution — it rewards results.\n\n" +
+        "— The Board of Directors",
+        [{ label: "Begin", style: "btn-primary", onClick: function() {
+          // After the welcome letter, Jenkins gives the first tutorial beat
+          setTimeout(maybeShowTutorial, 350);
+        }}]
+      );
+    }, 400);
+  }
+
+  // ----------------------------------------------------------
+  // INIT
+  // ----------------------------------------------------------
+  function init() {
+    var buttons = {
+      "btn-advance-quarter": advanceQuarter,
+      "btn-new-game":        newGame,
+      "btn-new-game-go":     newGame,
+      "btn-issue-debt":      handleIssueDebt,
+      "btn-issue-equity":    handleIssueEquity,
+      "btn-buyback":         handleBuyback,
+      "btn-set-dividend":    handleSetDividend,
+      "btn-div-10":          function() { handleDividendQuickRaise(10); },
+      "btn-div-20":          function() { handleDividendQuickRaise(20); },
+      "btn-div-50":          function() { handleDividendQuickRaise(50); },
+      "btn-redeem-preferred": handleRedeemPreferred,
+      "btn-help":            showHelp,
+      "btn-help-close":      closeHelp,
+    };
+    Object.keys(buttons).forEach(function(id) {
+      var btn = el(id);
+      if (btn) btn.addEventListener("click", buttons[id]);
+    });
+
+    document.addEventListener("keydown", function(e) {
+      if (e.key === "F1")     { e.preventDefault(); showHelp(); }
+      if (e.key === "Escape") { closeHelp(); closeModal(); }
+    });
+
+    var mo = el("modal-overlay");
+    if (mo) mo.addEventListener("click", function(e) { if (e.target === mo) closeModal(); });
+    var ho = el("help-overlay");
+    if (ho) ho.addEventListener("click", function(e) { if (e.target === ho) closeHelp(); });
+
+    Charts.init();
+
+    var so = el("start-overlay");
+    if (so) so.classList.remove("hidden");
+
+    Leaderboard.renderLeaderboard("leaderboard-container");
+  }
+
+  // ----------------------------------------------------------
+  // PUBLIC API
+  // ----------------------------------------------------------
+  return {
+    init:                init,
+    newGame:             newGame,
+    renderAll:           renderAll,
+    showModal:           showModal,
+    closeModal:          closeModal,
+    showToast:           showToast,
+    showGameOver:        showGameOver,
+    advanceQuarter:      advanceQuarter,
+    showAnnualReport:    showAnnualReport,
+    closeAnnualReport:   closeAnnualReport,
+    showHelp:            showHelp,
+    closeHelp:           closeHelp,
+    switchHelpTab:       switchHelpTab,
+    confirmBuyProperty:  confirmBuyProperty,
+    confirmSellProperty: confirmSellProperty,
+    confirmRetireDebt:   confirmRetireDebt,
+    handleIssueDebt:     handleIssueDebt,
+    handleIssueEquity:   handleIssueEquity,
+    handleBuyback:       handleBuyback,
+    handleRedeemPreferred: handleRedeemPreferred,
+    handleSetDividend:   handleSetDividend,
+    leaseUp:             leaseUp,
+    confirmRenovate:     confirmRenovate,
+    confirmReposition:   confirmReposition,
+    hireStaff:           hireStaff,
+    fireStaff:           fireStaff,
+    makeDecision:        makeDecision,
+    showBoardMeeting:    showBoardMeeting,
+    boardResponse:       boardResponse,
+    backroomDeal:        backroomDeal,
+    closeBoardMeeting:   closeBoardMeeting,
+  };
+
+}());
+
+document.addEventListener("DOMContentLoaded", UI.init);
