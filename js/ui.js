@@ -1545,12 +1545,31 @@ window.UI = (function() {
         ? '<span class="cost-badge cost-capital">💡 ' + (c.cost||1) + ' Capital</span>'
         : c.costType === "cash"
         ? '<span class="cost-badge cost-cash">💰 Cash</span>'
-        : '<span class="cost-badge cost-income">📉 Income</span>';
+        : c.costType === "income"
+        ? '<span class="cost-badge cost-income">📉 Income</span>'
+        : '';
 
-      html += '<div class="decision-choice" onclick="UI.makeDecision(' + i + ')">' +
-        '<div class="choice-label">' + c.label + costBadge + '</div>' +
-        '<div class="choice-detail">' + c.detail.replace(/\n/g,"<br>") + '</div>' +
-        '</div>';
+      // Determine availability: capital cost and any custom check() must pass.
+      var available = true, reason = "";
+      if (c.costType === "capital" && (GameState.board.politicalCapital||0) < (c.cost||1)) {
+        available = false; reason = "Need " + (c.cost||1) + " political capital (you have " + (GameState.board.politicalCapital||0) + ")";
+      }
+      if (available && typeof c.check === "function" && !c.check()) {
+        available = false; reason = c.checkMsg || "Not available right now";
+      }
+
+      if (available) {
+        html += '<div class="decision-choice" onclick="UI.makeDecision(' + i + ')">' +
+          '<div class="choice-label">' + c.label + costBadge + '</div>' +
+          '<div class="choice-detail">' + c.detail.replace(/\n/g,"<br>") + '</div>' +
+          '</div>';
+      } else {
+        html += '<div class="decision-choice decision-choice-disabled" title="' + reason + '">' +
+          '<div class="choice-label">' + c.label + costBadge + '</div>' +
+          '<div class="choice-detail">' + c.detail.replace(/\n/g,"<br>") + '</div>' +
+          '<div class="choice-unavailable">🔒 ' + reason + '</div>' +
+          '</div>';
+      }
     });
 
     html += '</div>' +
