@@ -597,166 +597,207 @@ input::placeholder { color:var(--text-muted); }
 .choice-unavailable { font-size:11px; color:var(--red); margin-top:4px; font-weight:600; }
 
 /* ============================================================
-   MOBILE OPTIMISATION — phones up to 480px
-   Priorities: no horizontal scroll, no iOS zoom, board meeting fits
+   MOBILE — phones ≤640px
+   Key rules:
+   1. No horizontal scroll — NOTHING overflows the viewport
+   2. Tab bar wraps into 2 rows (no horizontal scroll on tabs)
+   3. Board meeting portraits scale down to fit 5 across
+   4. Advance Quarter button sticks to bottom
+   5. iOS font-size fix already applied above (input = 16px)
    ============================================================ */
 
-/* ---- PREVENT HORIZONTAL OVERFLOW EVERYWHERE ---- */
-@media (max-width:480px) {
-  html, body { overflow-x:hidden; }
-  * { max-width:100%; box-sizing:border-box; }
+/* ---- GLOBAL OVERFLOW GUARD ---- */
+@media (max-width:640px) {
+  html { overflow-x:hidden; }
+  body { overflow-x:hidden; }
+  #app { overflow-x:hidden; }
+}
 
-  /* ---- HEADER ---- */
-  #header { padding:8px 12px; }
-  .header-company { font-size:14px; }
-  .header-stats { gap:6px; }
-  .hdr-stat-value { font-size:13px; }
+/* ---- HEADER (≤640px) ---- */
+@media (max-width:640px) {
+  #header { padding:8px 10px; }
+  .header-company { font-size:13px; }
+  .header-top { gap:8px; }
+  .header-stats { gap:5px 8px; }
+  .hdr-stat-value { font-size:12px; }
   .hdr-stat-label { font-size:9px; }
-
-  /* Hide less-critical header stats on tiny screens, keep Share Price + Cash + Dividend */
-  /* We can't hide by index easily without JS so we shrink them all equally */
-  .board-pressure-wrap { margin-top:6px; flex-wrap:wrap; gap:6px; }
+  /* Hide lower-priority header stats to keep it from wrapping badly */
+  /* Keep: Period, Share Price, Rating, Borrow At, Help btn */
+  #hdr-marketcap { display:none; }
+  #hdr-cycle     { display:none; }
+  #hdr-rate      { display:none; }
+  .board-pressure-wrap { margin-top:5px; gap:6px; }
   .pressure-track { max-width:none; flex:1; }
+}
 
-  /* ---- MAIN LAYOUT ---- */
-  #main { padding:8px; gap:10px; }
+/* ---- MAIN GRID (already 1-col at 1100px, this tightens padding) ---- */
+@media (max-width:640px) {
+  #main { padding:8px; gap:8px; }
+}
 
-  /* ---- TABS ---- */
-  .section-tab-bar { flex-wrap:nowrap; overflow-x:auto; -webkit-overflow-scrolling:touch; padding:4px 4px 0; gap:2px; }
-  .section-tab-btn { padding:10px 14px; font-size:12px; white-space:nowrap; flex-shrink:0; }
+/* ================================================================
+   TABS — THE MAIN BUG FIX
+   Problem: flex-wrap:nowrap + overflow-x:auto means tabs scroll
+   off screen and can't be reached.
+   Solution: wrap into 2 rows. Each tab takes ~half width.
+   ================================================================ */
+@media (max-width:640px) {
+  .section-tab-bar {
+    flex-wrap: wrap;          /* allow second row */
+    overflow-x: visible;      /* no horizontal scroll */
+    padding: 4px 4px 0;
+    gap: 3px;
+  }
+  .section-tab-btn {
+    flex: 1 1 auto;           /* each tab grows to fill its row share */
+    min-width: 0;
+    padding: 9px 8px;
+    font-size: 11px;
+    white-space: nowrap;
+    text-align: center;
+    /* 5 tabs → roughly 2+3 or 2+2+1 depending on labels */
+  }
+  /* Capital Actions tab — it's wider because of the emoji, let it take full row */
+  .section-tab-btn.tab-emphasis {
+    flex: 1 1 100%;
+  }
+}
 
-  /* ---- PANELS ---- */
-  .panel-body { padding:10px 12px; }
+/* ---- PANELS (≤480px) ---- */
+@media (max-width:480px) {
+  .panel-body { padding:10px; }
 
-  /* ---- P&L TABLE ---- */
-  .pnl-table { font-size:12px; }
+  /* P&L */
+  .pnl-table { font-size:11px; }
 
-  /* ---- CAPITAL ACTIONS ---- */
-  .actions-grid { padding:10px; gap:10px; }
-  .action-group { padding:10px; }
-  .input-row { flex-wrap:wrap; gap:6px; }
-  .input-row .btn { width:100%; }
-  .dividend-quick-row { flex-wrap:wrap; gap:4px; }
-
-  /* ---- PROPERTY CARDS ---- */
-  .prop-stats { grid-template-columns:1fr; gap:2px; }
-
-  /* ---- CHARTS ---- */
-  .chart-wrap canvas { height:160px; }
-
-  /* ---- BUTTONS ---- */
-  .btn { font-size:12px; padding:8px 12px; }
-  .btn-lg { font-size:14px; padding:12px 20px; }
-  #btn-advance-quarter { padding:14px; font-size:14px; }
-
-  /* ---- MODAL ---- */
-  #modal-overlay { padding:12px; align-items:flex-end; }
-  .modal-box { padding:18px; border-radius:var(--radius) var(--radius) 0 0; max-height:85vh; overflow-y:auto; }
-  #modal-actions { flex-direction:column; }
-  #modal-actions .btn { width:100%; }
-
-  /* ---- TOAST ---- */
-  #toast-container { bottom:12px; right:12px; left:12px; }
-  .toast { max-width:none; }
-
-  /* ---- DECISION EVENTS ---- */
-  .bm-response-buttons { flex-direction:column; }
-  .bm-btn { min-width:0; width:100%; }
-
-  /* ---- START SCREEN ---- */
-  #start-overlay { padding:12px; }
-  .start-logo { font-size:28px; }
-  .start-setup { padding:14px 16px; }
-  .start-cols { gap:12px; }
-
-  /* ---- GAMEOVER ---- */
-  .gameover-title { font-size:26px; }
-  .gameover-stats { grid-template-columns:1fr 1fr; }
-  #gameover-overlay { padding:20px; gap:14px; }
-  .gameover-letter { padding:14px 16px; }
-
-  /* ---- ANNUAL REPORT ---- */
-  .annual-report-box { padding:16px; }
-  .ar-header { margin-bottom:16px; padding-bottom:14px; }
-
-  /* ---- STAFF CARDS ---- */
-  .candidate-card { flex-direction:column; }
-  .candidate-portrait { width:48px; height:48px; }
-
-  /* ---- NEWS TERMINAL ---- */
-  .news-feed { max-height:180px; }
-
-  /* ---- HELP OVERLAY ---- */
-  .help-box { max-height:90vh; }
-  .help-tab-bar { overflow-x:auto; flex-wrap:nowrap; -webkit-overflow-scrolling:touch; }
-  .help-tab-btn { white-space:nowrap; flex-shrink:0; }
-
-  /* ---- GLOSSARY ---- */
-  .gl-item { grid-template-columns:80px 1fr; }
-
-  /* ---- LEADERBOARD ---- */
-  .lb-table { font-size:10px; }
-  .lb-name, .lb-reit { max-width:80px; }
-
-  /* ---- BS GRID ---- */
+  /* Balance sheet */
   .bs-grid { grid-template-columns:1fr 1fr; }
   .bs-value { font-size:13px; }
 
-  /* ---- RATIOS ---- */
+  /* Ratios */
   .ratios-grid { grid-template-columns:1fr; }
 
-  /* ==== BOARD MEETING — biggest mobile problem ==== */
-  .bm-container { width:100vw; max-height:100dvh; border-radius:0; overflow-y:auto; }
+  /* Property cards */
+  .prop-stats { grid-template-columns:1fr; gap:2px; }
 
-  /* Shrink the room image height so it doesn't eat the whole screen */
-  .bm-room { height:220px; max-height:220px; padding:8px; }
+  /* Charts */
+  .charts-grid { grid-template-columns:1fr; }
+  .chart-wrap.chart-wide { grid-column:span 1; }
+  .chart-wrap canvas { height:150px; }
 
-  /* Scale portraits down — 5 directors × smaller = fits in ~360px */
-  .bm-portrait-wrap { width:58px; height:70px; }
-  .bm-portrait {
-    width:58px;
-    height:70px;
-    /* sprite sheet is 440px wide for 110px cols → scale to 232px for 58px cols */
-    background-size:232px 70px;
-  }
-  .bm-dir-name { font-size:7px; }
-  .bm-dir-stars { font-size:9px; }
-  .bm-directors-row { gap:2px; padding:0 4px; }
+  /* Capital actions */
+  .actions-grid { grid-template-columns:1fr; padding:10px; gap:10px; }
+  .action-group { padding:10px; }
+  .input-row { flex-wrap:wrap; gap:6px; }
+  .dividend-quick-row { flex-wrap:wrap; gap:4px; }
 
-  /* Dialogue fits below the room */
-  .bm-dialogue { padding:12px 14px; gap:10px; min-height:auto; }
-  .bm-speech-box { padding:10px 12px; min-height:60px; }
+  /* Staff candidates */
+  .candidate-card { flex-direction:column; }
+  .candidate-portrait { width:48px; height:48px; }
 
-  /* Vote grid — 5 cols is tight, allow 2-col wrap */
-  .bm-vote-grid { grid-template-columns:repeat(3,1fr); gap:6px; }
+  /* News */
+  .news-feed { max-height:160px; }
 
-  /* Board attitudes panel */
-  .ba-name { min-width:80px; }
+  /* Annual report */
+  .annual-report-box { padding:14px; }
+  .ar-grid { grid-template-columns:1fr; }
 
-  /* Advance button — make it sticky at bottom on mobile */
+  /* Gameover */
+  #gameover-overlay { padding:20px; gap:14px; }
+  .gameover-title { font-size:24px; }
+  .gameover-stats { grid-template-columns:1fr 1fr; }
+  .gameover-letter { padding:14px; }
+
+  /* Help overlay */
+  .help-tab-bar { flex-wrap:wrap; overflow-x:visible; }
+  .help-tab-btn { flex:1 1 auto; min-width:0; font-size:11px; padding:8px 10px; white-space:nowrap; text-align:center; }
+
+  /* Glossary */
+  .gl-item { grid-template-columns:70px 1fr; }
+
+  /* Start screen */
+  #start-overlay { padding:12px; }
+  .start-logo { font-size:26px; }
+  .start-cols { grid-template-columns:1fr; }
+  .start-setup { padding:14px; }
+}
+
+/* ---- BUTTONS (≤480px) ---- */
+@media (max-width:480px) {
+  .btn { font-size:12px; }
+  /* Full-width modal buttons */
+  #modal-actions { flex-direction:column; }
+  #modal-actions .btn { width:100%; }
+  /* Modal from bottom */
+  #modal-overlay { padding:0; align-items:flex-end; }
+  .modal-box { border-radius:var(--radius) var(--radius) 0 0; max-height:85vh; overflow-y:auto; padding:18px; }
+  /* Toast full-width */
+  #toast-container { bottom:0; right:0; left:0; padding:0 8px 8px; }
+  .toast { max-width:none; }
+  /* Decision response buttons */
+  .bm-response-buttons { flex-direction:column; }
+  .bm-btn { min-width:0; width:100%; }
+}
+
+/* ---- ADVANCE BUTTON sticky at bottom on mobile ---- */
+@media (max-width:640px) {
   #btn-advance-quarter {
-    position:sticky;
-    bottom:0;
-    z-index:50;
-    border-radius:0;
-    margin:0 -8px;
-    width:calc(100% + 16px);
-    box-shadow:0 -4px 16px rgba(0,0,0,0.4);
+    position: sticky;
+    bottom: 0;
+    z-index: 50;
+    border-radius: 0;
+    /* compensate for #main padding so it touches screen edges */
+    margin-left: -8px;
+    margin-right: -8px;
+    width: calc(100% + 16px);
+    box-shadow: 0 -4px 16px rgba(0,0,0,0.5);
   }
 }
 
-/* ---- Slightly larger phones (481–640px) ---- */
-@media (min-width:481px) and (max-width:640px) {
-  #header { padding:10px 16px; }
-  #main { padding:10px; gap:10px; }
-  .bm-container { width:100vw; }
-  .bm-room { height:300px; max-height:300px; }
-  .bm-portrait-wrap { width:80px; height:96px; }
-  .bm-portrait { width:80px; height:96px; background-size:320px 96px; }
-  .section-tab-btn { padding:10px 16px; font-size:12px; }
+/* ================================================================
+   BOARD MEETING — scale portraits to fit 5 across on any phone
+   Original: 110px × 5 = 550px minimum → breaks on every phone
+   Fix at ≤480px: 58px × 5 = 290px → fits on 320px+
+   Fix at 481-640px: 76px × 5 = 380px → fits on 400px+
+   Sprite sheet is 440px wide (110px per column), so scale accordingly
+   ================================================================ */
+@media (max-width:480px) {
+  .bm-container {
+    width: 100vw;
+    border-radius: 0;
+    max-height: 100dvh;
+    overflow-y: auto;
+  }
+  .bm-room { height:200px; max-height:200px; padding:6px; }
+  .bm-directors-row { gap:2px; padding:0 4px; }
+  .bm-portrait-wrap { width:54px; height:64px; }
+  .bm-portrait {
+    width:54px; height:64px;
+    /* scale: 54/110 = 0.4909 → sheet: 440×0.4909=216px, h: 130×0.4909=64px */
+    background-size:216px 64px;
+  }
+  .bm-dir-name  { font-size:7px; }
+  .bm-dir-stars { font-size:8px; }
+  .bm-dialogue  { padding:10px 12px; gap:8px; min-height:auto; }
+  .bm-speech-box { padding:10px 12px; min-height:50px; }
+  /* Vote grid: 5 cols too tight → wrap to 3+2 */
+  .bm-vote-grid { grid-template-columns:repeat(3,1fr); gap:6px; }
 }
 
-/* ---- iOS input zoom kill — applied globally, not just mobile ---- */
-/* font-size already set to 16px on inputs above (line ~199).          */
-/* This catches any remaining select elements.                          */
-select { font-size:16px; }
+@media (min-width:481px) and (max-width:640px) {
+  .bm-container { width:100vw; border-radius:0; }
+  .bm-room { height:280px; max-height:280px; }
+  .bm-portrait-wrap { width:76px; height:90px; }
+  .bm-portrait {
+    width:76px; height:90px;
+    /* scale: 76/110 = 0.6909 → sheet: 440×0.6909=304px, h: 130×0.6909=90px */
+    background-size:304px 90px;
+  }
+  .bm-dir-name  { font-size:8px; }
+  .bm-dir-stars { font-size:9px; }
+}
+
+/* select elements also get font-size 16px to prevent iOS zoom */
+@media (max-width:640px) {
+  select { font-size:16px; }
+}
