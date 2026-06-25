@@ -48,7 +48,7 @@ window.GameState = {
   // BALANCE SHEET (rebalanced starting position)
   // ----------------------------------------------------------
   balance: {
-    cash:         30,     // dry powder for early moves, while still incentivizing debt
+    cash:         35,     // dry powder for early moves; cushions the new G&A floor + transaction fees
     totalAssets:  0,      // calculated on init
     totalDebt:    70,     // two tranches of $35M each (lower starting leverage)
     totalEquity:  0,      // calculated on init (common equity)
