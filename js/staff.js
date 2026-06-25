@@ -82,10 +82,10 @@ window.Staff = (function() {
     operations: {
       id:        "operations",
       title:     "Head of Operations",
-      blurb:     "Unlocks preventive maintenance. Reduces G&A and capex.",
+      blurb:     "Preventive maintenance cuts capex and trims G&A. Worth more as you scale.",
       salaryMin: 0.2,
       salaryMax: 0.5,
-      unlocks:   "Preventive maintenance + lower G&A/capex",
+      unlocks:   "Lower capex reserve + lower G&A (preventive maintenance)",
       candidateNames: ["Laura Simmons", "Hassan Ali", "Greg Thornton", "Mei Lin"],
       hints: [
         "Relentless cost controller.",
@@ -313,6 +313,13 @@ window.Staff = (function() {
 
     if (typeof News !== "undefined" && News.staffHired) {
       News.staffHired(candidate.name, candidate.title);
+    }
+
+    // A Head of IR pleases Petrova (the share-price / shareholder-value
+    // director) — a polished investor story reassures the market.
+    if (candidate.roleId === "ir" && typeof Board !== "undefined" && Board.getDirectorState) {
+      var pe = Board.getDirectorState("petrova");
+      if (pe) pe.attitude = Math.min(10, fmt(pe.attitude + 0.75, 2));
     }
 
     return { success: true, message: candidate.name + " hired as " + candidate.title + " at $" + candidate.salary + "M/quarter." };
