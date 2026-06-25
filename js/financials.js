@@ -16,9 +16,9 @@ window.Financials = (() => {
   // ----------------------------------------------------------
   // CONSTANTS
   // ----------------------------------------------------------
-  const OPEX_RATIO        = 0.31;  // Operating expenses as % of GPR (trimmed for breathing room)
+  const OPEX_RATIO        = 0.30;  // Operating expenses as % of GPR (trimmed to offset new G&A floor)
   const DEPRECIATION_RATE = 0.020; // Annual depreciation as % of asset value
-  const GA_BASE           = 0.0;   // Fixed G&A per quarter $M (trimmed)
+  const GA_BASE           = 0.4;   // Fixed G&A per quarter $M — realistic public-company overhead floor
   const GA_PORTFOLIO_PCT  = 0.003; // Additional G&A per $M of portfolio value
   const CAPEX_RESERVE_PCT = 0.005; // Annual normalized capex reserve as % of asset value
 
@@ -153,7 +153,18 @@ window.Financials = (() => {
     const totalAssetValue = GameState.portfolio.reduce(
       (sum, p) => sum + p.currentValue, 0
     );
-    return fmt(totalAssetValue * (CAPEX_RESERVE_PCT / 4));
+    let capex = totalAssetValue * (CAPEX_RESERVE_PCT / 4);
+
+    // Head of Operations — preventive maintenance genuinely lowers capex
+    // (fewer emergency repairs). Reduction scales with skill (8-18%). This
+    // benefit grows with portfolio size, so the role earns its keep more the
+    // bigger you get — without being game-changing.
+    if (typeof Staff !== "undefined" && Staff.hasRole("operations")) {
+      const capexReduction = 0.08 + Staff.skillFactor("operations") * 0.10; // 8-18%
+      capex = capex * (1 - capexReduction);
+    }
+
+    return fmt(capex);
   }
 
   // ----------------------------------------------------------
@@ -396,9 +407,11 @@ window.Financials = (() => {
     var rate      = GameState.market.baseInterestRate || 2.5;
 
     // Base band shifts with rates: the healthy (low) end tracks risk-free + a
-    // REIT risk premium. At 2.5% rates, healthy ~5%; at 6% rates, healthy ~8.5%.
-    var healthyYield   = rate + 2.5;   // premium end of the band
-    var distressYield  = rate + 7.0;   // distressed end of the band
+    // REIT risk premium. A Head of IR tightens the band by 1% (better guidance,
+    // institutional trust) → lower required yield → higher fair price.
+    var irBonus = (typeof Staff !== "undefined" && Staff.hasRole("ir")) ? 1.0 : 0;
+    var healthyYield   = rate + 2.5 - irBonus;   // premium end of the band
+    var distressYield  = rate + 7.0 - irBonus;   // distressed end of the band
 
     // Position within the band (0 = healthy/premium, 1 = distressed) driven by
     // operational quality: AFFO, dividend coverage, leverage, credit rating.
