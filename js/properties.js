@@ -288,16 +288,29 @@ window.Properties = (() => {
   // BUY a property from the market
   // Returns { success: bool, message: string }
   // ----------------------------------------------------------
+  // Transaction fee on any acquisition/disposition (legal, brokerage, closing
+  // costs). ~1% of price; an Acquisitions Lead cuts it roughly in half through
+  // relationships and off-market sourcing.
+  function transactionFee(price) {
+    var rate = 0.01;
+    if (typeof Staff !== "undefined" && Staff.hasRole("acquisitions")) {
+      rate = 0.01 * (0.5 - Staff.skillFactor("acquisitions") * 0.1); // ~0.4-0.5% with a lead
+    }
+    return Math.round(price * rate * 10) / 10;
+  }
+
   function buyProperty(propertyId) {
     const idx = GameState.propertyMarket.findIndex(p => p.id === propertyId);
     if (idx === -1) return { success: false, message: "Property not found in market." };
 
     const prop = GameState.propertyMarket[idx];
+    const fee  = transactionFee(prop.askingPrice);
+    const totalCost = Math.round((prop.askingPrice + fee) * 10) / 10;
 
-    if (GameState.balance.cash < prop.askingPrice) {
+    if (GameState.balance.cash < totalCost) {
       return {
         success: false,
-        message: `Insufficient cash. Need $${prop.askingPrice}M, have $${GameState.balance.cash}M.`
+        message: `Insufficient cash. Need $${totalCost}M (incl. $${fee}M fees), have $${GameState.balance.cash}M.`
       };
     }
 
@@ -307,7 +320,7 @@ window.Properties = (() => {
     prop.askingPrice = null;
     prop.daysOnMarket = null;
 
-    GameState.balance.cash -= prop.purchasePrice;
+    GameState.balance.cash = Math.round((GameState.balance.cash - totalCost) * 10) / 10;
     GameState.portfolio.push(prop);
     GameState.propertyMarket.splice(idx, 1);
 
@@ -320,7 +333,7 @@ window.Properties = (() => {
 
     return {
       success: true,
-      message: `Acquired ${prop.name} for $${prop.purchasePrice}M.`
+      message: `Acquired ${prop.name} for $${prop.purchasePrice}M (+ $${fee}M transaction fees).`
     };
   }
 
@@ -342,9 +355,11 @@ window.Properties = (() => {
                    : cycle === "recession" ? 0.93
                    : 1.00;
     const salePrice = Math.round(prop.currentValue * cycleMod * randBetween(0.97, 1.02) * 10) / 10;
-    const gain = Math.round((salePrice - prop.purchasePrice) * 10) / 10;
+    const fee = transactionFee(salePrice);
+    const netProceeds = Math.round((salePrice - fee) * 10) / 10;
+    const gain = Math.round((netProceeds - prop.purchasePrice) * 10) / 10;
 
-    GameState.balance.cash += salePrice;
+    GameState.balance.cash = Math.round((GameState.balance.cash + netProceeds) * 10) / 10;
     GameState.portfolio.splice(idx, 1);
 
     if (typeof News !== "undefined" && News.propertySold) {
@@ -353,7 +368,7 @@ window.Properties = (() => {
 
     return {
       success: true,
-      message: `Sold ${prop.name} for $${salePrice}M (${gain >= 0 ? "+" : ""}$${gain}M vs cost).`,
+      message: `Sold ${prop.name} for $${salePrice}M (− $${fee}M fees = $${netProceeds}M net; ${gain >= 0 ? "+" : ""}$${gain}M vs cost).`,
       salePrice,
       gain,
     };
