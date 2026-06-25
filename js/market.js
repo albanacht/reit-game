@@ -197,6 +197,7 @@ window.Market = (() => {
     // The Fed moves in discrete 0.25% steps, not every quarter (every 2-3
     // quarters typically), upward-biased to make long games progressively
     // harder — with rare surprise shocks and occasional relief cuts.
+    var prevBaseRate = market.baseInterestRate; // snapshot for cap-rate linkage
     if (market.rateHoldQuarters === undefined) market.rateHoldQuarters = 2;
     market.rateHoldQuarters -= 1;
 
@@ -236,8 +237,15 @@ window.Market = (() => {
     }
     market.rateDirection = cycleDef.rateDirection;
 
-    // Apply cap rate drift to all sector/location combos
-    const capDelta = cycleDef.capRateDelta + randBetween(-0.02, 0.02);
+    // ── Cap rates now FOLLOW the base rate (the real-world relationship) ──
+    // When the central bank raises rates, investors demand higher yields on
+    // property too → cap rates rise → values fall. When rates fall, cap rates
+    // compress → values rise. The base-rate move this quarter is the dominant
+    // driver; a small cycle component + noise keeps some independent texture.
+    var baseRateMove = market.baseInterestRate - prevBaseRate; // + = rates rose
+    var ratePass     = baseRateMove * 0.6;        // ~60% of the rate move passes into cap rates
+    var cycleComponent = cycleDef.capRateDelta * 0.35; // small residual cycle mood
+    const capDelta = ratePass + cycleComponent + randBetween(-0.02, 0.02);
     const sectors = ["office", "industrial", "multifamily", "retail"];
     const locations = ["tier1", "tier2", "suburban"];
 
@@ -259,6 +267,16 @@ window.Market = (() => {
         ) / 100;
       });
     });
+
+    // Explanatory note when rates moved meaningfully — teaches the player that
+    // rate changes ripple into property values.
+    if (typeof News !== "undefined" && News.add && Math.abs(baseRateMove) >= 0.15) {
+      if (baseRateMove > 0) {
+        News.add("Higher rates lift cap rates across the market — property values come under pressure.", "rating", "bad");
+      } else {
+        News.add("Falling rates compress cap rates — property values get a tailwind.", "rating", "good");
+      }
+    }
 
     // Transition to next cycle if time is up
     if (market.cycleQuartersRemaining <= 0) {
